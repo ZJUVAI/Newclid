@@ -827,132 +827,203 @@ def audit_generation_quality(
     ]
 
     if plan:
-        coordinate_candidates = coordinate_candidates or []
-        unmatched_relations = [
-            relation
-            for relation in plan.get("coordinate_relations", [])
-            if not any(coordinate_relation_matches_candidate(relation, candidate) for candidate in coordinate_candidates)
-        ]
-        if unmatched_relations:
-            issues.append("coordinate_relations_unmatched:" + " | ".join(unmatched_relations))
-        direct_relations = plan.get("aux_direct_relations") or plan.get("verification_chain") or [""]
-        ok, message = validate_aux_step_scope(direct_relations[0], aux_part, visible_points)
-        if not ok:
-            issues.append(message)
-        bridge_relations = flatten_bridge_relations(plan)
-        if not bridge_relations:
-            issues.append("missing_bridge_relations")
-        write_output = generation.get("write_output") or ""
-        coordinate_relations = [
-            relation
-            for relation in plan.get("coordinate_relations", [])
-            if isinstance(relation, str) and relation.strip()
-        ]
-        coverage_targets = plan.get("coverage_targets", {}) if isinstance(plan.get("coverage_targets"), dict) else {}
-        anchor_points = {
-            point.lower()
-            for point in (plan.get("anchor_points") or [])
-            if isinstance(point, str) and point.strip()
-        }
-        non_anchor_coordinate_points = []
-        for relation in coordinate_relations:
-            for point in extract_point_mentions(relation, visible_points):
-                point = point.lower()
-                if point in anchor_points or point in non_anchor_coordinate_points:
-                    continue
-                non_anchor_coordinate_points.append(point)
-        coordinate_focus_relations = [
-            relation
-            for relation in (coverage_targets.get("coordinate_focus_relations") or coordinate_relations)
-            if isinstance(relation, str) and relation.strip()
-        ]
-        observation_focus_relations = [
-            relation
-            for relation in (coverage_targets.get("observation_focus_relations") or [])
-            if isinstance(relation, str) and relation.strip()
-        ]
-        if not observation_focus_relations:
-            for observation in plan.get("observation_relations", []) or []:
-                if not isinstance(observation, dict):
-                    continue
-                relation = observation.get("relation")
-                if isinstance(relation, str) and relation.strip() and relation not in observation_focus_relations:
-                    observation_focus_relations.append(relation.strip())
-        coordinate_reuse_min = int(coverage_targets.get("coordinate_reuse_min") or (1 if coordinate_relations else 0))
-        early_coordinate_reuse_min = int(coverage_targets.get("early_coordinate_reuse_min") or 0)
-        observation_relation_mentions = (
-            count_relation_mentions(write_output, observation_focus_relations, point_names=visible_points)
-            if write_output and observation_focus_relations else 0
-        )
-        coordinate_relation_mentions = (
-            count_relation_mentions(write_output, coordinate_relations, point_names=visible_points)
-            if write_output and coordinate_relations else 0
-        )
-        mentioned_coordinate_points = (
-            extract_point_mentions(write_output, non_anchor_coordinate_points)
-            if write_output and non_anchor_coordinate_points else set()
-        )
-        if observation_focus_relations and observation_relation_mentions == 0:
-            issues.append("observation_cues_not_reused_in_body")
-        if coordinate_relations and coordinate_relation_mentions == 0:
-            issues.append("coordinate_cues_not_reused_in_body")
-        elif coordinate_relations and coordinate_relation_mentions < coordinate_reuse_min:
-            issues.append(
-                f"coordinate_cue_reuse_too_shallow:{coordinate_relation_mentions}/{coordinate_reuse_min}"
+        if plan.get("dossier_version") == "dossier_v1":
+            coordinate_candidates = coordinate_candidates or []
+            unmatched_relations = [
+                relation
+                for relation in plan.get("coordinate_relations", [])
+                if not any(coordinate_relation_matches_candidate(relation, candidate) for candidate in coordinate_candidates)
+            ]
+            if unmatched_relations:
+                issues.append("coordinate_relations_unmatched:" + " | ".join(unmatched_relations))
+            direct_relations = plan.get("aux_immediate_effects") or plan.get("aux_direct_relations") or [""]
+            ok, message = validate_aux_step_scope(direct_relations[0], aux_part, visible_points)
+            if not ok:
+                issues.append(message)
+            if not isinstance(plan.get("bridge_chain"), list) or not plan.get("bridge_chain"):
+                issues.append("missing_bridge_chain")
+            if not isinstance(plan.get("goal_closure"), list) or not plan.get("goal_closure"):
+                issues.append("missing_goal_closure")
+            write_output = generation.get("write_output") or ""
+            coordinate_relations = [
+                relation
+                for relation in plan.get("coordinate_relations", [])
+                if isinstance(relation, str) and relation.strip()
+            ]
+            observation_focus_relations = [
+                relation
+                for relation in (plan.get("image_scan") or [])
+                if isinstance(relation, str) and relation.strip()
+            ]
+            if write_output:
+                if observation_focus_relations:
+                    observation_relation_mentions = count_relation_mentions(
+                        write_output,
+                        observation_focus_relations,
+                        point_names=visible_points,
+                    )
+                    if observation_relation_mentions == 0:
+                        issues.append("observation_cues_not_reused_in_body")
+                if coordinate_relations:
+                    coordinate_relation_mentions = count_relation_mentions(
+                        write_output,
+                        coordinate_relations,
+                        point_names=visible_points,
+                    )
+                    if coordinate_relation_mentions == 0:
+                        issues.append("coordinate_cues_not_reused_in_body")
+                sentences = split_into_sentences(write_output)
+                search_start = 0
+                for idx, step in enumerate(plan.get("bridge_chain", [])):
+                    match_idx = None
+                    for sentence_idx in range(search_start, len(sentences)):
+                        if relation_mentioned_in_text(sentences[sentence_idx], step.get("claim", "")):
+                            match_idx = sentence_idx
+                            break
+                    if match_idx is None:
+                        issues.append(f"bridge_claim_missing_in_body:{idx}")
+                        continue
+                    sentence = sentences[match_idx].lower()
+                    if any(marker in sentence for marker in generic_bridge_markers):
+                        issues.append(f"generic_bridge_phrase:{idx}")
+                    search_start = match_idx + 1
+                for idx, step in enumerate(plan.get("goal_closure", [])):
+                    match_idx = None
+                    for sentence_idx in range(search_start, len(sentences)):
+                        if relation_mentioned_in_text(sentences[sentence_idx], step.get("claim", "")):
+                            match_idx = sentence_idx
+                            break
+                    if match_idx is None:
+                        issues.append(f"goal_closure_missing_in_body:{idx}")
+                        continue
+                    search_start = match_idx + 1
+        else:
+            coordinate_candidates = coordinate_candidates or []
+            unmatched_relations = [
+                relation
+                for relation in plan.get("coordinate_relations", [])
+                if not any(coordinate_relation_matches_candidate(relation, candidate) for candidate in coordinate_candidates)
+            ]
+            if unmatched_relations:
+                issues.append("coordinate_relations_unmatched:" + " | ".join(unmatched_relations))
+            direct_relations = plan.get("aux_direct_relations") or plan.get("verification_chain") or [""]
+            ok, message = validate_aux_step_scope(direct_relations[0], aux_part, visible_points)
+            if not ok:
+                issues.append(message)
+            bridge_relations = flatten_bridge_relations(plan)
+            if not bridge_relations:
+                issues.append("missing_bridge_relations")
+            write_output = generation.get("write_output") or ""
+            coordinate_relations = [
+                relation
+                for relation in plan.get("coordinate_relations", [])
+                if isinstance(relation, str) and relation.strip()
+            ]
+            coverage_targets = plan.get("coverage_targets", {}) if isinstance(plan.get("coverage_targets"), dict) else {}
+            anchor_points = {
+                point.lower()
+                for point in (plan.get("anchor_points") or [])
+                if isinstance(point, str) and point.strip()
+            }
+            non_anchor_coordinate_points = []
+            for relation in coordinate_relations:
+                for point in extract_point_mentions(relation, visible_points):
+                    point = point.lower()
+                    if point in anchor_points or point in non_anchor_coordinate_points:
+                        continue
+                    non_anchor_coordinate_points.append(point)
+            coordinate_focus_relations = [
+                relation
+                for relation in (coverage_targets.get("coordinate_focus_relations") or coordinate_relations)
+                if isinstance(relation, str) and relation.strip()
+            ]
+            observation_focus_relations = [
+                relation
+                for relation in (coverage_targets.get("observation_focus_relations") or [])
+                if isinstance(relation, str) and relation.strip()
+            ]
+            if not observation_focus_relations:
+                for observation in plan.get("observation_relations", []) or []:
+                    if not isinstance(observation, dict):
+                        continue
+                    relation = observation.get("relation")
+                    if isinstance(relation, str) and relation.strip() and relation not in observation_focus_relations:
+                        observation_focus_relations.append(relation.strip())
+            coordinate_reuse_min = int(coverage_targets.get("coordinate_reuse_min") or (1 if coordinate_relations else 0))
+            early_coordinate_reuse_min = int(coverage_targets.get("early_coordinate_reuse_min") or 0)
+            observation_relation_mentions = (
+                count_relation_mentions(write_output, observation_focus_relations, point_names=visible_points)
+                if write_output and observation_focus_relations else 0
             )
-        if non_anchor_coordinate_points and not mentioned_coordinate_points:
-            issues.append("non_anchor_coordinate_cues_unused")
-        if write_output and isinstance(plan.get("bridge_steps"), list):
-            sentences = split_into_sentences(write_output)
-            if observation_focus_relations:
-                early_body = " ".join(sentences[: min(3, len(sentences))])
-                early_observation_mentions = count_relation_mentions(
-                    early_body,
-                    observation_focus_relations,
-                    point_names=visible_points,
+            coordinate_relation_mentions = (
+                count_relation_mentions(write_output, coordinate_relations, point_names=visible_points)
+                if write_output and coordinate_relations else 0
+            )
+            mentioned_coordinate_points = (
+                extract_point_mentions(write_output, non_anchor_coordinate_points)
+                if write_output and non_anchor_coordinate_points else set()
+            )
+            if observation_focus_relations and observation_relation_mentions == 0:
+                issues.append("observation_cues_not_reused_in_body")
+            if coordinate_relations and coordinate_relation_mentions == 0:
+                issues.append("coordinate_cues_not_reused_in_body")
+            elif coordinate_relations and coordinate_relation_mentions < coordinate_reuse_min:
+                issues.append(
+                    f"coordinate_cue_reuse_too_shallow:{coordinate_relation_mentions}/{coordinate_reuse_min}"
                 )
-                if early_observation_mentions < 1:
-                    issues.append("early_observation_cue_missing")
-            if early_coordinate_reuse_min and coordinate_focus_relations:
-                early_body = " ".join(sentences[: min(3, len(sentences))])
-                early_coordinate_mentions = count_relation_mentions(
-                    early_body,
-                    coordinate_focus_relations,
-                    point_names=visible_points,
-                )
-                if early_coordinate_mentions < early_coordinate_reuse_min:
-                    issues.append("early_non_anchor_coordinate_cue_missing")
-            search_start = 0
-            for idx, step in enumerate(plan["bridge_steps"]):
-                match_idx = None
-                for sentence_idx in range(search_start, len(sentences)):
-                    if bridge_step_relation_realized(sentences[sentence_idx], step):
-                        match_idx = sentence_idx
-                        break
-                if match_idx is None:
-                    issues.append(f"bridge_relation_missing_in_body:{idx}")
-                    continue
-                sentence = sentences[match_idx].lower()
-                sentence_text = sentences[match_idx]
-                if any(marker in sentence for marker in generic_bridge_markers):
-                    issues.append(f"generic_bridge_phrase:{idx}")
-                required_supports = step.get("required_supports") or step.get("depends_on", [])
-                min_support_mentions = step.get("min_support_mentions", 1 if required_supports else 0)
-                mentioned_dependencies = count_support_relation_mentions(
-                    sentence_text,
-                    required_supports,
-                    point_names=visible_points,
-                    target_relation=step.get("approved_route_relation") or step.get("relation", ""),
-                )
-                if mentioned_dependencies < min_support_mentions:
-                    issues.append(f"bridge_supports_missing_in_body:{idx}")
-                search_start = match_idx + 1
-        if isinstance(plan.get("bridge_steps"), list) and plan.get("goal_finish"):
-            last_step = plan["bridge_steps"][-1] if plan["bridge_steps"] else None
-            if isinstance(last_step, dict):
-                last_relation = last_step.get("approved_route_relation") or last_step.get("relation", "")
-                if relations_semantically_match(last_relation, plan.get("goal_finish", ""), visible_points):
-                    issues.append("bridge_goal_finish_duplicate")
+            if non_anchor_coordinate_points and not mentioned_coordinate_points:
+                issues.append("non_anchor_coordinate_cues_unused")
+            if write_output and isinstance(plan.get("bridge_steps"), list):
+                sentences = split_into_sentences(write_output)
+                if observation_focus_relations:
+                    early_body = " ".join(sentences[: min(3, len(sentences))])
+                    early_observation_mentions = count_relation_mentions(
+                        early_body,
+                        observation_focus_relations,
+                        point_names=visible_points,
+                    )
+                    if early_observation_mentions < 1:
+                        issues.append("early_observation_cue_missing")
+                if early_coordinate_reuse_min and coordinate_focus_relations:
+                    early_body = " ".join(sentences[: min(3, len(sentences))])
+                    early_coordinate_mentions = count_relation_mentions(
+                        early_body,
+                        coordinate_focus_relations,
+                        point_names=visible_points,
+                    )
+                    if early_coordinate_mentions < early_coordinate_reuse_min:
+                        issues.append("early_non_anchor_coordinate_cue_missing")
+                search_start = 0
+                for idx, step in enumerate(plan["bridge_steps"]):
+                    match_idx = None
+                    for sentence_idx in range(search_start, len(sentences)):
+                        if bridge_step_relation_realized(sentences[sentence_idx], step):
+                            match_idx = sentence_idx
+                            break
+                    if match_idx is None:
+                        issues.append(f"bridge_relation_missing_in_body:{idx}")
+                        continue
+                    sentence = sentences[match_idx].lower()
+                    sentence_text = sentences[match_idx]
+                    if any(marker in sentence for marker in generic_bridge_markers):
+                        issues.append(f"generic_bridge_phrase:{idx}")
+                    required_supports = step.get("required_supports") or step.get("depends_on", [])
+                    min_support_mentions = step.get("min_support_mentions", 1 if required_supports else 0)
+                    mentioned_dependencies = count_support_relation_mentions(
+                        sentence_text,
+                        required_supports,
+                        point_names=visible_points,
+                        target_relation=step.get("approved_route_relation") or step.get("relation", ""),
+                    )
+                    if mentioned_dependencies < min_support_mentions:
+                        issues.append(f"bridge_supports_missing_in_body:{idx}")
+                    search_start = match_idx + 1
+            if isinstance(plan.get("bridge_steps"), list) and plan.get("goal_finish"):
+                last_step = plan["bridge_steps"][-1] if plan["bridge_steps"] else None
+                if isinstance(last_step, dict):
+                    last_relation = last_step.get("approved_route_relation") or last_step.get("relation", "")
+                    if relations_semantically_match(last_relation, plan.get("goal_finish", ""), visible_points):
+                        issues.append("bridge_goal_finish_duplicate")
 
     text_to_scan = " ".join(
         part for part in [generation.get("write_output"), generation.get("thinking")] if part

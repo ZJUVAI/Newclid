@@ -258,6 +258,7 @@ def build_pending_review_payloads(
                 "surface_pass": surface_pass,
                 "review_recommendation": "review_now" if surface_pass else "fix_surface_first",
                 "context": {
+                    "generation_style": item_record.get("generation_style"),
                     "image_path": item_record.get("image_path", ""),
                     "public_problem": item_record.get("public_problem", ""),
                     "aux": item_record.get("aux", ""),

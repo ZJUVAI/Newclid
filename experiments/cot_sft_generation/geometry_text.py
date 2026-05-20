@@ -97,16 +97,19 @@ def relation_keyword_present(text):
         "perpendicular",
         "equal",
         "congruent",
+        "equidistant",
         "ratio",
         "proportion",
         "similar",
         "angle",
         "midpoint",
         "collinear",
+        "straight line",
         "isosceles",
         "equilateral",
         "circle",
         "cyclic",
+        "concyclic",
         "symmetric",
         "symmetry",
         "diameter",
@@ -115,6 +118,7 @@ def relation_keyword_present(text):
         "alignment",
         "right angle",
         "right-angled",
+        "intersect at right angles",
     ]
     lowered = text.lower()
     if any(keyword in lowered for keyword in keywords):
@@ -185,8 +189,17 @@ def normalize_relation_surface(text):
         point_a = coincide_match.group(1).lower()
         point_b = coincide_match.group(2).lower()
         return f"{point_a} equals {point_b}"
+    compact_line_match = re.fullmatch(
+        r"(?:point\s+)?([a-z]\w*)\s+lies\s+on\s+(?:the\s+)?(?:line(?:\s+segment)?|segment)\s+([a-z]{2})\.?",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    if compact_line_match:
+        point_name = compact_line_match.group(1).lower()
+        line_token = compact_line_match.group(2).lower()
+        return f"{line_token[0]}, {line_token[1]}, {point_name} are collinear"
     line_match = re.fullmatch(
-        r"(?:point\s+)?([a-z]\w*)\s+lies\s+on\s+(?:the\s+)?(?:line|segment)\s+([a-z]\w*)([a-z]\w*)\.?",
+        r"(?:point\s+)?([a-z]\w*)\s+lies\s+on\s+(?:the\s+)?(?:line(?:\s+segment)?|segment)\s+([a-z]\w*)([a-z]\w*)\.?",
         normalized,
         flags=re.IGNORECASE,
     )
@@ -195,6 +208,22 @@ def normalize_relation_surface(text):
         line_p1 = line_match.group(2).lower()
         line_p2 = line_match.group(3).lower()
         return f"{line_p1}, {line_p2}, {point_name} are collinear"
+    straight_line_patterns = [
+        r"(?:points?\s+)?([a-z]\w*)\s*,\s*([a-z]\w*)\s*,\s*(?:and\s+)?([a-z]\w*)\s+lie\s+on\s+(?:a|the)\s+straight\s+line\.?",
+        r"(?:points?\s+)?([a-z]\w*)\s*,\s*([a-z]\w*)\s*,\s*(?:and\s+)?([a-z]\w*)\s+"
+        r"(?:look|looks|seem|seems|appear|appears)\s+to\s+lie\s+on\s+(?:a|the)\s+straight\s+line\.?",
+    ]
+    for pattern in straight_line_patterns:
+        straight_line_match = re.fullmatch(
+            pattern,
+            normalized,
+            flags=re.IGNORECASE,
+        )
+        if straight_line_match:
+            point_a = straight_line_match.group(1).lower()
+            point_b = straight_line_match.group(2).lower()
+            point_c = straight_line_match.group(3).lower()
+            return f"{point_a}, {point_b}, {point_c} are collinear"
     natural_collinear_patterns = [
         r"(?:points?\s+)?([a-z]\w*)\s*,\s*([a-z]\w*)\s*,\s*(?:and\s+)?([a-z]\w*)\s+"
         r"(?:look|looks|stay|stays|remain|remains|seem|seems|appear|appears|are)\s+"
@@ -214,6 +243,27 @@ def normalize_relation_surface(text):
             point_b = natural_collinear_match.group(2).lower()
             point_c = natural_collinear_match.group(3).lower()
             return f"{point_a}, {point_b}, {point_c} are collinear"
+    perpendicular_match = re.fullmatch(
+        r"lines?\s+([a-z]{2})\s+and\s+([a-z]{2})\s+intersect\s+at\s+right\s+angles\.?",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    if perpendicular_match:
+        line_a = perpendicular_match.group(1).lower()
+        line_b = perpendicular_match.group(2).lower()
+        return f"line {line_a} is perpendicular to line {line_b}"
+    equidistant_match = re.fullmatch(
+        r"(?:point\s+)?([a-z]\w*)\s+"
+        r"(?:look|looks|seem|seems|appear|appears|is|are)\s+"
+        r"(?:to\s+be\s+)?equidistant\s+from\s+(?:points?\s+)?([a-z]\w*)\s+and\s+([a-z]\w*)\.?",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    if equidistant_match:
+        point_name = equidistant_match.group(1).lower()
+        endpoint_a = equidistant_match.group(2).lower()
+        endpoint_b = equidistant_match.group(3).lower()
+        return f"{point_name}{endpoint_a} equals {point_name}{endpoint_b}"
     ratio_match = re.fullmatch(
         r"([a-z]{2})\s*:\s*([a-z]{2})\s*=\s*([a-z]{2})\s*:\s*([a-z]{2})",
         normalized,

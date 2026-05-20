@@ -34,6 +34,18 @@ class CotSftGeometryTextTest(unittest.TestCase):
             normalize_relation_surface("the line through e, f, and g stays nearly collinear"),
             "e, f, g are collinear",
         )
+        self.assertEqual(
+            normalize_relation_surface("points a, c, and e lie on a straight line"),
+            "a, c, e are collinear",
+        )
+        self.assertEqual(
+            normalize_relation_surface("lines ae and cf intersect at right angles"),
+            "line ae is perpendicular to line cf",
+        )
+        self.assertEqual(
+            normalize_relation_surface("point g appears to be equidistant from b and e"),
+            "gb equals ge",
+        )
 
     def test_relations_semantically_match_accepts_surface_variants(self):
         self.assertTrue(

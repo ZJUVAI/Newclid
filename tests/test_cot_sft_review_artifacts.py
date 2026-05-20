@@ -106,6 +106,7 @@ class CotSftReviewArtifactsTest(unittest.TestCase):
             num_workers=1,
             max_retries_per_stage=3,
             model_name="model",
+            generation_style="dossier_v1",
             output_jsonl="out.jsonl",
             artifacts_dir="artifacts",
             runtime_seconds=1.0,
@@ -114,6 +115,7 @@ class CotSftReviewArtifactsTest(unittest.TestCase):
         self.assertEqual(summary["surface_pass_items"], 1)
         self.assertEqual(summary["surface_pass_rate"], 1.0)
         self.assertEqual(summary["artifact_schema_version"], ARTIFACT_SCHEMA_VERSION)
+        self.assertEqual(summary["generation_style"], "dossier_v1")
         self.assertEqual(summary["semantic_review_status"], "not_reviewed")
         self.assertIsNone(summary["semantic_pass_rate"])
         self.assertIsNone(summary["manual_critical_error_rate"])
@@ -317,6 +319,7 @@ class CotSftReviewArtifactsTest(unittest.TestCase):
                 "generation_audit": {"issues": ["coordinate_cues_not_reused_in_body"]},
                 "attempts_used": 2,
                 "error": None,
+                "generation_style": "dossier_v1",
             }
         ]
         item_audits = [

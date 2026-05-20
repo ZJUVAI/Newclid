@@ -101,6 +101,7 @@ class CotSftReplayArtifactChecksTest(unittest.TestCase):
                     "max_retries": 1,
                     "sequential": True,
                     "verbose": True,
+                    "generation_style": "model_evidence_legacy",
                 },
                 output_jsonl=str(output_path),
                 run_dir=str(run_dir),
@@ -129,6 +130,7 @@ class CotSftReplayArtifactChecksTest(unittest.TestCase):
                     random_sample=False,
                     process_all=False,
                     max_retries=1,
+                    generation_style="model_evidence_legacy",
                     run_metadata=run_metadata,
                     run_dir=run_dir,
                 )

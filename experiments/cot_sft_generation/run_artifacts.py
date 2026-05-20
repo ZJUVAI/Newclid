@@ -169,11 +169,13 @@ def build_missing_image_item_record(
     image_path: str,
     source_audit: Dict[str, Any],
     error: str,
+    generation_style: str | None = None,
 ) -> Dict[str, Any]:
     return {
         "sample_order": sample_order,
         "input_index": input_index,
         "image_path": image_path,
+        "generation_style": generation_style,
         "goal_type": None,
         "aux_type": None,
         "source_audit": source_audit,
@@ -199,12 +201,14 @@ def build_item_record(
     source_audit: Dict[str, Any],
     generation_audit: Dict[str, Any],
     generation: Dict[str, Any],
+    generation_style: str | None = None,
 ) -> Dict[str, Any]:
     surface_pass = bool(generation.get("success"))
     return {
         "sample_order": sample_order,
         "input_index": input_index,
         "image_path": image_path,
+        "generation_style": generation_style or generation.get("generation_style"),
         "public_problem": public_problem,
         "aux": aux_part,
         "goal_type": goal_type,
@@ -231,6 +235,7 @@ def build_item_audit_record(item_record: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "sample_order": item_record["sample_order"],
         "input_index": item_record["input_index"],
+        "generation_style": item_record.get("generation_style"),
         "goal_type": item_record.get("goal_type"),
         "aux_type": item_record.get("aux_type"),
         "source_audit": item_record.get("source_audit", {}),
@@ -244,6 +249,7 @@ def build_semantic_audit_stub(item_record: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "sample_order": item_record["sample_order"],
         "input_index": item_record["input_index"],
+        "generation_style": item_record.get("generation_style"),
         "image_path": item_record.get("image_path", ""),
         "goal_type": item_record.get("goal_type"),
         "aux_type": item_record.get("aux_type"),
@@ -270,6 +276,7 @@ def build_run_summary(
     num_workers: int,
     max_retries_per_stage: int,
     model_name: str,
+    generation_style: str | None,
     output_jsonl: str,
     artifacts_dir: str,
     runtime_seconds: float,
@@ -320,6 +327,7 @@ def build_run_summary(
         "num_workers": num_workers,
         "max_retries_per_stage": max_retries_per_stage,
         "model_name": model_name,
+        "generation_style": generation_style,
         "output_jsonl": os.path.abspath(output_jsonl),
         "artifacts_dir": os.path.abspath(artifacts_dir),
         "runtime_seconds": runtime_seconds,

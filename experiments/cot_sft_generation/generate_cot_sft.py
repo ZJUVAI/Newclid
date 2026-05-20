@@ -92,6 +92,11 @@ try:
         summarize_aux_clause,
     )
     from .prompt_builders import (
+        build_dossier_critic_prompt as build_dossier_critic_prompt_text,
+        build_dossier_plan_prompt as build_dossier_plan_prompt_text,
+        build_dossier_plan_retry_feedback,
+        build_dossier_write_prompt as build_dossier_write_prompt_text,
+        build_dossier_writer_retry_feedback,
         build_plan_prompt as build_plan_prompt_text,
         build_plan_critic_prompt as build_plan_critic_prompt_text,
         build_plan_retry_feedback,
@@ -175,6 +180,11 @@ except ImportError:  # pragma: no cover - script execution path
         summarize_aux_clause,
     )
     from prompt_builders import (
+        build_dossier_critic_prompt as build_dossier_critic_prompt_text,
+        build_dossier_plan_prompt as build_dossier_plan_prompt_text,
+        build_dossier_plan_retry_feedback,
+        build_dossier_write_prompt as build_dossier_write_prompt_text,
+        build_dossier_writer_retry_feedback,
         build_plan_prompt as build_plan_prompt_text,
         build_plan_critic_prompt as build_plan_critic_prompt_text,
         build_plan_retry_feedback,
@@ -259,6 +269,10 @@ INLINE_POINT_COORD_RE = re.compile(
 )
 RAW_PLAN_SUPPORT_REF_RE = re.compile(
     r"^(text_facts_used|image_observations|coordinate_derivations|bridge_steps)\[(\d+)\]$",
+    re.IGNORECASE,
+)
+DOSSIER_SUPPORT_REF_RE = re.compile(
+    r"^(visible_facts|image_scan|coordinate_checks|aux_immediate_effects|bridge_chain)\[(\d+)\]$",
     re.IGNORECASE,
 )
 
@@ -3322,6 +3336,585 @@ def build_write_prompt(record, plan, aux_part, point_coords):
     )
 
 
+def build_dossier_hidden_milestone_summary(
+    sanitized_rest,
+    aux_part,
+    visible_goal,
+    source_audit=None,
+):
+    proof_guidance = build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal)
+    return {
+        "immediate_aux_milestones": list(proof_guidance.get("immediate_aux_consequences") or [])[:4],
+        "plausible_bridge_milestones": (
+            list(proof_guidance.get("aux_bridge_relations") or [])
+            + list(proof_guidance.get("bridge_relations") or [])
+        )[:6],
+        "plausible_goal_closures": list(proof_guidance.get("goal_finish_relations") or [])[:4],
+        "source_audit_flags": list((source_audit or {}).get("issues") or [])[:6],
+    }
+
+
+def build_safe_dossier_aux_motivation(aux_part: str, visible_goal: str):
+    goal_family = "goal relation"
+    visible_goal_lower = (visible_goal or "").lower()
+    if visible_goal_lower.startswith("eqratio"):
+        goal_family = "ratio relation"
+    elif visible_goal_lower.startswith("eqangle"):
+        goal_family = "angle relation"
+    elif visible_goal_lower.startswith("simtri") or visible_goal_lower.startswith("simtrir"):
+        goal_family = "similarity relation"
+    elif visible_goal_lower.startswith("contri") or visible_goal_lower.startswith("contrir"):
+        goal_family = "congruence relation"
+    aux_labels = [label for label, _ in build_aux_keyword_expectations(aux_part or "")]
+    aux_cue = aux_labels[0] if aux_labels else "local helper"
+    stage_phrase = "in stages and then reconnect those stages" if len(extract_aux_new_points(aux_part or "")) > 1 else "first and then reconnect that relation"
+    return (
+        f"the helper should create one local {aux_cue} relation {stage_phrase} "
+        f"to the visible figure before the target {goal_family} closes."
+    )
+
+
+def canonicalize_dossier_image_scan(items, visible_points, min_len=1, max_len=4):
+    raw_items = items if isinstance(items, list) else []
+    cleaned = []
+    used_lower = set()
+    for idx, item in enumerate(raw_items[:max_len]):
+        ok, _, cleaned_item = validate_descriptive_text(
+            item,
+            f"image_scan[{idx}]",
+            min_chars=5,
+            point_names=visible_points,
+        )
+        if not ok:
+            continue
+        normalized_item = normalize_relation_surface(cleaned_item)
+        if not relation_keyword_present(normalized_item):
+            continue
+        mentioned = extract_point_mentions(normalized_item, visible_points)
+        if len(mentioned) < 2:
+            continue
+        lowered = normalized_item.lower()
+        if lowered in used_lower:
+            continue
+        cleaned.append(normalized_item)
+        used_lower.add(lowered)
+    if len(cleaned) < min_len:
+        return False, "image_scan must include at least one concrete geometric relation cue", None
+    return True, None, cleaned
+
+
+def _resolve_dossier_support_index(raw_index: int, bucket_len: int):
+    if raw_index < 0:
+        return None, "support indices must be non-negative"
+    if raw_index == 0:
+        if bucket_len <= 0:
+            return None, "supports references an unavailable earlier item"
+        return 0, None
+    normalized_index = raw_index - 1
+    if normalized_index >= bucket_len:
+        return None, "supports references an unknown item"
+    return normalized_index, None
+
+
+def _resolve_dossier_support_ref(
+    ref_text,
+    cleaned_visible_facts,
+    cleaned_image_scan,
+    cleaned_coordinate_checks,
+    cleaned_aux_effects,
+    cleaned_bridge_chain,
+):
+    match = DOSSIER_SUPPORT_REF_RE.fullmatch(str(ref_text or "").strip())
+    if not match:
+        return None, (
+            "supports must use only visible_facts[i], image_scan[i], coordinate_checks[i], "
+            "aux_immediate_effects[i], or earlier bridge_chain[i]"
+        )
+    bucket_name = match.group(1).lower()
+    raw_index = int(match.group(2))
+    if bucket_name == "visible_facts":
+        index, index_error = _resolve_dossier_support_index(raw_index, len(cleaned_visible_facts))
+        if index_error:
+            return None, "supports references unknown visible_facts item"
+        return cleaned_visible_facts[index], None
+    if bucket_name == "image_scan":
+        index, index_error = _resolve_dossier_support_index(raw_index, len(cleaned_image_scan))
+        if index_error:
+            return None, "supports references unknown image_scan item"
+        return cleaned_image_scan[index], None
+    if bucket_name == "coordinate_checks":
+        index, index_error = _resolve_dossier_support_index(raw_index, len(cleaned_coordinate_checks))
+        if index_error:
+            return None, "supports references unknown coordinate_checks item"
+        return cleaned_coordinate_checks[index]["relation"], None
+    if bucket_name == "aux_immediate_effects":
+        index, index_error = _resolve_dossier_support_index(raw_index, len(cleaned_aux_effects))
+        if index_error:
+            return None, "supports references unknown aux_immediate_effects item"
+        return cleaned_aux_effects[index], None
+    if bucket_name == "bridge_chain":
+        index, index_error = _resolve_dossier_support_index(raw_index, len(cleaned_bridge_chain))
+        if index_error:
+            return None, "supports may reference only earlier bridge_chain items"
+        return cleaned_bridge_chain[index]["claim"], None
+    return None, "unsupported support reference bucket"
+
+
+def validate_dossier_plan_response(
+    output_text: str,
+    point_coords,
+    visible_goal="",
+    aux_part=None,
+    coordinate_candidates=None,
+    sanitized_rest=None,
+    visible_premise_summaries=None,
+    visible_text_facts=None,
+):
+    del coordinate_candidates, sanitized_rest, visible_premise_summaries
+    dossier = output_text if isinstance(output_text, dict) else extract_json_object(output_text)
+    if not isinstance(dossier, dict):
+        return False, "Planner must return a single JSON object", None
+
+    visible_points = extract_visible_point_names(point_coords)
+    aux_points = [point.lower() for point in extract_aux_new_points(aux_part or "")]
+    known_points = visible_points + aux_points
+    limits = compute_plan_complexity_limits(point_coords, visible_goal=visible_goal, aux_part=aux_part)
+    max_bridge_steps = max(6, limits["bridge_steps_max"])
+    required_keys = [
+        "visible_facts",
+        "image_scan",
+        "goal_obstacle",
+        "aux_motivation",
+        "construction",
+        "aux_immediate_effects",
+        "bridge_chain",
+        "goal_closure",
+    ]
+    missing = [key for key in required_keys if key not in dossier]
+    if missing:
+        return False, f"Dossier JSON missing keys: {missing}", None
+
+    max_visible_facts = min(12, max(6, len(dossier.get("visible_facts") or []), limits["visible_relations_max"]))
+    ok, message, cleaned_visible_facts = validate_relation_list(
+        dossier.get("visible_facts"),
+        "visible_facts",
+        visible_points,
+        min_len=1,
+        max_len=max_visible_facts,
+        min_chars=5,
+    )
+    if not ok:
+        return False, message, None
+    if visible_text_facts:
+        unmatched_visible_facts = [
+            relation
+            for relation in cleaned_visible_facts
+            if not any(
+                relations_semantically_match(
+                    relation,
+                    item.get("relation", ""),
+                    visible_points,
+                )
+                for item in visible_text_facts
+                if isinstance(item, dict) and item.get("relation")
+            )
+        ]
+        if unmatched_visible_facts:
+            return False, "visible_facts must stay grounded in public problem facts", None
+
+    max_image_scan = min(6, max(3, len(dossier.get("image_scan") or []), limits["coordinate_relations_max"] + 1))
+    ok, message, cleaned_image_scan = canonicalize_dossier_image_scan(
+        dossier.get("image_scan"),
+        visible_points,
+        min_len=1,
+        max_len=max_image_scan,
+    )
+    if not ok:
+        return False, message, None
+
+    cleaned_plan = {
+        "generation_style": "dossier_v1",
+        "dossier_version": "dossier_v1",
+        "visible_facts": cleaned_visible_facts,
+        "visible_relations": cleaned_visible_facts[:],
+        "image_scan": cleaned_image_scan,
+        "image_observations": cleaned_image_scan[:],
+        "observation_relations": [
+            {
+                "id": f"obs_{idx + 1}",
+                "relation": relation,
+                "points": sorted(extract_point_mentions(relation, visible_points)),
+            }
+            for idx, relation in enumerate(cleaned_image_scan)
+        ],
+        "anchor_points": [],
+        "anchor_relation": "",
+    }
+
+    for key in ["goal_obstacle", "aux_motivation", "construction"]:
+        raw_value = dossier.get(key)
+        if key == "aux_motivation":
+            raw_value = raw_value or build_safe_dossier_aux_motivation(aux_part or "", visible_goal)
+        ok, message, cleaned_value = validate_descriptive_text(
+            raw_value,
+            key,
+            point_names=known_points,
+        )
+        if not ok and key == "aux_motivation":
+            ok, message, cleaned_value = validate_descriptive_text(
+                build_safe_dossier_aux_motivation(aux_part or "", visible_goal),
+                key,
+                point_names=known_points,
+            )
+        if not ok:
+            return False, message, None
+        cleaned_plan[key] = cleaned_value
+    canonical_construction = build_canonical_construction(aux_part or "")
+    if canonical_construction:
+        cleaned_plan["construction"] = canonical_construction
+
+    coordinate_checks = dossier.get("coordinate_checks") or []
+    if not isinstance(coordinate_checks, list):
+        return False, "coordinate_checks must be a list", None
+    allowed_calc_types = {"parallel", "perpendicular", "equal_length", "midpoint", "collinear"}
+    cleaned_checks = []
+    for idx, check in enumerate(coordinate_checks[: limits["coordinate_relations_max"]]):
+        if not isinstance(check, dict):
+            return False, f"coordinate_checks[{idx}] must be an object", None
+        calc_type = str(check.get("calc_type") or "").strip().lower()
+        if calc_type not in allowed_calc_types:
+            return False, f"coordinate_checks[{idx}].calc_type is unsupported", None
+        ok, message, cleaned_relation = validate_descriptive_text(
+            check.get("relation"),
+            f"coordinate_checks[{idx}].relation",
+            min_chars=5,
+            point_names=visible_points,
+        )
+        if not ok:
+            return False, message, None
+        cleaned_relation = normalize_relation_surface(cleaned_relation)
+        if not relation_keyword_present(cleaned_relation):
+            return False, f"coordinate_checks[{idx}].relation must mention a concrete geometric relation", None
+        points = [
+            point.lower()
+            for point in (check.get("points") or [])
+            if isinstance(point, str) and point.lower() in point_coords
+        ]
+        min_point_count = 4 if calc_type in {"parallel", "perpendicular", "equal_length"} else 3
+        if len(points) < min_point_count:
+            return False, (
+                f"coordinate_checks[{idx}].points must name at least {min_point_count} visible points"
+            ), None
+        if any(point in aux_points for point in points):
+            return False, f"coordinate_checks[{idx}] must not assign coordinates to auxiliary points", None
+        ok, message, why_it_matters = validate_descriptive_text(
+            check.get("why_it_matters"),
+            f"coordinate_checks[{idx}].why_it_matters",
+            min_chars=8,
+            point_names=known_points,
+        )
+        if not ok:
+            return False, message, None
+        cleaned_item = {
+            "relation": cleaned_relation,
+            "points": points,
+            "calc_type": calc_type,
+            "render_mode": normalize_coordinate_render_mode("coordinate", calc_type),
+            "why_it_matters": why_it_matters,
+            "witness": build_coordinate_candidate_witness(
+                {"relation_type": calc_type, "points": points},
+                point_coords,
+            ),
+        }
+        cleaned_item["rendered_text"] = render_coordinate_derivation_snippet(cleaned_item, point_coords)
+        cleaned_checks.append(cleaned_item)
+    cleaned_plan["coordinate_checks"] = cleaned_checks
+    cleaned_plan["coordinate_derivations"] = cleaned_checks[:]
+    cleaned_plan["coordinate_relations"] = [item["relation"] for item in cleaned_checks]
+
+    aux_immediate_effects = canonicalize_aux_direct_relations(
+        dossier.get("aux_immediate_effects"),
+        aux_part or "",
+        visible_points,
+        preferred_immediate=build_aux_direct_consequences(aux_part or ""),
+        min_len=limits["aux_direct_relations_min"],
+        max_len=limits["aux_direct_relations_max"],
+    )
+    if not (
+        limits["aux_direct_relations_min"] <= len(aux_immediate_effects) <= limits["aux_direct_relations_max"]
+    ):
+        return False, (
+            "aux_immediate_effects must be a list with "
+            f"{limits['aux_direct_relations_min']} to {limits['aux_direct_relations_max']} ordered direct consequences"
+        ), None
+    cleaned_aux_effects = []
+    for idx, relation in enumerate(aux_immediate_effects):
+        ok, message, cleaned_relation = validate_descriptive_text(
+            relation,
+            f"aux_immediate_effects[{idx}]",
+            min_chars=5,
+            point_names=known_points,
+        )
+        if not ok:
+            return False, message, None
+        cleaned_relation = normalize_relation_surface(cleaned_relation)
+        if not relation_keyword_present(cleaned_relation):
+            return False, f"aux_immediate_effects[{idx}] must mention a concrete geometric relation", None
+        ok, message = validate_aux_step_scope(cleaned_relation, aux_part or "", visible_points)
+        if not ok:
+            return False, f"aux_immediate_effects[{idx}] invalid: {message}", None
+        cleaned_aux_effects.append(cleaned_relation)
+    cleaned_plan["aux_immediate_effects"] = cleaned_aux_effects
+    cleaned_plan["aux_direct_relations"] = cleaned_aux_effects[:]
+
+    def clean_claim_steps(step_items, field_name, max_len, allow_empty=False, available_bridge_chain=None):
+        if not isinstance(step_items, list):
+            return False, f"{field_name} must be a list", None
+        if not allow_empty and not step_items:
+            return False, f"{field_name} must not be empty", None
+        if len(step_items) > max_len:
+            return False, f"{field_name} must contain at most {max_len} steps", None
+        available_bridge_chain = available_bridge_chain or []
+        cleaned_steps = []
+        for idx, step in enumerate(step_items):
+            if not isinstance(step, dict):
+                return False, f"{field_name}[{idx}] must be an object", None
+            if any(key not in step for key in ["claim", "supports", "why_next"]):
+                return False, f"{field_name}[{idx}] must contain claim, supports, and why_next", None
+            ok, message, cleaned_claim = validate_descriptive_text(
+                step.get("claim"),
+                f"{field_name}[{idx}].claim",
+                min_chars=5,
+                point_names=known_points,
+            )
+            if not ok:
+                return False, message, None
+            cleaned_claim = normalize_relation_surface(cleaned_claim)
+            if not relation_keyword_present(cleaned_claim):
+                return False, f"{field_name}[{idx}].claim must mention a concrete geometric relation", None
+            supports = [str(ref).strip() for ref in (step.get("supports") or []) if str(ref).strip()]
+            if not supports:
+                return False, f"{field_name}[{idx}].supports must not be empty", None
+            resolved_supports = []
+            for ref in supports:
+                resolved, support_error = _resolve_dossier_support_ref(
+                    ref,
+                    cleaned_visible_facts,
+                    cleaned_image_scan,
+                    cleaned_checks,
+                    cleaned_aux_effects,
+                    cleaned_steps if field_name == "bridge_chain" else available_bridge_chain,
+                )
+                if support_error:
+                    return False, f"{field_name}[{idx}].supports invalid: {support_error}", None
+                resolved_supports.append(resolved)
+            ok, message, cleaned_why_next = validate_descriptive_text(
+                step.get("why_next"),
+                f"{field_name}[{idx}].why_next",
+                min_chars=8,
+                point_names=known_points,
+            )
+            if not ok:
+                return False, message, None
+            cleaned_steps.append(
+                {
+                    "id": f"{field_name[0].upper()}{idx + 1}",
+                    "claim": cleaned_claim,
+                    "supports": supports,
+                    "resolved_supports": resolved_supports,
+                    "why_next": cleaned_why_next,
+                }
+            )
+        return True, "ok", cleaned_steps
+
+    ok, message, cleaned_bridge_chain = clean_claim_steps(
+        dossier.get("bridge_chain"),
+        "bridge_chain",
+        max_len=max_bridge_steps,
+    )
+    if not ok:
+        return False, message, None
+
+    ok, message, cleaned_goal_closure = clean_claim_steps(
+        dossier.get("goal_closure"),
+        "goal_closure",
+        max_len=3,
+        available_bridge_chain=cleaned_bridge_chain,
+    )
+    if not ok:
+        return False, message, None
+
+    goal_spec = parse_goal_expression(visible_goal)
+    goal_points = set(goal_spec.get("points") or [])
+    goal_keywords = goal_keyword_hints(visible_goal)
+    final_goal_claim = cleaned_goal_closure[-1]["claim"]
+    if goal_points:
+        mentioned_goal_points = {point for point in goal_points if point in final_goal_claim.lower()}
+        if len(mentioned_goal_points) < min(2, len(goal_points)):
+            return False, "goal_closure must finish with goal-side points", None
+    if goal_keywords and not any(keyword in final_goal_claim.lower() for keyword in goal_keywords):
+        return False, "goal_closure must finish on the correct goal relation family", None
+
+    if aux_points:
+        construction_text = f"{cleaned_plan['aux_motivation']} {cleaned_plan['construction']}".lower()
+        for label, keywords in build_aux_keyword_expectations(aux_part or ""):
+            if not any(keyword in construction_text for keyword in keywords):
+                return False, f"construction is missing an expected {label} cue", None
+        preconstruction_texts = (
+            cleaned_visible_facts
+            + cleaned_image_scan
+        )
+        for point_name in aux_points:
+            if any(re.search(rf"\b{re.escape(point_name)}\b", text.lower()) for text in preconstruction_texts):
+                return False, f"new point '{point_name}' must not appear before the construction field", None
+            if point_name not in cleaned_plan["construction"].lower():
+                return False, f"construction must mention new point '{point_name}' explicitly", None
+        if len(aux_points) > 1:
+            stage_markers = ["first", "then", "next", "after", "finally", "together", "simultaneously"]
+            combined_text = (
+                f"{cleaned_plan['construction']} "
+                f"{' '.join(cleaned_aux_effects)} "
+                f"{' '.join(step['claim'] for step in cleaned_bridge_chain)}"
+            ).lower()
+            if not any(marker in combined_text for marker in stage_markers):
+                return False, "multi-point auxiliary dossiers must describe a staged strategy", None
+
+    referenced_coordinate_checks = set()
+    referenced_aux_effects = set()
+    for step in cleaned_bridge_chain + cleaned_goal_closure:
+        for ref in step["supports"]:
+            lowered = ref.lower()
+            if lowered.startswith("coordinate_checks["):
+                referenced_coordinate_checks.add(lowered)
+            if lowered.startswith("aux_immediate_effects["):
+                referenced_aux_effects.add(lowered)
+    for idx, _ in enumerate(cleaned_checks, start=1):
+        if f"coordinate_checks[{idx}]".lower() not in referenced_coordinate_checks:
+            return False, f"coordinate_checks[{idx - 1}] must support a later bridge or closure step", None
+    if cleaned_aux_effects and not referenced_aux_effects and aux_points:
+        first_bridge_claim = cleaned_bridge_chain[0]["claim"].lower() if cleaned_bridge_chain else ""
+        if not any(point in first_bridge_claim for point in aux_points):
+            return False, "bridge_chain must reconnect the auxiliary consequences to the old figure", None
+
+    cleaned_plan["bridge_chain"] = cleaned_bridge_chain
+    cleaned_plan["goal_closure"] = cleaned_goal_closure
+    cleaned_plan["goal_obstacle"] = cleaned_plan["goal_obstacle"]
+    cleaned_plan["goal_bottleneck"] = cleaned_plan["goal_obstacle"]
+    cleaned_plan["aux_motivation"] = cleaned_plan["aux_motivation"]
+    cleaned_plan["helper_idea"] = cleaned_plan["aux_motivation"]
+    cleaned_plan["figure_overview"] = " ".join(cleaned_image_scan[:2])
+    cleaned_plan["coordinate_hints"] = build_canonical_coordinate_hint(cleaned_plan["coordinate_relations"])
+    cleaned_plan["coverage_targets"] = {
+        "coordinate_focus_relations": cleaned_plan["coordinate_relations"][:3],
+        "observation_focus_relations": cleaned_image_scan[:3],
+        "coordinate_reuse_min": 1 if cleaned_checks else 0,
+        "goal_points": list(goal_points),
+    }
+    cleaned_plan["bridge_steps"] = [
+        {
+            "id": f"B{idx + 1}",
+            "relation": step["claim"],
+            "support_refs": step["supports"],
+            "depends_on": step["resolved_supports"],
+            "required_supports": step["resolved_supports"][: min(2, len(step["resolved_supports"]))],
+            "min_support_mentions": 1,
+            "why_it_helps": step["why_next"],
+            "proof_alignment": "bridge",
+            "focus_points": sorted(extract_point_mentions(step["claim"], known_points)),
+            "approved_route_relation": step["claim"],
+        }
+        for idx, step in enumerate(cleaned_bridge_chain)
+    ]
+    cleaned_plan["bridge_relations"] = [step["claim"] for step in cleaned_bridge_chain]
+    cleaned_plan["goal_finish"] = final_goal_claim
+    return True, "Valid dossier", cleaned_plan
+
+
+def validate_dossier_writer_body(output_text: str, visible_goal="", injected_prefix="", plan=None):
+    del injected_prefix
+    if not output_text or not output_text.strip():
+        return False, "Writer body is empty"
+    body = output_text.strip()
+    if body.startswith("<thinking>") or body.endswith("</thinking>"):
+        return False, "Writer body must be plain text only, without <thinking> tags"
+    if RAW_POINT_TAG_RE.search(body) or POINT_TAG_RE.search(body) or "<coord>" in body:
+        return False, "Writer body must not contain point/coord tags"
+    if len(body) < 120:
+        return False, f"Writer body too short ({len(body)} chars, minimum 120)"
+    if len(body) > compute_writer_body_budget(plan=plan):
+        return False, f"Writer body too long ({len(body)} chars, maximum {compute_writer_body_budget(plan=plan)})"
+    if re.search(r"\b(I|We|I'm|We'll|I've|we've)\b", body):
+        return False, "Writer body must stay impersonal and should not use first-person narration"
+    for pattern in FORBIDDEN_THINKING_PATTERNS:
+        hit = pattern.search(body)
+        if hit:
+            return False, f"Writer body contains forbidden pattern: {hit.group(0)}"
+    if re.search(r"\bsimilarity or angle equality\b", body, re.IGNORECASE):
+        return False, "Writer body must state concrete relations instead of vague high-level shortcuts"
+
+    plan = plan or {}
+    new_points = [point.lower() for point in extract_aux_new_points(plan.get("construction", ""))]
+    if not new_points and plan.get("construction"):
+        new_points = [
+            point.lower()
+            for point in re.findall(r"\b([a-z]\w*)\b", plan.get("construction", "").lower())
+            if len(point) == 1
+        ]
+    if new_points and not any(re.search(rf"\b{re.escape(point)}\b", body.lower()) for point in new_points):
+        return False, "Writer body must mention the auxiliary construction itself"
+
+    coordinate_derivations = [
+        item for item in (plan.get("coordinate_derivations") or [])
+        if isinstance(item, dict) and item.get("rendered_text")
+    ]
+    if INLINE_POINT_COORD_RE.search(body):
+        if not coordinate_derivations:
+            return False, "Writer body uses coordinates without any approved coordinate snippet"
+        if not any(item["rendered_text"] in body for item in coordinate_derivations):
+            return False, "Writer body must reuse one approved coordinate snippet verbatim"
+
+    sentences = split_into_sentences(body)
+    if plan.get("aux_immediate_effects"):
+        if not any(
+            relation_mentioned_in_text(body, relation)
+            for relation in plan.get("aux_immediate_effects", [])
+            if isinstance(relation, str) and relation.strip()
+        ):
+            return False, "Writer body must state at least one approved aux_immediate_effect"
+
+    search_start = 0
+    for idx, step in enumerate(plan.get("bridge_chain", []) if isinstance(plan, dict) else []):
+        match_idx = None
+        claim = step.get("claim", "")
+        for sentence_idx in range(search_start, len(sentences)):
+            if relation_mentioned_in_text(sentences[sentence_idx], claim):
+                match_idx = sentence_idx
+                break
+        if match_idx is None:
+            return False, f"Writer body must explicitly realize bridge_chain[{idx}]"
+        search_start = match_idx + 1
+
+    for idx, step in enumerate(plan.get("goal_closure", []) if isinstance(plan, dict) else []):
+        match_idx = None
+        claim = step.get("claim", "")
+        for sentence_idx in range(search_start, len(sentences)):
+            if relation_mentioned_in_text(sentences[sentence_idx], claim):
+                match_idx = sentence_idx
+                break
+        if match_idx is None:
+            return False, f"Writer body must explicitly realize goal_closure[{idx}]"
+        search_start = match_idx + 1
+
+    goal_points = parse_goal_expression(visible_goal).get("points", [])
+    goal_keywords = goal_keyword_hints(visible_goal)
+    suffix = " ".join(sentences[max(0, len(sentences) - 2):]).lower()
+    if goal_points and not any(point in suffix for point in goal_points):
+        return False, "Writer body must close near the goal-side points"
+    if goal_keywords and not any(keyword in suffix for keyword in goal_keywords):
+        return False, "Writer body must close on the correct goal relation family"
+    return True, "Valid dossier writer body"
+
+
 def _resolve_raw_plan_support_ref(
     ref_text,
     cleaned_text_facts,
@@ -4104,7 +4697,14 @@ def run_plan_stage(
     }
 
 
-def run_plan_critic_stage(stage_name, messages, model_name, max_retries, fallback_model_names=None):
+def run_plan_critic_stage(
+    stage_name,
+    messages,
+    model_name,
+    max_retries,
+    fallback_model_names=None,
+    allow_revised_plan=False,
+):
     last_error = None
     last_output = None
     for attempt in range(1, max_retries + 1):
@@ -4116,7 +4716,9 @@ def run_plan_critic_stage(stage_name, messages, model_name, max_retries, fallbac
             last_output = output
             parsed = extract_json_object(output)
             if isinstance(parsed, dict) and isinstance(parsed.get("approved"), bool):
-                if parsed["approved"]:
+                if parsed["approved"] or (
+                    allow_revised_plan and isinstance(parsed.get("revised_dossier"), dict)
+                ):
                     return {
                         "success": True,
                         "output": output,
@@ -4147,8 +4749,21 @@ def run_plan_critic_stage(stage_name, messages, model_name, max_retries, fallbac
     }
 
 
-def run_writer_stage(stage_name, messages, model_name, visible_goal, injected_prefix, plan, max_retries, fallback_model_names=None):
+def run_writer_stage(
+    stage_name,
+    messages,
+    model_name,
+    visible_goal,
+    injected_prefix,
+    plan,
+    max_retries,
+    fallback_model_names=None,
+    validator_fn=None,
+    retry_feedback_builder=None,
+):
     del injected_prefix
+    validator_fn = validator_fn or validate_writer_body
+    retry_feedback_builder = retry_feedback_builder or build_writer_retry_feedback
     last_error = None
     last_output = None
     for attempt in range(1, max_retries + 1):
@@ -4158,7 +4773,7 @@ def run_writer_stage(stage_name, messages, model_name, visible_goal, injected_pr
             output = call_model(messages, model_name, fallback_model_names=fallback_model_names)
             elapsed = time.time() - start
             last_output = output
-            ok, message = validate_writer_body(
+            ok, message = validator_fn(
                 output,
                 visible_goal=visible_goal,
                 plan=plan,
@@ -4174,7 +4789,7 @@ def run_writer_stage(stage_name, messages, model_name, visible_goal, injected_pr
             last_error = message
             logger.warning(f"[{stage_name}] Validation failed: {message}")
             if attempt < max_retries:
-                feedback = build_writer_retry_feedback(message, plan)
+                feedback = retry_feedback_builder(message, plan)
                 messages = messages + [{"role": "user", "content": feedback}]
                 time.sleep(1)
         except Exception as exc:
@@ -4188,6 +4803,227 @@ def run_writer_stage(stage_name, messages, model_name, visible_goal, injected_pr
         "attempts_used": max_retries,
         "elapsed_seconds": None,
         "error": last_error or "Unknown error",
+    }
+
+
+def generate_dossier_thinking(
+    record,
+    image_path: Path,
+    aux_part,
+    sanitized_rest,
+    model_name,
+    max_retries,
+    verbose,
+    plan_mode=None,
+    fallback_model_names=None,
+    source_audit=None,
+):
+    point_coords = get_point_coords(record)
+    visible_goal = extract_problem_goal(record)
+    visible_text_facts = build_visible_text_facts(record)
+    hidden_milestone_summary = build_dossier_hidden_milestone_summary(
+        sanitized_rest,
+        aux_part,
+        visible_goal,
+        source_audit=source_audit,
+    )
+    visible_fact_relations = [fact.get("relation", "") for fact in visible_text_facts if fact.get("relation")]
+    plan_prompt = build_dossier_plan_prompt_text(
+        record,
+        aux_part,
+        visible_text_facts=visible_fact_relations,
+        point_coords=point_coords,
+        hidden_milestone_summary=hidden_milestone_summary,
+    )
+    plan_messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "image_url", "image_url": {"url": _encode_image_base64(image_path)}},
+                {"type": "text", "text": plan_prompt},
+            ],
+        }
+    ]
+    plan_result = run_plan_stage(
+        "plan",
+        plan_messages,
+        model_name=model_name,
+        fallback_model_names=fallback_model_names,
+        point_coords=point_coords,
+        visible_goal=visible_goal,
+        aux_part=aux_part,
+        coordinate_candidates=None,
+        sanitized_rest=sanitized_rest,
+        visible_premise_summaries=[fact["relation"] for fact in visible_text_facts],
+        visible_text_facts=visible_text_facts,
+        max_retries=max_retries,
+        validator_fn=validate_dossier_plan_response,
+        retry_feedback_builder=build_dossier_plan_retry_feedback,
+    )
+    if not plan_result["success"]:
+        return {
+            "success": False,
+            "thinking": plan_result["output"],
+            "plan_prompt": plan_prompt if verbose else None,
+            "write_prompt": None,
+            "plan_output": plan_result["output"] if verbose else None,
+            "plan_parsed": None,
+            "attempts_used": plan_result["attempts_used"],
+            "elapsed_seconds": plan_result["elapsed_seconds"],
+            "error": plan_result["error"],
+            "write_output": None,
+            "generation_style": "dossier_v1",
+        }
+
+    if plan_mode == "plan_only":
+        return {
+            "success": True,
+            "thinking": None,
+            "plan_prompt": plan_prompt if verbose else None,
+            "write_prompt": None,
+            "plan_output": json.dumps(plan_result["parsed"], ensure_ascii=False, indent=2) if verbose else None,
+            "plan_parsed": plan_result["parsed"],
+            "attempts_used": plan_result["attempts_used"],
+            "elapsed_seconds": plan_result["elapsed_seconds"],
+            "error": None,
+            "write_output": None,
+            "generation_style": "dossier_v1",
+        }
+
+    critic_prompt = build_dossier_critic_prompt_text(
+        record,
+        plan_result["parsed"],
+        hidden_milestone_summary=hidden_milestone_summary,
+    )
+    critic_messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "image_url", "image_url": {"url": _encode_image_base64(image_path)}},
+                {"type": "text", "text": critic_prompt},
+            ],
+        }
+    ]
+    critic_result = run_plan_critic_stage(
+        "plan_critic",
+        critic_messages,
+        model_name=model_name,
+        fallback_model_names=fallback_model_names,
+        max_retries=max_retries,
+        allow_revised_plan=True,
+    )
+    if not critic_result["success"]:
+        return {
+            "success": False,
+            "thinking": plan_result["output"],
+            "plan_prompt": plan_prompt if verbose else None,
+            "write_prompt": None,
+            "plan_output": json.dumps(plan_result["parsed"], ensure_ascii=False, indent=2) if verbose else None,
+            "plan_parsed": plan_result["parsed"],
+            "attempts_used": plan_result["attempts_used"] + critic_result["attempts_used"],
+            "elapsed_seconds": (plan_result["elapsed_seconds"] or 0.0) + (critic_result["elapsed_seconds"] or 0.0),
+            "error": critic_result["error"],
+            "write_output": None,
+            "generation_style": "dossier_v1",
+        }
+
+    if not critic_result["parsed"].get("approved") and isinstance(critic_result["parsed"].get("revised_dossier"), dict):
+        merged_revised_dossier = dict(plan_result["parsed"])
+        merged_revised_dossier.update(critic_result["parsed"]["revised_dossier"])
+        ok, message, cleaned_plan = validate_dossier_plan_response(
+            merged_revised_dossier,
+            point_coords,
+            visible_goal=visible_goal,
+            aux_part=aux_part,
+            visible_text_facts=visible_text_facts,
+        )
+        if not ok:
+            return {
+                "success": False,
+                "thinking": None,
+                "plan_prompt": plan_prompt if verbose else None,
+                "write_prompt": None,
+                "plan_output": json.dumps(plan_result["parsed"], ensure_ascii=False, indent=2) if verbose else None,
+                "plan_parsed": plan_result["parsed"],
+                "attempts_used": plan_result["attempts_used"] + critic_result["attempts_used"],
+                "elapsed_seconds": (plan_result["elapsed_seconds"] or 0.0) + (critic_result["elapsed_seconds"] or 0.0),
+                "error": f"critic revised_dossier invalid: {message}",
+                "write_output": None,
+                "generation_style": "dossier_v1",
+            }
+        plan_result["parsed"] = cleaned_plan
+
+    write_prompt = build_dossier_write_prompt_text(
+        record,
+        plan_result["parsed"],
+        aux_part=aux_part,
+        coordinate_derivation_block=build_coordinate_derivation_block(plan_result["parsed"], point_coords),
+    )
+    write_messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "image_url", "image_url": {"url": _encode_image_base64(image_path)}},
+                {"type": "text", "text": write_prompt},
+            ],
+        }
+    ]
+    write_result = run_writer_stage(
+        "write",
+        write_messages,
+        model_name=model_name,
+        fallback_model_names=fallback_model_names,
+        visible_goal=visible_goal,
+        injected_prefix="",
+        plan=plan_result["parsed"],
+        max_retries=max_retries,
+        validator_fn=validate_dossier_writer_body,
+        retry_feedback_builder=build_dossier_writer_retry_feedback,
+    )
+    assembled_thinking = None
+    if write_result["output"]:
+        assembled_thinking = f"<thinking>{write_result['output'].strip()}</thinking>"
+        is_valid, message = validate_thinking_response(
+            assembled_thinking,
+            point_coords=point_coords,
+            require_coord_tags=False,
+            max_total_len=compute_thinking_total_budget(plan_result["parsed"]),
+        )
+        if not is_valid:
+            return {
+                "success": False,
+                "thinking": assembled_thinking,
+                "plan_prompt": plan_prompt if verbose else None,
+                "write_prompt": write_prompt if verbose else None,
+                "plan_output": json.dumps(plan_result["parsed"], ensure_ascii=False, indent=2) if verbose else None,
+                "plan_parsed": plan_result["parsed"],
+                "attempts_used": plan_result["attempts_used"] + critic_result["attempts_used"] + write_result["attempts_used"],
+                "elapsed_seconds": (
+                    (plan_result["elapsed_seconds"] or 0.0) +
+                    (critic_result["elapsed_seconds"] or 0.0) +
+                    (write_result["elapsed_seconds"] or 0.0)
+                ),
+                "error": f"Final assembly validation failed: {message}",
+                "write_output": write_result["output"],
+                "generation_style": "dossier_v1",
+            }
+
+    return {
+        "success": write_result["success"],
+        "thinking": assembled_thinking,
+        "plan_prompt": plan_prompt if verbose else None,
+        "write_prompt": write_prompt if verbose else None,
+        "plan_output": json.dumps(plan_result["parsed"], ensure_ascii=False, indent=2) if verbose else None,
+        "plan_parsed": plan_result["parsed"],
+        "elapsed_seconds": (
+            (plan_result["elapsed_seconds"] or 0.0) +
+            (critic_result["elapsed_seconds"] or 0.0) +
+            (write_result["elapsed_seconds"] or 0.0)
+        ),
+        "attempts_used": plan_result["attempts_used"] + critic_result["attempts_used"] + write_result["attempts_used"],
+        "error": write_result["error"],
+        "write_output": write_result["output"],
+        "generation_style": "dossier_v1",
     }
 
 
@@ -4900,6 +5736,7 @@ def process_and_generate_sft(
     process_all,
     max_retries,
     plan_mode=None,
+    generation_style="dossier_v1",
     planner_style="default",
     run_metadata=None,
     run_dir=None,
@@ -4987,21 +5824,36 @@ def process_and_generate_sft(
                     image_path=str(image_path),
                     source_audit=source_audit,
                     error=f"Image not found: {image_path}",
+                    generation_style=generation_style,
                 ),
             }
 
-        generation = generate_thinking(
-            record,
-            image_path=image_path,
-            aux_part=record["_aux_part"],
-            sanitized_rest=record["_sanitized_rest"],
-            model_name=model_name,
-            fallback_model_names=fallback_model_names,
-            max_retries=max_retries,
-            verbose=verbose,
-            plan_mode=plan_mode,
-            planner_style=planner_style,
-        )
+        if generation_style == "dossier_v1":
+            generation = generate_dossier_thinking(
+                record,
+                image_path=image_path,
+                aux_part=record["_aux_part"],
+                sanitized_rest=record["_sanitized_rest"],
+                model_name=model_name,
+                fallback_model_names=fallback_model_names,
+                max_retries=max_retries,
+                verbose=verbose,
+                plan_mode=plan_mode,
+                source_audit=source_audit,
+            )
+        else:
+            generation = generate_thinking(
+                record,
+                image_path=image_path,
+                aux_part=record["_aux_part"],
+                sanitized_rest=record["_sanitized_rest"],
+                model_name=model_name,
+                fallback_model_names=fallback_model_names,
+                max_retries=max_retries,
+                verbose=verbose,
+                plan_mode=plan_mode,
+                planner_style=planner_style,
+            )
         public_problem = build_public_problem_text(record)
         aux_part = record["_aux_part"]
         goal_type = parse_goal_expression(visible_goal).get("predicate") or None
@@ -5049,6 +5901,7 @@ def process_and_generate_sft(
             source_audit=source_audit,
             generation_audit=generation_audit,
             generation=generation,
+            generation_style=generation_style,
         )
         return {"result_data": result_data, "item_record": item_record}
 
@@ -5089,6 +5942,7 @@ def process_and_generate_sft(
         num_workers=num_workers,
         max_retries_per_stage=max_retries,
         model_name=model_name,
+        generation_style=generation_style,
         output_jsonl=output_jsonl,
         artifacts_dir=run_dir,
         runtime_seconds=time.time() - start_time,
@@ -5186,6 +6040,13 @@ def parse_args():
         help="Write sampled inputs and item-level prompts/outputs to artifacts.",
     )
     parser.add_argument(
+        "--generation-style",
+        type=str,
+        default="dossier_v1",
+        choices=["dossier_v1", "model_evidence_legacy"],
+        help="Generation pipeline style. Default: dossier_v1.",
+    )
+    parser.add_argument(
         "--plan-only",
         action="store_true",
         help="Run only the planner stage and stop after plan validation/artifact export.",
@@ -5202,6 +6063,8 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
+    if args.generation_style != "model_evidence_legacy" and args.planner_style != "default":
+        raise SystemExit("--planner-style is supported only with --generation-style model_evidence_legacy")
     if args.planner_style != "default" and not args.plan_only:
         raise SystemExit("--planner-style raw_record_v1 is currently supported only together with --plan-only")
     fallback_model_names = normalize_model_name_list(args.fallback_models)
@@ -5232,6 +6095,7 @@ if __name__ == "__main__":
         model_name=args.model_name,
         fallback_model_names=fallback_model_names,
         plan_mode="plan_only" if args.plan_only else None,
+        generation_style=args.generation_style,
         planner_style=args.planner_style,
         verbose=args.verbose,
         random_sample=not args.sequential,

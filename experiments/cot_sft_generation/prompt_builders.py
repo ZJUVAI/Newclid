@@ -126,6 +126,57 @@ def build_raw_record_plan_json_example():
     )
 
 
+def build_dossier_plan_json_example():
+    return json.dumps(
+        {
+            "visible_facts": [
+                "line ab is parallel to line cd",
+                "ab equals ac",
+            ],
+            "image_scan": [
+                "points b, d, and f appear nearly collinear",
+                "point f looks like the midpoint of ac",
+            ],
+            "coordinate_checks": [
+                {
+                    "relation": "point f looks like the midpoint of ac",
+                    "points": ["f", "a", "c"],
+                    "calc_type": "midpoint",
+                    "why_it_matters": "this gives one concrete balance cue that can be reused after the helper is added.",
+                }
+            ],
+            "goal_obstacle": "the visible figure still lacks one clean bridge from the helper frame back to the target relation.",
+            "aux_motivation": "the helper should create one local consequence first and then reconnect that consequence to the broader figure.",
+            "construction": "construct point h so that ah equals dh and bh equals ch.",
+            "aux_immediate_effects": [
+                "ah equals dh",
+                "bh equals ch",
+            ],
+            "bridge_chain": [
+                {
+                    "claim": "ah equals bh",
+                    "supports": ["visible_facts[2]", "coordinate_checks[1]"],
+                    "why_next": "this creates one shared equality inside the helper frame before the transfer to the d-side and c-side.",
+                },
+                {
+                    "claim": "dh equals ch",
+                    "supports": ["aux_immediate_effects[1]", "bridge_chain[1]"],
+                    "why_next": "this transfers the helper control to the d-side and c-side before the final close.",
+                },
+            ],
+            "goal_closure": [
+                {
+                    "claim": "ad equals bc",
+                    "supports": ["bridge_chain[2]", "visible_facts[2]"],
+                    "why_next": "this is the target relation.",
+                }
+            ],
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
 def build_formal_language_guide():
     return (
         "- `cong a b c d`: segment ab equals segment cd.\n"
@@ -223,6 +274,56 @@ def build_raw_record_plan_prompt(record):
     )
 
 
+def build_dossier_plan_prompt(
+    record,
+    aux_part,
+    visible_text_facts,
+    point_coords,
+    hidden_milestone_summary,
+):
+    public_problem = build_public_problem_text(record)
+    visible_goal = extract_problem_goal(record)
+    hidden_aux_brief = build_hidden_aux_brief(aux_part)
+    return (
+        "You are planning a geometry CoT training example under a dossier protocol.\n\n"
+        "[Visible Inputs]\n"
+        "The final student will only see the image and the public problem text below.\n"
+        f"{public_problem}\n\n"
+        "[Visible Goal]\n"
+        f"{visible_goal}\n\n"
+        "[Visible Facts Extracted From The Public Problem]\n"
+        f"{json.dumps(visible_text_facts, ensure_ascii=False, indent=2)}\n\n"
+        "[Visible Point Coordinates]\n"
+        f"{json.dumps(point_coords, ensure_ascii=False, indent=2)}\n\n"
+        "[Hidden Milestone Summary]\n"
+        "These are soft supervision milestones only. They are here to keep the route plausible, "
+        "not to lock wording or exact step count.\n"
+        f"{json.dumps(hidden_milestone_summary, ensure_ascii=False, indent=2)}\n\n"
+        "[Hidden Aux Target]\n"
+        f"{hidden_aux_brief}\n\n"
+        "[Task]\n"
+        "Return exactly one JSON object that captures a full visible-only reasoning dossier. "
+        "The dossier should scan the figure, explain the obstacle, motivate the auxiliary construction, "
+        "state the immediate consequences, bridge back to the old figure, and close to the goal.\n\n"
+        "[Critical Requirements]\n"
+        "- Keep the reasoning visible-only in tone, even though hidden milestones are available.\n"
+        "- `visible_facts` should restate only public givens or direct public goal-side facts.\n"
+        "- `image_scan` should state concrete figure relations such as midpoint, collinear, equal-length, parallel, perpendicular, or cyclic cues, not generic scene description.\n"
+        "- Prefer direct relation sentences such as `a, c, e are collinear`, `line ae is perpendicular to line cf`, or `g is the midpoint of be`.\n"
+        "- `coordinate_checks` are optional. Use them only when they genuinely support a later bridge or closure step.\n"
+        "- If you use `coordinate_checks`, each one must name visible points only and explain why the check matters later.\n"
+        "- `construction` must match the hidden aux target itself. Do not invent a different helper condition.\n"
+        "- `aux_immediate_effects` must be direct consequences of the construction itself.\n"
+        "- `bridge_chain` and `goal_closure` must use supports of the form `visible_facts[i]`, `image_scan[i]`, `coordinate_checks[i]`, `aux_immediate_effects[i]`, or earlier `bridge_chain[i]`.\n"
+        "- Multi-point auxiliary constructions must explain the stages explicitly.\n"
+        "- Avoid vague phrases such as desired angle equality, desired ratio, specific angle conditions, necessary relationships, or this point is crucial.\n"
+        "- Do not mention proof ids, rule names, hidden hints, or coordinate-table wording.\n"
+        "- Do not use LaTeX or markdown code fences in JSON values.\n\n"
+        "[Output Schema Example]\n"
+        f"{build_dossier_plan_json_example()}\n"
+    )
+
+
 def build_plan_retry_feedback(validation_message, aux_part):
     hints = [
         "Return exactly one JSON object with all required top-level keys.",
@@ -239,6 +340,32 @@ def build_plan_retry_feedback(validation_message, aux_part):
         hints.append("Keep aux_direct_relations to direct local consequences of the construction itself.")
     if aux_part and aux_part.count("x00") > 1:
         hints.append("Because the auxiliary target introduces multiple points, construction should describe the stages explicitly.")
+    return "\n".join(f"- {hint}" for hint in hints)
+
+
+def build_dossier_plan_retry_feedback(validation_message, aux_part):
+    hints = [
+        "Return exactly one JSON object with all required dossier keys.",
+        "Use only support strings of the form visible_facts[i], image_scan[i], coordinate_checks[i], aux_immediate_effects[i], or earlier bridge_chain[i].",
+        "Keep the route visible-only in tone and avoid proof-engine phrasing.",
+        "Construction should match the hidden aux target instead of inventing a different helper condition.",
+    ]
+    if "image_scan" in validation_message:
+        hints.append("Each image_scan item should name a concrete geometric relation cue, not a generic description of the scene or the target.")
+        hints.append("Prefer direct relation sentences such as 'a, c, e are collinear' or 'line ae is perpendicular to line cf'.")
+    if "coordinate_checks" in validation_message:
+        hints.append("Coordinate checks are optional, but if present they must use visible points only and must support a later bridge or closure step.")
+    if "aux_immediate_effects" in validation_message:
+        hints.append("Keep aux_immediate_effects to direct consequences of the construction itself.")
+        hints.append("Mirror the hidden aux target exactly instead of inventing a different condition for the new point.")
+    if "goal_closure" in validation_message:
+        hints.append("Goal closure must end on the correct goal-side relation family and must mention the goal-side points.")
+    if "construction" in validation_message:
+        hints.append("Construction must mention the auxiliary point names explicitly, match the hidden aux target, and keep staged wording for multi-point constructions.")
+    if "forbidden pattern" in validation_message:
+        hints.append("Avoid phrases like desired angle equality, desired ratio, specific angle conditions, necessary relationships, or this point is crucial.")
+    if aux_part and aux_part.count("x00") > 1:
+        hints.append("Because the auxiliary target introduces multiple points, the construction and follow-up should say first/then/finally or an equivalent staged strategy.")
     return "\n".join(f"- {hint}" for hint in hints)
 
 
@@ -260,6 +387,29 @@ def build_raw_plan_retry_feedback(validation_message, aux_part):
     return "\n".join(f"- {hint}" for hint in hints)
 
 
+def build_dossier_critic_prompt(record, dossier, hidden_milestone_summary):
+    public_problem = build_public_problem_text(record)
+    visible_goal = extract_problem_goal(record)
+    return (
+        "You are checking a geometry reasoning dossier before it is rendered into final thinking.\n\n"
+        "[Visible Problem]\n"
+        f"{public_problem}\n\n"
+        "[Visible Goal]\n"
+        f"{visible_goal}\n\n"
+        "[Candidate Dossier]\n"
+        f"{json.dumps(dossier, ensure_ascii=False, indent=2)}\n\n"
+        "[Hidden Milestone Summary]\n"
+        f"{json.dumps(hidden_milestone_summary, ensure_ascii=False, indent=2)}\n\n"
+        "[Task]\n"
+        "Return exactly one JSON object with keys `approved`, `issues`, `summary`, and optional `revised_dossier`.\n"
+        "- `approved` must be true only if the dossier stays visible-only, avoids unsupported jumps, and genuinely closes to the visible goal.\n"
+        "- `issues` must be a short JSON list of concrete problems if not approved.\n"
+        "- `summary` must be one short sentence.\n"
+        "- `revised_dossier` may be included only when you can repair the route while preserving the same overall strategy.\n"
+        "Do not output prose outside the JSON object.\n"
+    )
+
+
 def build_plan_critic_prompt(record, plan, hidden_route_hints):
     public_problem = build_public_problem_text(record)
     visible_goal = extract_problem_goal(record)
@@ -279,6 +429,36 @@ def build_plan_critic_prompt(record, plan, hidden_route_hints):
         "- `issues` must be a short JSON list of concrete problems if not approved.\n"
         "- `summary` must be one short sentence.\n"
         "Do not rewrite the plan and do not output prose outside the JSON object.\n"
+    )
+
+
+def build_dossier_write_prompt(record, dossier, aux_part, coordinate_derivation_block):
+    public_problem = build_public_problem_text(record)
+    visible_goal = extract_problem_goal(record)
+    return (
+        "You are writing the final geometry thinking trace for SFT from an approved reasoning dossier.\n\n"
+        "[Visible Inputs]\n"
+        "The student will only see the image and the public problem text below.\n"
+        f"{public_problem}\n\n"
+        "[Visible Goal]\n"
+        f"{visible_goal}\n\n"
+        "[Approved Dossier]\n"
+        f"{json.dumps(dossier, ensure_ascii=False, indent=2)}\n\n"
+        "[Approved Coordinate Snippets]\n"
+        "These snippets are optional. Use one only when the dossier really depends on it, and keep it exactly as written.\n"
+        f"{coordinate_derivation_block}\n\n"
+        "[Hidden Aux Target]\n"
+        f"{build_hidden_aux_brief(aux_part)}\n\n"
+        "[Write Requirements]\n"
+        "- Output only the plain-text content that should go inside one <thinking>...</thinking> block.\n"
+        "- Write as if the reasoning comes from the image and the public problem text.\n"
+        "- Start from the real obstacle and auxiliary motivation, then carry the route through the construction to the goal.\n"
+        "- Distinguish public givens from figure observations in wording.\n"
+        "- You may omit coordinates entirely. If you use coordinates, reuse one approved snippet verbatim.\n"
+        "- Never assign coordinates to auxiliary points.\n"
+        "- Do not mention hidden proofs, hidden hints, a coordinate table, or external supervision.\n"
+        "- Do not use LaTeX, $...$, backticks, or XML tags.\n"
+        "- Make the auxiliary effects, bridge chain, and goal closure explicit.\n"
     )
 
 
@@ -312,6 +492,31 @@ def build_write_prompt(record, plan, aux_part, coordinate_derivation_block):
     )
 
 
+def build_dossier_writer_retry_feedback(validation_message, dossier):
+    hints = [
+        "Output only plain text, not <thinking> tags.",
+        "Keep the body faithful to the approved dossier.",
+    ]
+    if "coordinate snippet" in validation_message:
+        hints.append("If you use coordinates, reuse one approved coordinate snippet verbatim.")
+    if "aux_immediate_effects" in validation_message:
+        hints.append("State at least one direct consequence of the auxiliary construction before the bridge chain moves on.")
+    if "bridge_chain" in validation_message:
+        hints.append("Make each bridge claim explicit in order, without skipping the middle of the route.")
+    if "goal_closure" in validation_message:
+        hints.append("State the goal-side closing claim explicitly near the end.")
+    if "first-person" in validation_message:
+        hints.append("Use impersonal phrasing such as 'the obstacle is' or 'this gives'.")
+    focus_points = []
+    for step in dossier.get("bridge_chain", []) if isinstance(dossier, dict) else []:
+        for support in step.get("supports", []) or []:
+            if isinstance(support, str) and support not in focus_points:
+                focus_points.append(support)
+    if focus_points:
+        hints.append(f"Keep the body grounded in dossier items such as {', '.join(focus_points[:5])}.")
+    return "\n".join(f"- {hint}" for hint in hints)
+
+
 def build_writer_retry_feedback(validation_message, plan):
     hints = [
         "Output only plain text, not <thinking> tags.",
@@ -336,6 +541,12 @@ def build_writer_retry_feedback(validation_message, plan):
 
 
 __all__ = [
+    "build_dossier_critic_prompt",
+    "build_dossier_plan_json_example",
+    "build_dossier_plan_prompt",
+    "build_dossier_plan_retry_feedback",
+    "build_dossier_write_prompt",
+    "build_dossier_writer_retry_feedback",
     "build_formal_language_guide",
     "build_plan_json_example",
     "build_plan_prompt",

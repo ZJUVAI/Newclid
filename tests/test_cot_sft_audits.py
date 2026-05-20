@@ -403,6 +403,58 @@ class CotSftAuditsTest(unittest.TestCase):
 
         self.assertIn("bridge_supports_missing_in_body:1", audit["issues"])
 
+    def test_audit_generation_quality_uses_dossier_specific_checks(self):
+        record = {
+            "point_coords_grid": {
+                "a": [0, 0],
+                "b": [4, 0],
+                "c": [0, 2],
+                "d": [4, 2],
+            }
+        }
+        generation = {
+            "plan_parsed": {
+                "dossier_version": "dossier_v1",
+                "image_scan": ["point a looks like the midpoint of bc"],
+                "coordinate_relations": ["point a looks like the midpoint of bc"],
+                "aux_immediate_effects": ["ah equals dh", "bh equals ch"],
+                "bridge_chain": [
+                    {
+                        "claim": "ah equals bh",
+                        "supports": ["visible_facts[2]", "coordinate_checks[1]"],
+                        "why_next": "this creates the helper balance.",
+                    },
+                    {
+                        "claim": "dh equals ch",
+                        "supports": ["aux_immediate_effects[1]", "bridge_chain[1]"],
+                        "why_next": "this transfers the helper balance.",
+                    },
+                ],
+                "goal_closure": [
+                    {
+                        "claim": "ad equals bc",
+                        "supports": ["bridge_chain[2]", "visible_facts[2]"],
+                        "why_next": "this is the target relation.",
+                    }
+                ],
+            },
+            "write_output": (
+                "The obstacle is to transfer the d-side and c-side through one helper frame before the target equality closes. "
+                "The figure also suggests that point a looks like the midpoint of bc, so the outer balance around a, b, and c is worth tracking. "
+                "Construct point h such that ah equals dh and bh equals ch. "
+                "From the construction, ah equals dh and bh equals ch. "
+                "These equalities give ah equals bh, which creates one shared balance inside the helper frame. "
+                "Then dh equals ch, so that helper balance reaches the d-side and c-side. "
+                "Therefore ad equals bc."
+            ),
+        }
+
+        audit = audit_generation_quality(record, generation, "<aux>x00 h : cong a h d h; cong b h c h</aux>")
+
+        self.assertNotIn("bridge_supports_missing_in_body:0", audit["issues"])
+        self.assertNotIn("bridge_supports_missing_in_body:1", audit["issues"])
+        self.assertNotIn("goal_closure_missing_in_body:0", audit["issues"])
+
 
 if __name__ == "__main__":
     unittest.main()

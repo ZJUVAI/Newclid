@@ -1,6 +1,11 @@
 import unittest
 
 from experiments.cot_sft_generation.prompt_builders import (
+    build_dossier_critic_prompt,
+    build_dossier_plan_prompt,
+    build_dossier_plan_retry_feedback,
+    build_dossier_write_prompt,
+    build_dossier_writer_retry_feedback,
     build_formal_language_guide,
     build_plan_critic_prompt,
     build_plan_prompt,
@@ -160,6 +165,86 @@ class CotSftPromptBuildersTest(unittest.TestCase):
         self.assertIn("goal_bottleneck -> helper_idea -> construction", planning_guidance)
         self.assertIn("coordinate_derivations", raw_feedback)
         self.assertIn("bridge_steps[i]", raw_feedback)
+
+    def test_build_dossier_plan_prompt_uses_visible_coords_and_hidden_milestones(self):
+        prompt = build_dossier_plan_prompt(
+            self.record,
+            "<aux>x00 h : midp h b c</aux>",
+            ["line ab is parallel to line cd", "ab equals ac"],
+            self.record["point_coords_grid"],
+            {
+                "immediate_aux_milestones": ["ah equals dh"],
+                "plausible_bridge_milestones": ["angle abc equals angle cda"],
+                "plausible_goal_closures": ["angle abc equals angle dcb"],
+                "source_audit_flags": [],
+            },
+        )
+
+        self.assertIn("[Visible Point Coordinates]", prompt)
+        self.assertIn("[Hidden Milestone Summary]", prompt)
+        self.assertIn("coordinate_checks", prompt)
+        self.assertIn("visible_facts[i]", prompt)
+        self.assertIn("Do not invent a different helper condition", prompt)
+
+    def test_build_dossier_plan_retry_feedback_mentions_dossier_supports(self):
+        feedback = build_dossier_plan_retry_feedback(
+            "goal_closure must finish on the correct goal relation family",
+            "<aux>x00 h : coll h a b; x00 k : perp k h a b</aux>",
+        )
+
+        self.assertIn("visible_facts[i]", feedback)
+        self.assertIn("goal closure", feedback.lower())
+        self.assertIn("staged strategy", feedback.lower())
+        self.assertIn("hidden aux target", feedback.lower())
+
+    def test_build_dossier_critic_prompt_requests_optional_revised_dossier(self):
+        prompt = build_dossier_critic_prompt(
+            self.record,
+            {
+                "visible_facts": ["line ab is parallel to line cd"],
+                "image_scan": ["point h looks like the midpoint of bc"],
+                "coordinate_checks": [],
+                "goal_obstacle": "one bridge is still missing.",
+                "aux_motivation": "a helper should create a local balance first.",
+                "construction": "construct point h on bc.",
+                "aux_immediate_effects": ["h, b, c are collinear"],
+                "bridge_chain": [{"claim": "ab equals ac", "supports": ["visible_facts[1]"], "why_next": "this helps."}],
+                "goal_closure": [{"claim": "angle abc equals angle dcb", "supports": ["bridge_chain[1]"], "why_next": "this is the target."}],
+            },
+            {"plausible_goal_closures": ["angle abc equals angle dcb"]},
+        )
+
+        self.assertIn("revised_dossier", prompt)
+        self.assertIn("[Candidate Dossier]", prompt)
+
+    def test_build_dossier_write_prompt_mentions_optional_coordinates(self):
+        prompt = build_dossier_write_prompt(
+            self.record,
+            {
+                "goal_obstacle": "one bridge is missing.",
+                "aux_motivation": "a helper should create local balance first.",
+                "construction": "construct point h on bc.",
+                "aux_immediate_effects": ["h, b, c are collinear"],
+                "bridge_chain": [{"claim": "ab equals ac", "supports": ["visible_facts[1]"], "why_next": "this helps."}],
+                "goal_closure": [{"claim": "angle abc equals angle dcb", "supports": ["bridge_chain[1]"], "why_next": "this is the target."}],
+            },
+            "<aux>x00 h : midp h b c</aux>",
+            "- No explicit coordinate computation is required.",
+        )
+
+        self.assertIn("[Approved Dossier]", prompt)
+        self.assertIn("You may omit coordinates entirely", prompt)
+
+    def test_build_dossier_writer_retry_feedback_mentions_goal_closure(self):
+        feedback = build_dossier_writer_retry_feedback(
+            "Writer body must explicitly realize goal_closure[0]",
+            {
+                "bridge_chain": [{"supports": ["visible_facts[1]", "coordinate_checks[1]"]}],
+            },
+        )
+
+        self.assertIn("goal-side closing claim", feedback)
+        self.assertIn("visible_facts[1]", feedback)
 
 
 if __name__ == "__main__":
