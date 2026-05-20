@@ -1,0 +1,41 @@
+{
+  "artifact_schema_version": "cot_sft_artifacts_v1",
+  "started_at_utc": "2026-05-20T05:52:14+00:00",
+  "script": "/root/GenesisGeo-cot/experiments/cot_sft_generation/generate_cot_sft.py",
+  "cwd": "/root/GenesisGeo-cot",
+  "repo_root": "/root/GenesisGeo-cot",
+  "model_name": "qwen/qwen2.5-vl-72b-instruct",
+  "fallback_model_names": [
+    "gpt-4.1-mini",
+    "gpt-4o-mini"
+  ],
+  "api_base_url": "https://api.zjuqx.cn/v1",
+  "api_timeout_seconds": 120.0,
+  "api_call_retries": 3,
+  "api_retry_backoff_seconds": 3.0,
+  "default_input_jsonl": "/root/GenesisGeo-cot/datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl",
+  "output_jsonl": "/root/GenesisGeo-cot/experiments/cot_sft_generation/generated/dossier_v1_stratified4_20260520.jsonl",
+  "run_dir": "/root/GenesisGeo-cot/experiments/cot_sft_generation/generated/dossier_v1_stratified4_20260520_artifacts_20260520_055214",
+  "arguments": {
+    "input": "experiments/cot_sft_generation/benchmarks/stratified_v1_12sample_input.jsonl",
+    "output": "experiments/cot_sft_generation/generated/dossier_v1_stratified4_20260520.jsonl",
+    "num_samples": 4,
+    "process_all": false,
+    "num_workers": 1,
+    "model_name": "qwen/qwen2.5-vl-72b-instruct",
+    "fallback_models": "gpt-4.1-mini,gpt-4o-mini",
+    "api_timeout_seconds": 120.0,
+    "max_retries": 2,
+    "sequential": true,
+    "verbose": true,
+    "generation_style": "dossier_v1",
+    "plan_only": false,
+    "planner_style": "default"
+  },
+  "git_commit": "0ee51463cfd88a2986e295ab5afc770923fbbe2a",
+  "git_branch": "feat/cot-sft-generation",
+  "git_dirty": true,
+  "resolved_input_jsonl": "/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/stratified_v1_12sample_input.jsonl",
+  "input_jsonl_sha256": "d1564ef9bb5cb66a9c75aca50c13fdcf5ba6405f465ddc20f1c24ca10a556819",
+  "input_jsonl_bytes": 35792
+}

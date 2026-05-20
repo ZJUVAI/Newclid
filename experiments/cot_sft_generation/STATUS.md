@@ -98,10 +98,47 @@
     - 当前结果：全部检查通过
 - 这一步的作用不是直接证明语义质量已经够好，而是把“visual cue 只停留在 prefix、正文又退回 anchor-only narration”这个已知失败模式正式收进实现与回归基线。
 
+### 阶段 8：`dossier_v1` 默认化并做第一次端到端 live 审读
+
+- 2026-05-20，默认生成风格已经从旧的 `model_evidence` 切到 `dossier_v1`：
+  - 默认：`--generation-style dossier_v1`
+  - fallback：`--generation-style model_evidence_legacy`
+- 这轮不是只改 prompt，而是同时完成了：
+  - dossier prompt / schema / validator / writer 主链落地
+  - legacy fallback 路由保留
+  - `generation_style` 写入 run artifacts / semantic review context
+  - dossier-specific generation audit 分支
+  - critic `revised_dossier` patch merge 回原 dossier 的运行时处理
+- 自动回归：
+  - `python -m unittest discover -s tests -p 'test_cot_sft_*.py'`
+    - 当前结果：`Ran 71 tests ... OK`
+  - `python experiments/cot_sft_generation/maintenance_smoke_check.py`
+    - 当前结果：全部检查通过
+- 真实 live run 证据：
+  - run：`generated/dossier_v1_stratified4_rerun4_20260520.jsonl`
+  - artifacts：`generated/dossier_v1_stratified4_rerun4_20260520_artifacts_20260520_062623/summary.json`
+  - 模型：`qwen/qwen2.5-vl-72b-instruct`
+  - 结果：
+    - `surface_pass`: `3/4`
+    - `avg_attempts_used`: `5.25`
+    - 剩余 `1` 条失败原因：writer length budget
+- 真实人工/Codex 语义审读：
+  - 同一 run 的 `3` 条 `surface_pass` 样本已回填到 `semantic_audits.jsonl`
+  - 审读结果：
+    - `semantic_pass`: `0/3`
+    - `manual_critical_error`: `3/3`
+  - 主要问题：
+    - bridge relation 仍然常常不能由 cited supports 推出
+    - 一些样本虽然 `surface_pass`，但后半段 route 仍然是伪闭环
+    - 这说明 `dossier_v1` 已经把端到端 orchestration 跑通，但默认 `qwen` 还没有给出可直接批量使用的语义质量
+
 ## 当前流程概括
 
+- 当前默认主链：`dossier_v1`
+- 当前 fallback：`model_evidence_legacy`
+
 1. 输入处理
-   - 读取题面、图片、`<aux>`、proof、visible point 坐标等字段。
+  - 读取题面、图片、`<aux>`、proof、visible point 坐标等字段。
    - 只把图片和题面视为未来学生可见输入，其余字段只在生成期做监督。
 
 2. `source audit`
@@ -260,6 +297,11 @@
     - sample1：`plan 1 + write 1`
     - sample2：`plan 1 + write 1`
     - sample3：`plan 1 + write 2`
+- 如果只看当前默认 `dossier_v1` 主链：
+  - 最新真实证据是 `generated/dossier_v1_stratified4_rerun4_20260520_artifacts_20260520_062623/summary.json`
+  - `surface_pass`: `3/4`
+  - 但经人工/Codex 审读后，`semantic_pass`: `0/3`
+  - 因此它已经证明“新链路能跑通且 surface 改善明显”，还没有证明“默认模型输出已经达到 README 的数据质量目标”
 - 如果按 `semantic_pass` 看，当前还没有一轮最新 run 能证明“这一批样本已经达到 README 的数据质量目标”：
   - 对 `v142` 的人工/Codex 审读结论是：`4/4 surface_pass`，但 `0/4 semantic_pass`
   - 其中 sample0 最接近可用，但后半段 bridge 仍有支撑错位和 route 落地不实的问题

@@ -10,6 +10,28 @@
 2. 导出时只保留学生未来能看到的输入，也就是图片和题面。
 3. 最终 `thinking` 必须像是“看图后形成的辅助构造思路”，不能泄露 hidden proof 或坐标表来源。
 
+## 1.1 2026-05 默认运行状态
+
+- 当前 runtime 默认：`generation_style = dossier_v1`
+- 兼容 fallback：`generation_style = model_evidence_legacy`
+- `dossier_v1` 的主字段是：
+  - `visible_facts`
+  - `image_scan`
+  - `coordinate_checks`（可选）
+  - `goal_obstacle`
+  - `aux_motivation`
+  - `construction`
+  - `aux_immediate_effects`
+  - `bridge_chain`
+  - `goal_closure`
+- `plan critic` 现在允许返回部分 `revised_dossier` patch；runtime 会先和原 dossier merge，再重新做脚本校验。
+- 2026-05-20 的默认模型 live 证据见：
+  - `generated/dossier_v1_stratified4_rerun4_20260520_artifacts_20260520_062623/summary.json`
+  - 结果：`3/4 surface_pass`
+  - 同一 run 的人工/Codex 语义审读结果：`0/3 semantic_pass`，`3/3 manual_critical_error`
+
+下面详细字段说明里仍保留了 legacy `model_evidence` 的字段和 contract，目的是方便维护 fallback 路线；当 README、STATUS 与本文件局部描述有冲突时，以 README 和 STATUS 中的最新 rollout 状态为准。
+
 ## 2. 实际流水线
 
 ### 2.1 输入读取
@@ -41,7 +63,28 @@
 
 ### 2.3 `plan` 阶段
 
-当前实现只保留单模式 `model_evidence`：
+当前有两条可运行链路：
+
+- 默认：`dossier_v1`
+- fallback：`model_evidence_legacy`
+
+其中 `dossier_v1` 是当前主链，`model_evidence_legacy` 只保留给回放、旧 artifact 对齐和回退验证。
+
+`dossier_v1` 的实际流程是：
+
+1. 脚本给 planner 提供：
+   - 公开题面
+   - 可见点坐标
+   - visible text facts
+   - hidden milestone summary
+   - hidden aux brief
+2. planner 直接输出完整 dossier。
+3. 脚本做 relation normalization、aux alignment、support parsing、goal-side closure 校验。
+4. `plan critic` 可以返回 `approved=true`，也可以返回部分 `revised_dossier` patch。
+5. runtime 把 patch merge 回原 dossier，再做一次完整 dossier 校验。
+6. writer 基于批准后的 dossier 写最终正文。
+
+legacy `model_evidence_legacy` 的流程如下，保留原说明用于 fallback 维护：
 
 1. 脚本先抽取三类证据：
    - `visible_text_facts`

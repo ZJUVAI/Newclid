@@ -199,56 +199,78 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 
 ## 当前生成框架
 
-当前代码是“脚本提证据 + 模型定路线 + 脚本复算/验收”的单模式 `model_evidence` 流程：
+当前默认主链已经切到 `dossier_v1`，旧的 `model_evidence` 路线保留为显式 fallback：
+
+- 默认：`--generation-style dossier_v1`
+- 兼容 fallback：`--generation-style model_evidence_legacy`
+
+`dossier_v1` 的核心思想是：把 route 的主导权交给模型，但把真正 deterministic 的部分继续交给脚本兜底，例如 aux 构造语义对齐、自然语言关系归一化、support 引用解析、surface audit 和语义审读 artifacts。
 
 1. `source audit`
    - 先检查图片、题面、`<aux>`、proof、坐标字段是否缺失或明显冲突。
    - 发现异常先记录，不为了通过率强行硬写。
 
-2. `plan`
-   - planner 只输出结构化 JSON，不直接写整段 `thinking`。
-   - 脚本不会再预先锁死 bridge route，也不会再先产出 scripted skeleton。
-   - 脚本只提供三类证据：
-     - `visible_text_facts`
-     - `image_coordinate_candidates`
-     - `hidden_route_hints`
-   - planner 负责选择哪些 text facts / coordinate candidates 值得进入路线，并输出：
-     - `selected_text_fact_ids`
-     - `selected_coordinate_candidate_ids`
-     - `image_observations`
-     - `coordinate_derivations`
-     - `goal_bottleneck`
+2. `dossier plan`
+   - planner 只输出结构化 dossier，不直接写整段 `thinking`。
+   - 当前 dossier 主字段是：
+     - `visible_facts`
+     - `image_scan`
+     - `coordinate_checks`（可选）
+     - `goal_obstacle`
+     - `aux_motivation`
      - `construction`
-     - `aux_direct_relations`
-     - `bridge_steps`
-     - `goal_finish`
+     - `aux_immediate_effects`
+     - `bridge_chain`
+     - `goal_closure`
+   - planner 负责决定从哪里起手观察、aux 后果怎么回接旧图、最后怎样闭到 goal。
 
 3. `plan critic`
    - planner 产出后，会再走一次 model critic。
-   - critic 只回答这条 plan 是否可接受，不负责改写 plan。
-   - 作用：
-     - 检查 bridge steps 的 `support_refs` 是否真的引用了前文证据
-     - 检查后半段是否仍对齐 hidden `bridge` / `goal_finish` hints
+   - critic 可以：
+     - 直接 `approved: true`
+     - 或返回 `revised_dossier`
+   - 当前实现把 `revised_dossier` 当成 patch，而不是要求 critic 重发完整 dossier：先和原 dossier merge，再重新做脚本校验。
 
-4. 脚本补全与复算
-   - 脚本会把所选 `T* / C* / B*` 关系解析成 writer 可直接复用的 surface forms。
-   - `coordinate_derivations` 会被脚本复算成 deterministic plain-text 计算句，避免模型胡写数值。
-   - 脚本保留 `visible_relations`、`coordinate_relations`、`bridge_steps[*].depends_on` 这类派生字段，方便 audit 和 replay。
+4. 脚本兜底与规范化
+   - 对 `image_scan` / `aux_immediate_effects` 做自然语言关系归一化，识别 `straight line`、`intersect at right angles`、`equidistant` 这类自然表述。
+   - 对 `supports` 兼容常见的 `0-based / 1-based` 混用。
+   - 当模型把 aux 构造写偏时，脚本会把 `construction` 对齐回 hidden `<aux>`，并优先保留直接由 aux 决定的 immediate consequences。
+   - 保留 dossier-first 字段，同时补兼容 alias，方便 artifacts / audits / replay 沿用原有分析工具。
 
 5. `write`
-   - writer 直接写完整 `thinking` 正文，不再走 injected prefix + body continuation。
-   - writer 可以显式写可见点坐标和 plain-text 计算，但不能写 auxiliary 点坐标。
-   - writer 必须把被选中的 `coordinate_derivations` 真正接入后续 bridge。
+   - writer 直接写完整 `thinking` 正文。
+   - writer 不再接 injected prefix continuation，而是从批准后的 dossier 写成完整 visible-only narrative。
+   - 如果用到显式坐标句，只能复用脚本批准的 plain-text snippet，且不能给 auxiliary 点分配坐标。
 
-6. 终检与导出
+6. 终检、artifact 与语义审读
    - writer 正文通过脚本终检后，才会组装成最终 `<thinking>...</thinking>`。
    - 终检会检查：
      - 长度和格式
      - shorthand / 泄露
      - inline visible-point coordinates 是否与源数据一致
-     - coordinate derivation 是否真的在正文里被复用
-     - bridge relation 是否逐句按顺序落实
-     - `goal_finish` 是否真的落地
+     - dossier 的 `bridge_chain` / `goal_closure` 是否在正文中按顺序落实
+     - 收尾是否落到 goal-side points 和 goal relation family
+   - run artifacts 里会显式记录：
+     - `generation_style`
+     - `surface_pass`
+     - `semantic_audits.jsonl`
+     - `summary.json` 里的 `semantic_review_status` / `semantic_pass_rate`
+
+## 最新实测（2026-05-20）
+
+- 默认模型 `qwen/qwen2.5-vl-72b-instruct`
+- 基准：`benchmarks/stratified_v1_12sample_input.jsonl` 中分层抽样 `4` 条
+- 真实 run：
+  - `generated/dossier_v1_stratified4_rerun4_20260520.jsonl`
+  - `generated/dossier_v1_stratified4_rerun4_20260520_artifacts_20260520_062623/summary.json`
+- 结果：
+  - `surface_pass`: `3/4`
+  - 对这 `3` 条 `surface_pass` 样本做了人工/Codex 审读后：
+    - `semantic_pass`: `0/3`
+    - `manual_critical_error`: `3/3`
+- 当前结论：
+  - `dossier_v1` 端到端已经跑通，且比最初的 `0/4` 有明显 surface 改善。
+  - 但以 README 的数据质量目标衡量，默认 `qwen` 这轮输出仍然不能直接用于批量生产，主要问题还是 bridge 语义不成立、goal 尾段未真实闭环。
 
 更细的字段说明和脚本过程见 [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/CURRENT_DESIGN.md)。
 

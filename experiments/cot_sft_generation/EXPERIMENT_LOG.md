@@ -2,6 +2,76 @@
 
 本文件用于实时记录 `experiments/cot_sft_generation` 近期实验、证据和当前运行状态。
 
+## 2026-05-20 dossier_v1 默认化与第一次 live 语义审读
+
+### 本轮实现
+
+- 默认主链切到 `dossier_v1`
+  - CLI 默认：`--generation-style dossier_v1`
+  - legacy fallback：`--generation-style model_evidence_legacy`
+- 新增 / 调整：
+  - dossier planner prompt / critic prompt / writer prompt
+  - dossier plan validator / writer validator
+  - critic `revised_dossier` patch merge 回原 dossier
+  - `generation_style` 写入 `item_records.jsonl`、`item_audits.jsonl`、`semantic_audits.jsonl`、`summary.json`
+  - dossier-specific `audit_generation_quality(...)` 分支
+- 为了让 live run 更贴近 README 的最终质量目标，又补了几类 runtime 兜底：
+  - `straight line` / `intersect at right angles` / `equidistant` 这类自然表述的 relation normalization
+  - dossier `supports` 的 `0-based / 1-based` 混用兼容
+  - `construction` 对齐 hidden `<aux>`
+  - `aux_immediate_effects` 优先回收到 direct aux consequences
+  - critic partial revision patch merge，而不是强迫 critic 重发完整 dossier
+
+### 自动验证
+
+- `python -m unittest discover -s tests -p 'test_cot_sft_*.py'`
+  - 当前结果：`Ran 71 tests ... OK`
+- `python experiments/cot_sft_generation/maintenance_smoke_check.py`
+  - 当前结果：全部检查通过
+
+### live run 记录
+
+- 失败摸底：
+  - `generated/dossier_v1_stratified4_20260520.jsonl`
+  - `generated/dossier_v1_stratified4_20260520_artifacts_20260520_055214/summary.json`
+  - 结果：`0/4`
+  - 主要原因：`coordinate_checks` 被误设为必填
+- 第二次摸底：
+  - `generated/dossier_v1_stratified4_rerun_20260520.jsonl`
+  - `generated/dossier_v1_stratified4_rerun_20260520_artifacts_20260520_055509/summary.json`
+  - 结果：`0/4`
+  - 主要原因：planner 仍被自然语言 relation、aux immediate consequences、support indexing 等机械摩擦卡住
+- 当前有效 run：
+  - `generated/dossier_v1_stratified4_rerun4_20260520.jsonl`
+  - `generated/dossier_v1_stratified4_rerun4_20260520_artifacts_20260520_062623/summary.json`
+  - 模型：`qwen/qwen2.5-vl-72b-instruct`
+  - 结果：
+    - `surface_pass`: `3/4`
+    - `surface_fail`: `1/4`
+    - 剩余失败原因：writer length budget
+
+### 人工 / Codex 语义审读
+
+- 对这轮 run 的 `3` 条 `surface_pass` 样本做了人工/Codex 审读，并回填：
+  - `generated/dossier_v1_stratified4_rerun4_20260520_artifacts_20260520_062623/semantic_audits.jsonl`
+- 汇总刷新后：
+  - `semantic_pass`: `0/3`
+  - `manual_critical_error`: `3/3`
+- 共性问题：
+  - bridge relation 仍经常不能由 cited supports 推出
+  - route 表面完整，但最后几步依然是假闭环
+  - 少数样本虽然 `surface_pass`，但正文还会泄露内部 dossier refs
+
+### 当前判断
+
+- `dossier_v1` 已经完成端到端落地，且比初始 `0/4` 明显更稳健。
+- 但当前默认 `qwen` 还没有给出可以记作 `semantic_pass` 的样本。
+- 因此，这轮改动的价值是：
+  - 新链路已经可运行、可回归、可审计
+  - `surface_pass` 不再被大量机械摩擦阻断
+  - 语义质量问题第一次被明确压缩到“bridge 支撑不成立 / goal 收尾不闭环”这类真正的主问题上
+  - 后续如果继续追 README 的最终目标，重点应放在 planner/critic 的真实几何支撑，而不是再继续修 schema 摩擦
+
 ## 2026-05-19 observation-first 补充快照
 
 ### 最近提交
