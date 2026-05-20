@@ -41,83 +41,65 @@
 
 ### 2.3 `plan` 阶段
 
-这一步已经支持两种模式：
+当前实现只保留单模式 `model_evidence`：
 
-- `llm`
-  - planner 直接从 prompt 产出完整结构化 JSON。
-- `hybrid`
-  - 脚本先生成 observation-first 的 skeleton。
-  - planner 再只负责把 skeleton 展开成自然语言化、route-aware 的正式 plan。
-  - 最后脚本再统一做规范化、route 对齐和 coverage 补全。
+1. 脚本先抽取三类证据：
+   - `visible_text_facts`
+   - `image_coordinate_candidates`
+   - `hidden_route_hints`
+2. planner 从这三类证据中自主选择真正要进入路线的元素。
+3. 脚本再做 schema 校验、support 引用校验、hidden-route bucket 对齐校验，并把所选证据派生为 writer/audit 继续使用的 surface forms。
 
-当前推荐模式是 `hybrid`，因为它能把“先观察图上局部关系，再决定 anchor 和桥接路线”这件事固定下来，而不是把起手观察完全交给模型自由发挥。
+这里不再有：
 
-当前 skeleton 的顺序已经改成：
+- `llm` vs `hybrid` 的模式分叉
+- scripted skeleton 锁 route
+- injected prefix 驱动 writer body
 
-1. 先整理 `observation_relations`
-2. 再派生 `coordinate_relations`
-3. 再选择最小 `anchor_points`
-4. 再组装 `figure_overview`、`goal_bottleneck`、`helper_idea`、`bridge_steps`
+当前 planner 的核心输出字段是：
 
-也就是说，anchor 现在只负责最终文本中的定向和坐标标注，不再是 plan 的起点。
+1. `selected_text_fact_ids`
+   - 来自公开题面的 `T*` 事实。
 
-`plan` 的原始必填字段如下：
+2. `selected_coordinate_candidate_ids`
+   - 来自 visible point 坐标计算出的 `C*` 候选。
 
-1. `anchor_points`
-   - 格式：`list[str]`
-   - 长度：`3` 或 `4`
-   - 含义：最终会被脚本打上 `<point>...<coord>...</coord>` 标签的可见锚点。
+3. `image_observations`
+   - 模型认为值得在最终 reasoning 里先指出的图像/坐标观察。
 
-2. `anchor_relation`
-   - 格式：`str`
-   - 含义：围绕 `anchor_points` 的一句可见关系，用于开场定向。
+4. `coordinate_derivations`
+   - 每条都要显式指定：
+     - `candidate_id`
+     - `relation`
+     - `points`
+     - `calc_type`
+     - `render_mode`
+     - `why_it_matters`
+   - 脚本会复算并渲染成 deterministic plain-text 计算句。
 
-3. `figure_overview`
-   - 格式：`str`
-   - 含义：锚点之外的整图概览，必须把注意力扩展到和目标相关的其他可见点或子结构。
+5. `goal_bottleneck`
+   - 当前图到 visible goal 之间真正缺的那一步。
 
-4. `observation_relations`
-   - 格式：`list[object]`
-   - 长度：通常 `1` 到 `3`
-   - 每个对象至少包含：
-     - `relation: str`
-     - `points: list[str]`
-   - 含义：先从图上值得优先盯住的局部几何 cue 出发，例如近共线、中点感、局部平行或局部垂直。
-   - 要求：这些 cue 最终必须能回收到 visible points 与坐标支持，而不是纯高层形状判断。
+6. `helper_idea`
+   - 需要什么辅助机制，例如等长转移、角对齐、比例桥接。
 
-5. `coordinate_relations`
-   - 格式：`list[str]`
-   - 长度：`2` 到 `3`
-   - 含义：由 visible-point 坐标支持的具体关系检查。
-   - 要求：必须 grounded 在脚本内部算出的 coordinate candidates 上，不能随意发明。
+7. `construction`
+   - 正式引入 aux；多点 aux 时必须写 staged strategy。
 
-6. `visible_relations`
-   - 格式：`list[str]`
-   - 长度：`2` 到 `4`
-   - 含义：题面里已有、后续桥接应该主动复用的可见 formal relations。
+8. `aux_direct_relations`
+   - 构造后立刻成立的本地结果。
 
-7. `coordinate_hints`
-   - 格式：`str`
-   - 含义：把 `coordinate_relations` 转成自然语言提示。
-   - 要求：不能说 `coordinate table`，也不能用 `symmetry`、`midpoint property` 这种偷懒话术。
+9. `bridge_steps`
+   - 每步都必须包含：
+     - `relation`
+     - `support_refs`
+     - `why_it_helps`
+     - `proof_alignment`
+     - `focus_points`
+   - `support_refs` 只能引用 `T*`、`C*` 或更早的 `B*`。
 
-8. `goal_bottleneck`
-   - 格式：`str`
-   - 含义：当前图到 visible goal 之间真正缺的那一步。
-
-9. `helper_idea`
-   - 格式：`str`
-   - 含义：需要什么辅助机制，例如等长转移、角对齐、比例桥接。
-   - 要求：还不能提前说出新点名字。
-
-10. `construction`
-   - 格式：`str`
-   - 含义：正式引入 aux。
-   - 多点 aux 时：必须写出 staged strategy，例如 `first ... then ...`。
-
-11. `aux_direct_relations`
-    - 格式：`list[str]`
-    - 长度：通常 `1` 到 `3`；多点 aux 或更复杂题型允许放宽到 `4`
+10. `goal_finish`
+    - 最终收尾的 goal-side relation。
     - 含义：构造一完成就直接成立的局部后果。
     - 要求：必须是 immediate consequences，不能跳进旧图深处。
 

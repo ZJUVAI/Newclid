@@ -82,9 +82,11 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 
 4. 坐标应当服务于几何关系判断，而不是只做标签
    - 生成期可以使用 `point_coords_grid` / `grid_coord` 做内部 sanity check。
-   - 坐标的作用应当是帮助教师模型确认哪些平行、垂直、等长、中点、共线、圆结构值得进一步追踪，而且这些判断不应只围着少数 anchor 点打转。
-   - 最终 `thinking` 中的坐标标签只是一层可见锚定；高质量样本还应当体现这些坐标支持的几何关系确实进入了推理链，尤其要能覆盖 anchor 之外的 goal-side / outer visible points。
-   - 当前实现已经进一步要求：先形成 `observation_relations` 这类局部 visual cue，再由脚本和 planner 把它们接回 `coordinate_relations`、bridge 路线和最终正文；不能只是先固定 anchor point，然后把后续几何关系与坐标和局部区域脱钩。
+   - 坐标的作用应当是帮助教师模型确认哪些平行、垂直、等长、中点、共线等关系值得进一步追踪，而且这些判断不应只围着少数点打转。
+   - 当前实现允许最终 `thinking` 显式写出可见点坐标、向量/长度/面积残差这类 plain-text 计算，但这些计算必须服务于后续 bridge 或 goal，而不是装饰性堆算式。
+   - 文本里必须区分：
+     - 题面直接给出的 visible text facts
+     - 从图片和可见点坐标中观察或计算出的 image / coordinate facts
 
 5. 需要包含从提出 aux 到解答出 goal 的完整逻辑
    - 高质量样本不能只说明“为什么要加这个点”，还要继续写清楚加点之后的关键关系如何逐步推进到最终结论。
@@ -197,7 +199,7 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 
 ## 当前生成框架
 
-当前代码是“脚本强约束 + 两阶段模型生成”：
+当前代码是“脚本提证据 + 模型定路线 + 脚本复算/验收”的单模式 `model_evidence` 流程：
 
 1. `source audit`
    - 先检查图片、题面、`<aux>`、proof、坐标字段是否缺失或明显冲突。
@@ -205,54 +207,46 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 
 2. `plan`
    - planner 只输出结构化 JSON，不直接写整段 `thinking`。
-   - 默认推荐 `--plan-mode hybrid`：脚本先生成 observation-first skeleton，再让 planner 展开。
-   - 关键字段包括：
-     - `anchor_points`
-     - `observation_relations`
-     - `figure_overview`
-     - `coordinate_relations`
-     - `visible_relations`
+   - 脚本不会再预先锁死 bridge route，也不会再先产出 scripted skeleton。
+   - 脚本只提供三类证据：
+     - `visible_text_facts`
+     - `image_coordinate_candidates`
+     - `hidden_route_hints`
+   - planner 负责选择哪些 text facts / coordinate candidates 值得进入路线，并输出：
+     - `selected_text_fact_ids`
+     - `selected_coordinate_candidate_ids`
+     - `image_observations`
+     - `coordinate_derivations`
      - `goal_bottleneck`
      - `construction`
      - `aux_direct_relations`
      - `bridge_steps`
      - `goal_finish`
-   - 脚本会把 planner 输出继续规范化，并自动补齐 route / coverage 相关派生字段。
 
-3. 脚本补全中间约束
-   - 自动派生 `coverage_targets`，把 goal-side 非锚点区域显式交给 writer。
-   - 自动把 observation cues 变成 `observation_focus_relations` / `observation_focus_regions`，要求 writer 前段真的接回这些局部 visual cue。
-   - 为每个 `bridge_steps[*]` 自动补：
-     - `next_target_relation`
-     - `next_target_purpose`
-     - `required_supports`
-     - `focus_points`
-     - `preferred_sentence_shell`
-   - 对 `angle` / `similar` / `ratio` 这类高阶 bridge，还会检查 `required_supports` 是否已经覆盖当前 relation 里真正使用到的大部分 segment/ray 对象，避免正文一句里突然引入多个此前没有被 support 铺垫过的线段名。
-   - 如果 planner 只是把 coordinate-heavy 的外层点错误吸进了 `anchor_points`，导致非 anchor coverage 被人为吃掉，脚本会优先自动把多余 anchor 回收到最小 anchor frame，而不是立刻整条 plan 失败。
-   - 这些字段的目的，是强制 writer 不要只围着 anchor frame 打转，也不要跳过 bridge。
+3. `plan critic`
+   - planner 产出后，会再走一次 model critic。
+   - critic 只回答这条 plan 是否可接受，不负责改写 plan。
+   - 作用：
+     - 检查 bridge steps 的 `support_refs` 是否真的引用了前文证据
+     - 检查后半段是否仍对齐 hidden `bridge` / `goal_finish` hints
 
-4. `write`
-   - writer 只写 body 纯文本，不允许自己写 `<point>` / `<coord>`。
-   - 脚本会先注入 prefix：
-     - observation sentence
-     - figure overview sentence
-     - orientation / anchor sentence
-     - coordinate hint sentence
-     - visible relation sentence
-   - writer 实际吃到的是紧凑版 `Approved Writer Handoff`，而不是整份冗长 plan。
-   - prompt 中还会附带：
-     - `Global Coverage Targets`
-     - `Non-Skippable Bridge Checklist`
-     - 每个 bridge step 的 `preferred_sentence_shell`
+4. 脚本补全与复算
+   - 脚本会把所选 `T* / C* / B*` 关系解析成 writer 可直接复用的 surface forms。
+   - `coordinate_derivations` 会被脚本复算成 deterministic plain-text 计算句，避免模型胡写数值。
+   - 脚本保留 `visible_relations`、`coordinate_relations`、`bridge_steps[*].depends_on` 这类派生字段，方便 audit 和 replay。
 
-5. 终检与导出
-   - writer body 通过脚本终检后，才会组装成最终 `<thinking>...</thinking>`。
+5. `write`
+   - writer 直接写完整 `thinking` 正文，不再走 injected prefix + body continuation。
+   - writer 可以显式写可见点坐标和 plain-text 计算，但不能写 auxiliary 点坐标。
+   - writer 必须把被选中的 `coordinate_derivations` 真正接入后续 bridge。
+
+6. 终检与导出
+   - writer 正文通过脚本终检后，才会组装成最终 `<thinking>...</thinking>`。
    - 终检会检查：
      - 长度和格式
-     - prefix 重复
      - shorthand / 泄露
-     - observation cue 是否真的在正文里被复用，尤其是前 3 句
+     - inline visible-point coordinates 是否与源数据一致
+     - coordinate derivation 是否真的在正文里被复用
      - bridge relation 是否逐句按顺序落实
      - `goal_finish` 是否真的落地
 
@@ -267,7 +261,7 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 - `AR` / `r63` / `a01` 这类证明引擎痕迹
 - `sameclock` / `simtri` / `simtrir` 这类未来证明或引擎术语
 - “hidden reference / supervisor / given aux / rest of the proof” 等元话术
-- `coordinate` / `coordinates` / `coordinate table` 这类直接暴露 hidden 坐标来源的表述
+- `coordinate table` 这类直接暴露 hidden 坐标来源的表述
 - LaTeX / `$...$` 数学包裹
 - `this point is crucial` / `necessary relationships` / `help establish` 这类低信息密度套话
 
@@ -275,11 +269,7 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 
 - 输出必须是且仅是一个 `<thinking>...</thinking>` 块
 - `thinking` 长度足够；复杂题的总长度预算会按 plan 复杂度适度放宽
-- `<point>...</point><coord>(x,y)</coord>` 标签数量不能过多
-- 标签数量通常与 `anchor_points` 数一致；复杂题最多可放宽到 `5` 个
-- 至少出现一个 `<point>...</point><coord>(x,y)</coord>` 标签
-- 这些坐标必须与源数据中的 `point_coords_grid` / `grid_coord` 完全一致
-- `<point>` 标签不能单独出现，必须紧跟匹配坐标
+- 如果正文显式写了 `a=(x,y)` 这类可见点坐标，脚本会校验这些坐标必须与源数据中的 `point_coords_grid` / `grid_coord` 完全一致
 - `plan` 中的构造语义必须与 hidden aux 对齐，例如：
   - `midp` 必须明确 midpoint
   - `cyclic` 必须明确 circle / circumcircle / cyclic
