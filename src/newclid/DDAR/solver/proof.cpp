@@ -74,6 +74,12 @@ void Proof::ar(long long depth)
     {
         return;
     }
+
+    if (_statement->name() == "secant")
+    {
+        return;
+    }
+
     ensure_equations_initialized();
     for (const auto &req : _eqn_dist)
     {
