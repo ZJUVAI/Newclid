@@ -143,7 +143,7 @@ def reserve_port_across_hosts(hosts: list[str], max_attempts: int = 128) -> int:
     ) from last_error
 
 
-def reserve_unused_agent_ports(count: int) -> list[int]:
+def reserve_unused_ray_ports(count: int) -> list[int]:
     from ray._private.services import get_node_ip_address
 
     node_ip = get_node_ip_address()
@@ -160,29 +160,35 @@ def reserve_unused_agent_ports(count: int) -> list[int]:
 
 def ray_init_with_explicit_agent_ports(init_kwargs: dict[str, object]) -> None:
     # Ray still starts a dashboard agent even when include_dashboard=False.
-    # On this machine the auto-selected gRPC agent port has been colliding
-    # with lingering listeners on 127.0.0.1, so choose explicit free ports.
+    # Keep the agent ports and GCS port in one explicit pool so Ray does not
+    # auto-select a GCS port that collides with a dashboard agent port.
     from ray._private.parameter import RayParams
+    from ray._private.services import get_node_ip_address
 
+    node_ip = get_node_ip_address()
     (
+        gcs_server_port,
         metrics_agent_port,
         metrics_export_port,
         dashboard_agent_listen_port,
         runtime_env_agent_port,
-    ) = reserve_unused_agent_ports(4)
+    ) = reserve_unused_ray_ports(5)
     logger = logging.getLogger(__name__)
     logger.info(
-        "ray.init local port override: metrics_agent_port=%d metrics_export_port=%d dashboard_agent_listen_port=%d runtime_env_agent_port=%d",
+        "ray.init local port override: gcs_server_port=%d metrics_agent_port=%d metrics_export_port=%d dashboard_agent_listen_port=%d runtime_env_agent_port=%d node_ip=%s",
+        gcs_server_port,
         metrics_agent_port,
         metrics_export_port,
         dashboard_agent_listen_port,
         runtime_env_agent_port,
+        node_ip,
     )
 
     original_init = RayParams.__init__
 
     def patched_init(self, *args, **kwargs):
-        kwargs.setdefault("node_ip_address", "127.0.0.1")
+        kwargs.setdefault("node_ip_address", node_ip)
+        kwargs.setdefault("gcs_server_port", gcs_server_port)
         kwargs.setdefault("metrics_agent_port", metrics_agent_port)
         kwargs.setdefault("metrics_export_port", metrics_export_port)
         kwargs.setdefault("dashboard_agent_listen_port", dashboard_agent_listen_port)
