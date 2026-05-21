@@ -120,7 +120,7 @@ python experiments/cot_sft_generation/semantic_review.py \
    - 子集定义
    - 样本的 goal / aux 类型
    - 该回归集想监控的失败模式
-   - review-oriented benchmark 还应优先补 `source_index`、`focus_tags`、`review_axes` 和 `notes`
+   - review-oriented benchmark 还应优先补 `source_index`、`focus_tags`、`review_axes`、`must_check`、`review_prompts` 和 `notes`
 3. 如果某个历史固定回归集不再使用，应在 manifest 或文档中标明废弃，而不是直接静默删除
 4. 当前 `quality_review_v1` 是默认主 benchmark；`fixed_v104sample` 和 `stratified_v1_12sample` 保留为 legacy support packs
 5. `python experiments/cot_sft_generation/maintenance_smoke_check.py` 现在会递归校验本目录下所有 `*_manifest.json`
@@ -145,7 +145,11 @@ python experiments/cot_sft_generation/semantic_review.py \
 - 多点构造的 staged strategy、step ordering、bridge unfolding 相关改动：至少审 `multi_point_staging_priority`
 - 想看坐标 cue 是否真正进入推理链：优先审 `coordinate_integration_priority`
 - 想看是否真的覆盖整图：优先审 `whole_figure_coverage_priority`
+- 想看单点样本是否也会退化成“只看局部”：优先审 `single_point_whole_figure_coverage_priority`
+- 想看单点样本里坐标 cue 是否真的扛起桥接：优先审 `single_point_coordinate_integration_priority`
+- 想看后半段收尾是否容易伪闭环：优先审 `high_closure_depth_priority`
 - 想看 visible-only 边界是否退化：优先审 `visible_only_boundary_priority`
+- 想看多机制多点构造是否容易 route drift：优先审 `mixed_mechanism_multi_point_priority`
 
 ### 按回归目的改动
 

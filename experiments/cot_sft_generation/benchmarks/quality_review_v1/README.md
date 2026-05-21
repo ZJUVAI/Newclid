@@ -31,6 +31,20 @@ Any claim that a new chain is "good enough" still requires semantic review using
 - [quality_review_v1_manifest.json](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/quality_review_v1/quality_review_v1_manifest.json)
   - coverage, ordering, and review-axis metadata
 
+## What Was Enhanced In The Main Pack
+
+This pack is still 12 samples. The enhancement is not sample-count growth.
+
+The enhancement is in the review structure:
+
+- each record now carries `route_depth_hint`
+- each record now carries `figure_span_hint`
+- each record now carries `coordinate_dependency_hint`
+- each record now carries `must_check`
+- each record now carries `review_prompts`
+
+The goal is to make the main pack stronger as a reusable review baseline before adding a separate stress pack.
+
 ## Why This Pack Replaces The Old Default
 
 The old `stratified_v1_12sample` pack had the right sample pool but the wrong order for quick prefix runs:
@@ -102,3 +116,33 @@ Current review axes are:
 - `multi_point_staging`
 
 The point is not to turn those axes into automatic pass/fail metrics. They are prompts for which parts of the immutable quality target must be checked most carefully on each sample.
+
+## Record-Level Review Metadata
+
+The manifest now annotates each record with a few extra hints:
+
+- `route_depth_hint`
+  - how long and failure-prone the closing chain usually is
+- `figure_span_hint`
+  - how much of the visible figure should realistically enter the reasoning
+- `coordinate_dependency_hint`
+  - how strongly the sample depends on coordinate or image-derived cues staying alive in the route
+- `must_check`
+  - the highest-priority axes to verify first
+- `review_prompts`
+  - concrete questions for human review
+
+These fields are review guidance only. They are not automatic labels and they do not override the semantic review guide.
+
+## New Priority Subsets
+
+The main pack now exposes a few more targeted subsets:
+
+- `single_point_whole_figure_coverage_priority`
+  - single-point cases that still need broad visible-figure coverage
+- `single_point_coordinate_integration_priority`
+  - single-point cases where coordinate or image cues are especially important
+- `high_closure_depth_priority`
+  - cases with longer or more failure-prone back-half closure
+- `mixed_mechanism_multi_point_priority`
+  - multi-point cases that mix several helper mechanisms and therefore drift more easily

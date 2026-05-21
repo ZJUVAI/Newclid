@@ -8,6 +8,21 @@
   "selection_rationale": "Keep the proven 12 source items from stratified_v1_12sample, but attach explicit review axes and reorder them so quick prefix runs do not silently collapse to single-point-only coverage.",
   "ordering_rationale": "The first 4 items cover four goal families across both single-point and multi-point aux. The first 6 items cover all six core goal families with a 3 single-point / 3 multi-point split.",
   "acceptance_policy": "No numeric threshold in this manifest implies data-quality acceptance. Surface metrics and review tallies still require semantic review against docs/immutable/DATA_QUALITY_REQUIREMENTS.md.",
+  "review_axis_definitions": {
+    "visible_only_boundary": "Check that the final thinking reads as image-and-problem-only reasoning and does not slip into hidden-proof phrasing or internal schema references.",
+    "whole_figure_coverage": "Check that the route uses non-anchor visible structure and does not stay trapped around the first 2-3 named points.",
+    "coordinate_integration": "Check that coordinate or visual cues enter the actual reasoning chain rather than appearing as decorative labels.",
+    "aux_to_goal_closure": "Check that the text really closes the chain from aux immediate effects through bridge steps to the goal-side finish.",
+    "single_point_necessity": "Check that the single helper point is motivated as a necessary bridge and not as an arbitrary add-on.",
+    "multi_point_staging": "Check that each auxiliary point has an explicit staged role and the route does not flatten the construction into one lump."
+  },
+  "record_annotation_guide": {
+    "route_depth_hint": "A rough hint for how long and failure-prone the back-half closure tends to be. It is a review-priority hint, not an automatic metric.",
+    "figure_span_hint": "A rough hint for how broad the visible structure is that should enter the reasoning. It helps target full-figure coverage review.",
+    "coordinate_dependency_hint": "A rough hint for how much the sample relies on coordinate or image-derived cues to stay credible.",
+    "must_check": "The highest-priority review axes that should be checked first on this sample.",
+    "review_prompts": "Concrete human-review prompts that tie the sample back to the immutable data-quality requirements."
+  },
   "prefix_presets": {
     "quick4_balanced": 4,
     "quick6_goal_aux_balanced": 6,
@@ -25,6 +40,14 @@
       "image_path": "./datasets/20260512/imgs_png_inverted/771d102f839b4d2b_12.png",
       "focus_tags": ["ratio_finish", "midpoint_bridge", "single_point_necessity"],
       "review_axes": ["coordinate_integration", "aux_to_goal_closure", "single_point_necessity"],
+      "route_depth_hint": "high",
+      "figure_span_hint": "broad",
+      "coordinate_dependency_hint": "high",
+      "must_check": ["coordinate_integration", "aux_to_goal_closure", "single_point_necessity"],
+      "review_prompts": [
+        "Does the midpoint-style cue actually enter the ratio chain, or is it only mentioned near the start?",
+        "After the helper point is added, does the text explicitly close the ratio route instead of stopping at a plausible local balance?"
+      ],
       "notes": "Single midpoint-style helper. Useful for checking whether one local balance cue actually closes a ratio chain."
     },
     {
@@ -38,6 +61,14 @@
       "image_path": "./datasets/20260512/imgs_png_inverted/771d102f839b4d2b_997.png",
       "focus_tags": ["multi_point_staging", "angle_finish", "line_to_right_angle_bridge"],
       "review_axes": ["multi_point_staging", "whole_figure_coverage", "aux_to_goal_closure"],
+      "route_depth_hint": "high",
+      "figure_span_hint": "broad",
+      "coordinate_dependency_hint": "medium",
+      "must_check": ["multi_point_staging", "whole_figure_coverage", "aux_to_goal_closure"],
+      "review_prompts": [
+        "Is the multi-point construction explained as a real sequence of steps, with each point unlocking a distinct relation?",
+        "Does the angle route reconnect to the broader visible figure, or does it stay inside the helper frame too long?"
+      ],
       "notes": "Balanced-prefix multi-point angle case. Useful for checking staged collinear plus perpendicular narration."
     },
     {
@@ -51,6 +82,14 @@
       "image_path": "./datasets/20260512/imgs_png_inverted/771d102f839b4d2b_125.png",
       "focus_tags": ["double_cyclic", "similarity_bridge", "single_point_necessity"],
       "review_axes": ["visible_only_boundary", "aux_to_goal_closure", "single_point_necessity"],
+      "route_depth_hint": "medium",
+      "figure_span_hint": "broad",
+      "coordinate_dependency_hint": "medium",
+      "must_check": ["visible_only_boundary", "aux_to_goal_closure", "single_point_necessity"],
+      "review_prompts": [
+        "Does the text keep the cyclic route visible-only, or does it drift into proof-engine style circle talk?",
+        "Is the single helper point justified as necessary before the similarity closure is claimed?"
+      ],
       "notes": "Single-point double-cyclic case. Useful for checking whether circle talk stays grounded and still closes to similarity."
     },
     {
@@ -64,6 +103,14 @@
       "image_path": "./datasets/20260512/imgs_png_inverted/771d102f839b4d2b_2381.png",
       "focus_tags": ["multi_point_staging", "parallel_bridge", "reverse_similarity_finish"],
       "review_axes": ["multi_point_staging", "coordinate_integration", "aux_to_goal_closure"],
+      "route_depth_hint": "high",
+      "figure_span_hint": "broad",
+      "coordinate_dependency_hint": "high",
+      "must_check": ["multi_point_staging", "coordinate_integration", "aux_to_goal_closure"],
+      "review_prompts": [
+        "Do the parallel and perpendicular cues genuinely drive the reverse-similarity route, or are they just named and abandoned?",
+        "Is the final reverse-similarity closure explicit, or does the route jump over the last bridge?"
+      ],
       "notes": "Balanced-prefix reverse-similarity case. Useful for checking whether mixed helper mechanisms stay explicit and ordered."
     },
     {
@@ -77,6 +124,14 @@
       "image_path": "./datasets/20260512/imgs_png_inverted/771d102f839b4d2b_153.png",
       "focus_tags": ["congruence_setup", "right_angle_bridge", "congruence_finish"],
       "review_axes": ["coordinate_integration", "aux_to_goal_closure", "single_point_necessity"],
+      "route_depth_hint": "medium",
+      "figure_span_hint": "medium",
+      "coordinate_dependency_hint": "high",
+      "must_check": ["coordinate_integration", "aux_to_goal_closure", "single_point_necessity"],
+      "review_prompts": [
+        "Does the right-angle or perpendicular support actually justify the congruence route?",
+        "Is the single helper point shown to be the needed bridge into the congruence closure?"
+      ],
       "notes": "Single-point congruence case. Useful for checking whether the helper is necessary and the triangle closure is real."
     },
     {
@@ -90,6 +145,14 @@
       "image_path": "./datasets/20260512/imgs_png_inverted/771d102f839b4d2b_9121.png",
       "focus_tags": ["multi_point_staging", "midpoint_bridge", "reverse_congruence_finish"],
       "review_axes": ["multi_point_staging", "whole_figure_coverage", "coordinate_integration"],
+      "route_depth_hint": "high",
+      "figure_span_hint": "broad",
+      "coordinate_dependency_hint": "high",
+      "must_check": ["multi_point_staging", "whole_figure_coverage", "coordinate_integration"],
+      "review_prompts": [
+        "Does the midpoint language stay concrete and get reused later, or does it dissolve into vague helper narration?",
+        "Does the reasoning use enough of the visible frame beyond the new points to make the reverse-congruence finish credible?"
+      ],
       "notes": "Balanced-prefix reverse-congruence case. Useful for checking staged midpoint language in a larger visible frame."
     },
     {
@@ -103,6 +166,14 @@
       "image_path": "./datasets/20260512/imgs_png_inverted/771d102f839b4d2b_25.png",
       "focus_tags": ["cyclic_bridge", "collinearity_reuse", "angle_finish"],
       "review_axes": ["visible_only_boundary", "aux_to_goal_closure", "single_point_necessity"],
+      "route_depth_hint": "medium",
+      "figure_span_hint": "broad",
+      "coordinate_dependency_hint": "medium",
+      "must_check": ["visible_only_boundary", "aux_to_goal_closure", "single_point_necessity"],
+      "review_prompts": [
+        "Does the angle closure remain grounded in visible cyclic and collinear facts rather than proof shorthand?",
+        "Even though the helper is only one point, does the reasoning still use enough of the whole figure?"
+      ],
       "notes": "Single-point cyclic plus collinear angle case. Useful for checking whether angle closure stays visible-only and non-tautological."
     },
     {
@@ -116,6 +187,14 @@
       "image_path": "./datasets/20260512/imgs_png_inverted/771d102f839b4d2b_3643.png",
       "focus_tags": ["multi_point_staging", "ratio_finish", "shape_diversity"],
       "review_axes": ["multi_point_staging", "whole_figure_coverage", "aux_to_goal_closure"],
+      "route_depth_hint": "high",
+      "figure_span_hint": "broad",
+      "coordinate_dependency_hint": "medium",
+      "must_check": ["multi_point_staging", "whole_figure_coverage", "aux_to_goal_closure"],
+      "review_prompts": [
+        "Does the text keep the roles of the multiple helper mechanisms separate before they are merged into the ratio chain?",
+        "Is the final ratio closure explicit and complete, rather than implied by a generic similarity claim?"
+      ],
       "notes": "Multi-point ratio case. Useful for checking whether several helper mechanisms still close one clean ratio chain."
     },
     {
@@ -129,6 +208,14 @@
       "image_path": "./datasets/20260512/imgs_png_inverted/771d102f839b4d2b_86.png",
       "focus_tags": ["parallel_bridge", "right_angle_control", "similarity_finish"],
       "review_axes": ["coordinate_integration", "aux_to_goal_closure", "single_point_necessity"],
+      "route_depth_hint": "medium",
+      "figure_span_hint": "broad",
+      "coordinate_dependency_hint": "high",
+      "must_check": ["coordinate_integration", "aux_to_goal_closure", "single_point_necessity"],
+      "review_prompts": [
+        "Do the parallel and perpendicular cues enter the first real bridge, or are they only used as scene-setting?",
+        "Does the final similarity route reuse those cues explicitly enough to justify the reverse-similarity finish?"
+      ],
       "notes": "Single-point reverse-similarity case. Useful for checking whether parallel and perpendicular cues truly support the similarity route."
     },
     {
@@ -142,6 +229,14 @@
       "image_path": "./datasets/20260512/imgs_png_inverted/771d102f839b4d2b_6283.png",
       "focus_tags": ["multi_point_staging", "congruence_finish", "shape_diversity"],
       "review_axes": ["multi_point_staging", "whole_figure_coverage", "aux_to_goal_closure"],
+      "route_depth_hint": "high",
+      "figure_span_hint": "broad",
+      "coordinate_dependency_hint": "medium",
+      "must_check": ["multi_point_staging", "whole_figure_coverage", "aux_to_goal_closure"],
+      "review_prompts": [
+        "Does the route explain why each added point exists before claiming the congruence finish?",
+        "Does the text keep using the old visible frame, or does it collapse into helper-only narration?"
+      ],
       "notes": "Multi-point congruence case. Useful for checking whether a longer staged helper route stays explicit instead of collapsing into shorthand."
     },
     {
@@ -155,6 +250,14 @@
       "image_path": "./datasets/20260512/imgs_png_inverted/771d102f839b4d2b_422.png",
       "focus_tags": ["angle_transfer", "perpendicular_bridge", "reverse_congruence_finish"],
       "review_axes": ["visible_only_boundary", "coordinate_integration", "aux_to_goal_closure"],
+      "route_depth_hint": "high",
+      "figure_span_hint": "broad",
+      "coordinate_dependency_hint": "high",
+      "must_check": ["visible_only_boundary", "coordinate_integration", "aux_to_goal_closure"],
+      "review_prompts": [
+        "Is the angle-transfer story actually supported by visible relations, or does it smuggle in hidden-route confidence?",
+        "Do the coordinate or perpendicular cues stay alive through the final reverse-congruence closure?"
+      ],
       "notes": "Single-point reverse-congruence case. Useful for checking whether angle transfer language is actually supported."
     },
     {
@@ -168,6 +271,14 @@
       "image_path": "./datasets/20260512/imgs_png_inverted/771d102f839b4d2b_2213.png",
       "focus_tags": ["multi_point_staging", "cyclic_bridge", "similarity_finish"],
       "review_axes": ["visible_only_boundary", "whole_figure_coverage", "aux_to_goal_closure"],
+      "route_depth_hint": "high",
+      "figure_span_hint": "broad",
+      "coordinate_dependency_hint": "medium",
+      "must_check": ["visible_only_boundary", "whole_figure_coverage", "aux_to_goal_closure"],
+      "review_prompts": [
+        "Does the route stay figure-grounded after the helper expands, or does it drift into abstract cyclic shorthand?",
+        "When the text claims the similarity finish, are the last 2-4 steps really present and justified?"
+      ],
       "notes": "Multi-point similarity case. Useful for checking whether the route stays figure-grounded after several helper steps."
     }
   ],
@@ -187,6 +298,10 @@
     "multi_point_staging_priority": [1, 3, 5, 7, 9, 11],
     "whole_figure_coverage_priority": [1, 3, 5, 7, 9, 11],
     "coordinate_integration_priority": [0, 3, 4, 5, 8, 10],
+    "single_point_whole_figure_coverage_priority": [0, 2, 6, 8, 10],
+    "single_point_coordinate_integration_priority": [0, 4, 8, 10],
+    "high_closure_depth_priority": [0, 1, 3, 5, 7, 9, 10, 11],
+    "mixed_mechanism_multi_point_priority": [1, 3, 7, 9, 11],
     "visible_only_boundary_priority": [2, 6, 10, 11],
     "aux_to_goal_closure_priority": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
     "semantic_review_priority": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]

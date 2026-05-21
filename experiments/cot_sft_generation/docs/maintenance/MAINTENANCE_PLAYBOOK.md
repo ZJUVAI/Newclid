@@ -341,6 +341,7 @@
 - `quality_review_v1` 负责当前主线的 review-oriented 回归与人审抽样。
 - `fixed_v104sample` 负责最小稳定回放。
 - `stratified_v1_12sample` 负责保留旧的 12-sample lineage 顺序，方便历史对照。
+- 对 review-oriented benchmark，除了 `focus_tags` 和 `review_axes`，还应优先维护样本级 `must_check` 与 `review_prompts`，避免人审时又退回到“凭感觉看起来顺不顺”。
 - 但这仍不代表长期分层 benchmark 已经彻底补齐，例如不同 `aux_shape` 和更长尾失败模式还需要继续补。
 
 ## 4. 当前代码最需要避免的维护风险
