@@ -8,6 +8,7 @@
   - 距离可放心全量生产还有什么差距
 - 当前代码流程和字段细节见 [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/CURRENT_DESIGN.md)。
 - 按时间顺序的近期实验记录见 [EXPERIMENT_LOG.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/EXPERIMENT_LOG.md)。
+- 如果下一会话准备继续推进新链路，请先读 [DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/DOSSIER_V1_MAINLINE.md)。
 
 ## 阶段性进展
 

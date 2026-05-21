@@ -16,6 +16,7 @@
 
 ## 文档导航
 
+- [DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/DOSSIER_V1_MAINLINE.md)：如果后续会话要以 `dossier_v1` 作为唯一主线继续迭代，先读这份；它收了当前有效证据、主问题和推荐迭代顺序。
 - [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/CURRENT_DESIGN.md)：当前代码真正执行的流程、`plan` 字段、脚本派生字段、writer 约束。
 - [ARTIFACT_SCHEMA.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/ARTIFACT_SCHEMA.md)：`summary.json`、`item_records.jsonl`、`item_audits.jsonl`、`semantic_audits.jsonl` 的正式字段协议。
 - [SEMANTIC_REVIEW_GUIDE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/SEMANTIC_REVIEW_GUIDE.md)：`semantic_pass` / `manual_critical_error` / `issue_codes` 的统一人审口径。
@@ -198,6 +199,8 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 因此，日常内环迭代可以先靠脚本筛选，但任何声称“质量提升”或“可以批量生产”的结论，都必须经过 Codex 人审确认。
 
 ## 当前生成框架
+
+如果你接下来明确要以新链路为主线继续做迭代，请先读 [DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/DOSSIER_V1_MAINLINE.md)。下面这节描述的是当前实现本身，而不是“下个会话最该先做什么”。
 
 当前默认主链已经切到 `dossier_v1`，旧的 `model_evidence` 路线保留为显式 fallback：
 
