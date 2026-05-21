@@ -5,6 +5,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from experiments.cot_sft_generation.generate_cot_sft import (
+    build_scripted_dossier_skeleton,
+    generate_dossier_thinking,
     process_and_generate_sft,
     validate_dossier_plan_response,
     validate_dossier_writer_body,
@@ -127,6 +129,25 @@ DOSSIER_WRITER_BODY = (
 
 
 class CotSftFixturePipelineTest(unittest.TestCase):
+    @staticmethod
+    def _extract_aux_and_rest(record):
+        llm_output = record.get("llm_output_renamed", "")
+        aux_start = llm_output.lower().find("<aux>")
+        aux_end = llm_output.lower().find("</aux>")
+        aux_part = llm_output[aux_start: aux_end + 6] if aux_start >= 0 and aux_end >= 0 else ""
+        sanitized_rest = llm_output[aux_end + 6:] if aux_end >= 0 else llm_output
+        return aux_part, sanitized_rest
+
+    @staticmethod
+    def _load_quality_review_record(index):
+        benchmark_path = Path("experiments/cot_sft_generation/benchmarks/quality_review_v1/quality_review_v1_input.jsonl")
+        records = [
+            json.loads(line)
+            for line in benchmark_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        return records[index]
+
     def test_validate_dossier_plan_response_accepts_zero_based_supports_and_canonicalizes_aux(self):
         dossier = {
             "visible_facts": ["ad equals bc", "g is the midpoint of be"],
@@ -270,6 +291,101 @@ class CotSftFixturePipelineTest(unittest.TestCase):
 
         self.assertFalse(writer_ok)
         self.assertIn("Internal planning reference detected", writer_message)
+
+    def test_build_scripted_dossier_skeleton_accepts_real_simtri_benchmark_sample(self):
+        record = self._load_quality_review_record(3)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+
+        ok, message, dossier = build_scripted_dossier_skeleton(
+            record,
+            aux_part,
+            sanitized_rest,
+            record["point_coords_grid"],
+            "simtri a c g f a g",
+        )
+
+        self.assertTrue(ok, message)
+        self.assertGreaterEqual(len(dossier["bridge_chain"]), 3)
+        self.assertEqual(dossier["goal_closure"][-1]["claim"], "triangles acg and fag are similar")
+
+    def test_generate_dossier_thinking_plan_only_falls_back_to_scripted_skeleton(self):
+        record = self._load_quality_review_record(3)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            image_path = Path(temp_dir) / "fixture.png"
+            image_path.write_bytes(b"fixture-image")
+
+            with patch(
+                "experiments.cot_sft_generation.generate_cot_sft.call_model",
+                side_effect=["not a json plan"],
+            ):
+                result = generate_dossier_thinking(
+                    record=record,
+                    image_path=image_path,
+                    aux_part=aux_part,
+                    sanitized_rest=sanitized_rest,
+                    model_name="fixture-model",
+                    max_retries=1,
+                    verbose=True,
+                    plan_mode="plan_only",
+                )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["generation_style"], "dossier_v1")
+        self.assertIsNotNone(result["plan_parsed"])
+        self.assertEqual(result["plan_parsed"]["goal_closure"][-1]["claim"], "triangles acg and fag are similar")
+
+    def test_generate_dossier_thinking_scripted_fallback_skips_critic_in_full_generation(self):
+        record = self._load_quality_review_record(3)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+        writer_output = (
+            "The obstacle is to reconnect the helper circles to the target triangle comparison. "
+            "Construct point h so that a, b, e, h are concyclic and a, c, g, h are concyclic. "
+            "This immediately gives a, b, e, h are concyclic and a, c, g, h are concyclic. "
+            "Then angle ac/ag equals angle ch/gh, so one goal-side direction is now available. "
+            "Next angle ac/ah equals angle cg/gh, which keeps the route tied to triangles around a, c, g, and h. "
+            "After that ratio ac to af equals ratio cg to ag, so the side comparison needed for the target is in place. "
+            "Therefore triangles acg and fag are similar."
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            image_path = Path(temp_dir) / "fixture.png"
+            image_path.write_bytes(b"fixture-image")
+
+            with patch(
+                "experiments.cot_sft_generation.generate_cot_sft.call_model",
+                side_effect=["not a json plan"],
+            ) as call_model_mock, patch(
+                "experiments.cot_sft_generation.generate_cot_sft.run_plan_critic_stage",
+            ) as critic_mock, patch(
+                "experiments.cot_sft_generation.generate_cot_sft.run_writer_stage",
+                return_value={
+                    "success": True,
+                    "output": writer_output,
+                    "attempts_used": 1,
+                    "elapsed_seconds": 0.01,
+                    "error": None,
+                },
+            ) as writer_mock, patch(
+                "experiments.cot_sft_generation.generate_cot_sft.validate_thinking_response",
+                return_value=(True, "Valid thinking"),
+            ):
+                result = generate_dossier_thinking(
+                    record=record,
+                    image_path=image_path,
+                    aux_part=aux_part,
+                    sanitized_rest=sanitized_rest,
+                    model_name="fixture-model",
+                    max_retries=1,
+                    verbose=True,
+                )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(call_model_mock.call_count, 1)
+        critic_mock.assert_not_called()
+        writer_mock.assert_called_once()
+        self.assertIn("triangles acg and fag are similar", result["thinking"])
 
     def test_process_and_generate_sft_runs_offline_dossier_pipeline(self):
         record = {

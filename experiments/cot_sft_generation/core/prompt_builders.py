@@ -497,6 +497,8 @@ def build_dossier_write_prompt(record, dossier, aux_part, coordinate_derivation_
         "- Distinguish public givens from figure observations in wording.\n"
         "- You may omit coordinates entirely. If you use coordinates, reuse one approved snippet verbatim.\n"
         "- Never assign coordinates to auxiliary points.\n"
+        "- Keep the prose compact: prefer 6-9 sentences, no bullet lists or numbered lists, and stay comfortably below the body-length cap.\n"
+        "- Use one short sentence for the obstacle/helper setup, then move directly through the construction, bridge chain, and final closure without repeating the same support twice.\n"
         "- Treat support refs as private bookkeeping. Do not quote schema keys or bracketed refs such as visible_facts[1], aux_immediate_effects[0], bridge_chain[2], or goal_closure[0]; restate the underlying geometry relation instead.\n"
         "- Do not mention hidden proofs, hidden hints, a coordinate table, or external supervision.\n"
         "- Do not use LaTeX, $...$, backticks, or XML tags.\n"
@@ -539,6 +541,10 @@ def build_dossier_writer_retry_feedback(validation_message, dossier):
         "Output only plain text, not <thinking> tags.",
         "Keep the body faithful to the approved dossier.",
     ]
+    lowered_message = str(validation_message or "").lower()
+    if "too long" in lowered_message:
+        hints.append("Compress the body into short continuous prose with no bullets or numbered steps.")
+        hints.append("Use one sentence for the obstacle/helper setup, one for the construction or immediate effects, then one sentence per bridge claim and one final goal sentence.")
     if "coordinate snippet" in validation_message:
         hints.append("If you use coordinates, reuse one approved coordinate snippet verbatim.")
     if "aux_immediate_effects" in validation_message:

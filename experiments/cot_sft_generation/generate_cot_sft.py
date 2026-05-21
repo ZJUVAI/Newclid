@@ -975,6 +975,35 @@ def build_canonical_goal_bottleneck(visible_goal):
     return f"the target relation around {point_text} still lacks a concrete bridge from the visible figure."
 
 
+def build_canonical_bridge_unlock(next_target_relation, final_step=False):
+    normalized_next = normalize_relation_surface(next_target_relation or "").strip()
+    lowered = normalized_next.lower()
+    if final_step:
+        if "ratio" in lowered:
+            return "this puts the needed segment comparison in place right before the final ratio closes."
+        if "angle" in lowered:
+            return "this puts the needed direction comparison in place right before the final angle closes."
+        if "similar" in lowered:
+            return "this supplies the last correspondence needed before the final similarity closes."
+        if "congruent" in lowered:
+            return "this supplies the last correspondence needed before the final congruence closes."
+        if any(token in lowered for token in [" equals ", "equal"]):
+            return "this puts the needed equality in place right before the final goal closes."
+        return "this sets up the last direct bridge before the final goal relation closes."
+
+    if "ratio" in lowered:
+        return "this creates one intermediate segment comparison that the next ratio step can reuse."
+    if "angle" in lowered:
+        return "this creates one intermediate direction comparison that the next angle step can reuse."
+    if "similar" in lowered:
+        return "this adds one correspondence that can be reused in the next triangle-comparison step."
+    if "congruent" in lowered:
+        return "this adds one correspondence that can be reused in the next congruence step."
+    if any(token in lowered for token in [" equals ", "equal"]):
+        return "this creates one intermediate equality that the next step can reuse."
+    return "this prepares one smaller bridge that the next step can reuse."
+
+
 def validate_descriptive_text(value, field_name, min_chars=12, point_names=None, ignored_forbidden_patterns=None):
     if isinstance(value, str) and point_names:
         value = normalize_point_case(value, point_names)
@@ -3318,6 +3347,36 @@ def build_scripted_plan_skeleton(
     }
 
 
+def enrich_bridge_steps_with_targets(plan):
+    if not isinstance(plan, dict):
+        return plan
+    bridge_steps = plan.get("bridge_steps")
+    if not isinstance(bridge_steps, list):
+        return plan
+    goal_finish = normalize_relation_surface(plan.get("goal_finish", "") or "").strip()
+    for idx, raw_step in enumerate(bridge_steps):
+        if not isinstance(raw_step, dict):
+            continue
+        step = raw_step
+        if idx + 1 < len(bridge_steps):
+            next_relation = (
+                bridge_steps[idx + 1].get("approved_route_relation")
+                or bridge_steps[idx + 1].get("relation", "")
+            )
+            next_purpose = "bridge"
+        else:
+            next_relation = goal_finish
+            next_purpose = "goal_finish"
+        step["next_target_relation"] = normalize_relation_surface(next_relation or goal_finish).strip()
+        step["next_target_purpose"] = next_purpose
+        if not step.get("approved_route_relation"):
+            step["approved_route_relation"] = step.get("relation", "")
+        if not step.get("proof_alignment"):
+            step["proof_alignment"] = "bridge"
+    plan["bridge_steps"] = bridge_steps
+    return plan
+
+
 def merge_plan_skeleton_and_narrative(plan_skeleton, narrative_fields):
     merged = json.loads(json.dumps(plan_skeleton))
     if not isinstance(narrative_fields, dict):
@@ -3388,6 +3447,310 @@ def build_safe_dossier_aux_motivation(aux_part: str, visible_goal: str):
         f"the helper should create one local {aux_cue} relation {stage_phrase} "
         f"to the visible figure before the target {goal_family} closes."
     )
+
+
+def build_dossier_relation_ref_catalog(
+    visible_facts,
+    image_scan,
+    coordinate_checks,
+    aux_immediate_effects,
+    bridge_claims,
+):
+    catalog = []
+    for idx, relation in enumerate(visible_facts or [], start=1):
+        if isinstance(relation, str) and relation.strip():
+            catalog.append({"ref": f"visible_facts[{idx}]", "relation": normalize_relation_surface(relation)})
+    for idx, relation in enumerate(image_scan or [], start=1):
+        if isinstance(relation, str) and relation.strip():
+            catalog.append({"ref": f"image_scan[{idx}]", "relation": normalize_relation_surface(relation)})
+    for idx, item in enumerate(coordinate_checks or [], start=1):
+        relation = item.get("relation") if isinstance(item, dict) else ""
+        if isinstance(relation, str) and relation.strip():
+            catalog.append({"ref": f"coordinate_checks[{idx}]", "relation": normalize_relation_surface(relation)})
+    for idx, relation in enumerate(aux_immediate_effects or [], start=1):
+        if isinstance(relation, str) and relation.strip():
+            catalog.append({"ref": f"aux_immediate_effects[{idx}]", "relation": normalize_relation_surface(relation)})
+    for idx, relation in enumerate(bridge_claims or [], start=1):
+        if isinstance(relation, str) and relation.strip():
+            catalog.append({"ref": f"bridge_chain[{idx}]", "relation": normalize_relation_surface(relation)})
+    return catalog
+
+
+def map_support_relations_to_dossier_refs(
+    support_relations,
+    support_catalog,
+    point_names,
+    max_supports=2,
+):
+    refs = []
+    used_refs = set()
+    for support_relation in support_relations or []:
+        if not isinstance(support_relation, str) or not support_relation.strip():
+            continue
+        normalized_support = normalize_relation_surface(support_relation)
+        matched_ref = None
+        for item in support_catalog or []:
+            relation = item.get("relation", "")
+            ref = item.get("ref", "")
+            if ref in used_refs:
+                continue
+            if normalized_support.lower() == str(relation).lower():
+                matched_ref = ref
+                break
+            if relations_semantically_match(normalized_support, relation, point_names):
+                matched_ref = ref
+                break
+        if matched_ref:
+            refs.append(matched_ref)
+            used_refs.add(matched_ref)
+        if len(refs) >= max_supports:
+            break
+    return refs
+
+
+def select_dossier_support_refs_for_relation(
+    relation_text,
+    support_catalog,
+    point_names,
+    preferred_supports=None,
+    next_target_relation="",
+    max_supports=2,
+):
+    support_catalog = support_catalog or []
+    preferred_refs = map_support_relations_to_dossier_refs(
+        preferred_supports or [],
+        support_catalog,
+        point_names,
+        max_supports=max_supports,
+    )
+    if len(preferred_refs) >= max_supports:
+        return preferred_refs[:max_supports]
+
+    ranked_supports = select_support_relations_for_step(
+        relation_text,
+        [item.get("relation", "") for item in support_catalog],
+        point_names,
+        next_target_relation=next_target_relation,
+        max_supports=max(max_supports, len(preferred_refs) + 1),
+    )
+    ranked_refs = map_support_relations_to_dossier_refs(
+        ranked_supports,
+        support_catalog,
+        point_names,
+        max_supports=max_supports,
+    )
+    combined = []
+    for ref in preferred_refs + ranked_refs:
+        if ref not in combined:
+            combined.append(ref)
+        if len(combined) >= max_supports:
+            break
+    return combined
+
+
+def build_scripted_dossier_skeleton(
+    record,
+    aux_part,
+    sanitized_rest,
+    point_coords,
+    visible_goal,
+    visible_text_facts=None,
+    visible_premise_summaries=None,
+):
+    visible_text_facts = visible_text_facts or build_visible_text_facts(record)
+    visible_premise_summaries = visible_premise_summaries or [
+        fact.get("relation", "")
+        for fact in visible_text_facts
+        if isinstance(fact, dict) and fact.get("relation")
+    ]
+    coordinate_candidates = build_hidden_coordinate_candidates(
+        point_coords,
+        max_items=64,
+        relax_type_limits=True,
+    )
+    scripted_plan = build_scripted_plan_skeleton(
+        record,
+        aux_part,
+        sanitized_rest,
+        point_coords,
+        coordinate_candidates,
+        visible_premise_summaries,
+        visible_goal,
+    )
+    proof_guidance = build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal)
+    visible_facts = [
+        relation
+        for relation in scripted_plan.get("visible_relations", []) or visible_premise_summaries
+        if isinstance(relation, str) and relation.strip()
+    ]
+    image_scan = [
+        observation.get("relation", "")
+        for observation in scripted_plan.get("observation_relations", [])
+        if isinstance(observation, dict) and observation.get("relation")
+    ]
+    if not image_scan:
+        image_scan = [
+            relation
+            for relation in scripted_plan.get("coordinate_relations", [])
+            if isinstance(relation, str) and relation.strip()
+        ]
+    aux_immediate_effects = [
+        relation
+        for relation in scripted_plan.get("aux_direct_relations", [])
+        if isinstance(relation, str) and relation.strip()
+    ]
+    known_points = extract_visible_point_names(point_coords) + [
+        point.lower()
+        for point in extract_aux_new_points(aux_part or "")
+    ]
+
+    normalized_goal_finish = normalize_relation_surface(scripted_plan.get("goal_finish", ""))
+    goal_tail_relations = []
+    for relation in proof_guidance.get("goal_finish_relations", []) or []:
+        if not isinstance(relation, str) or not relation.strip():
+            continue
+        normalized_relation = normalize_relation_surface(relation)
+        if relations_semantically_match(normalized_relation, normalized_goal_finish, known_points):
+            continue
+        if normalized_relation.lower() not in {item.lower() for item in goal_tail_relations}:
+            goal_tail_relations.append(normalized_relation)
+
+    base_bridge_steps = [
+        step
+        for step in scripted_plan.get("bridge_steps", [])
+        if isinstance(step, dict) and step.get("relation")
+    ]
+    max_bridge_steps = 6
+    keep_prefix_count = max_bridge_steps - len(goal_tail_relations)
+    min_prefix_count = 1 if base_bridge_steps and extract_aux_new_points(aux_part or "") else 0
+    keep_prefix_count = max(min_prefix_count, keep_prefix_count)
+    keep_prefix_count = min(len(base_bridge_steps), keep_prefix_count)
+    selected_bridge_specs = [
+        {
+            "relation": step.get("relation", ""),
+            "preferred_supports": step.get("required_supports") or step.get("depends_on") or [],
+            "why_next": step.get("why_it_helps", ""),
+            "source": "base",
+        }
+        for step in base_bridge_steps[:keep_prefix_count]
+    ]
+    remaining_slots = max(0, max_bridge_steps - len(selected_bridge_specs))
+    tail_relations_to_add = goal_tail_relations[-remaining_slots:] if remaining_slots else []
+    for idx, relation in enumerate(tail_relations_to_add):
+        next_relation = (
+            tail_relations_to_add[idx + 1]
+            if idx + 1 < len(tail_relations_to_add)
+            else normalized_goal_finish
+        )
+        selected_bridge_specs.append(
+            {
+                "relation": relation,
+                "preferred_supports": [],
+                "why_next": build_canonical_bridge_unlock(
+                    next_relation,
+                    final_step=(idx == len(tail_relations_to_add) - 1),
+                ),
+                "source": "tail",
+            }
+        )
+
+    raw_bridge_chain = []
+    prior_bridge_claims = []
+    for step_idx, step in enumerate(selected_bridge_specs):
+        if not isinstance(step, dict):
+            continue
+        support_catalog = build_dossier_relation_ref_catalog(
+            visible_facts,
+            image_scan,
+            [],
+            aux_immediate_effects,
+            prior_bridge_claims,
+        )
+        next_relation = (
+            selected_bridge_specs[step_idx + 1]["relation"]
+            if step_idx + 1 < len(selected_bridge_specs)
+            else normalized_goal_finish
+        )
+        max_supports = min(
+            compute_bridge_step_required_support_cap({"relation": step.get("relation", "")}),
+            max(1, len(support_catalog)),
+        )
+        support_refs = select_dossier_support_refs_for_relation(
+            step.get("relation", ""),
+            support_catalog,
+            known_points,
+            preferred_supports=step.get("preferred_supports"),
+            next_target_relation=next_relation,
+            max_supports=max_supports,
+        )
+        if not support_refs and support_catalog:
+            support_refs = [support_catalog[0]["ref"]]
+        resolved_support_relations = [
+            item.get("relation", "")
+            for item in support_catalog
+            if item.get("ref") in set(support_refs)
+        ]
+        unsupported_segments = find_unsupported_bridge_relation_segments(
+            {
+                "relation": step.get("relation", ""),
+                "approved_route_relation": step.get("relation", ""),
+            },
+            resolved_support_relations,
+        )
+        if step.get("source") == "tail" and len(unsupported_segments) > 1:
+            continue
+        raw_bridge_chain.append(
+            {
+                "claim": step.get("relation", ""),
+                "supports": support_refs,
+                "why_next": step.get("why_it_helps", "this moves the route one step closer to the visible goal."),
+            }
+        )
+        prior_bridge_claims.append(step.get("relation", ""))
+    goal_support_catalog = build_dossier_relation_ref_catalog(
+        visible_facts,
+        image_scan,
+        [],
+        aux_immediate_effects,
+        prior_bridge_claims,
+    )
+    goal_support_refs = select_dossier_support_refs_for_relation(
+        normalized_goal_finish,
+        goal_support_catalog,
+        known_points,
+        preferred_supports=[],
+        max_supports=min(4, max(1, len(goal_support_catalog))),
+    )
+    if not goal_support_refs and goal_support_catalog:
+        goal_support_refs = [goal_support_catalog[-1]["ref"]]
+
+    raw_dossier = {
+        "visible_facts": visible_facts,
+        "image_scan": image_scan,
+        "coordinate_checks": [],
+        "goal_obstacle": scripted_plan.get("goal_bottleneck") or build_canonical_goal_bottleneck(visible_goal),
+        "aux_motivation": scripted_plan.get("helper_idea") or build_safe_dossier_aux_motivation(aux_part or "", visible_goal),
+        "construction": scripted_plan.get("construction") or build_canonical_construction(aux_part or ""),
+        "aux_immediate_effects": aux_immediate_effects,
+        "bridge_chain": raw_bridge_chain,
+        "goal_closure": [
+            {
+                "claim": normalized_goal_finish,
+                "supports": goal_support_refs,
+                "why_next": "this is the target relation.",
+            }
+        ],
+    }
+    ok, message, cleaned_dossier = validate_dossier_plan_response(
+        raw_dossier,
+        point_coords,
+        visible_goal=visible_goal,
+        aux_part=aux_part,
+        visible_text_facts=visible_text_facts,
+    )
+    if not ok:
+        return False, f"scripted dossier skeleton invalid: {message}", None
+    return True, "Valid scripted dossier skeleton", cleaned_dossier
 
 
 def canonicalize_dossier_image_scan(items, visible_points, min_len=1, max_len=4):
@@ -4916,20 +5279,45 @@ def generate_dossier_thinking(
         validator_fn=validate_dossier_plan_response,
         retry_feedback_builder=build_dossier_plan_retry_feedback,
     )
+    plan_source = "llm"
     if not plan_result["success"]:
-        return {
-            "success": False,
-            "thinking": plan_result["output"],
-            "plan_prompt": plan_prompt if verbose else None,
-            "write_prompt": None,
-            "plan_output": plan_result["output"] if verbose else None,
-            "plan_parsed": None,
-            "attempts_used": plan_result["attempts_used"],
-            "elapsed_seconds": plan_result["elapsed_seconds"],
-            "error": plan_result["error"],
-            "write_output": None,
-            "generation_style": "dossier_v1",
-        }
+        skeleton_ok, skeleton_message, scripted_dossier = build_scripted_dossier_skeleton(
+            record,
+            aux_part,
+            sanitized_rest,
+            point_coords,
+            visible_goal,
+            visible_text_facts=visible_text_facts,
+            visible_premise_summaries=[fact["relation"] for fact in visible_text_facts],
+        )
+        if skeleton_ok:
+            logger.warning(
+                "[plan] Falling back to scripted dossier skeleton after planner failure: %s",
+                plan_result["error"],
+            )
+            plan_result = {
+                "success": True,
+                "output": json.dumps(scripted_dossier, ensure_ascii=False, indent=2),
+                "parsed": scripted_dossier,
+                "attempts_used": plan_result["attempts_used"],
+                "elapsed_seconds": plan_result["elapsed_seconds"],
+                "error": None,
+            }
+            plan_source = "scripted_fallback"
+        else:
+            return {
+                "success": False,
+                "thinking": plan_result["output"],
+                "plan_prompt": plan_prompt if verbose else None,
+                "write_prompt": None,
+                "plan_output": plan_result["output"] if verbose else None,
+                "plan_parsed": None,
+                "attempts_used": plan_result["attempts_used"],
+                "elapsed_seconds": plan_result["elapsed_seconds"],
+                "error": f"{plan_result['error']}; {skeleton_message}",
+                "write_output": None,
+                "generation_style": "dossier_v1",
+            }
 
     if plan_mode == "plan_only":
         return {
@@ -4946,68 +5334,79 @@ def generate_dossier_thinking(
             "generation_style": "dossier_v1",
         }
 
-    critic_prompt = build_dossier_critic_prompt_text(
-        record,
-        plan_result["parsed"],
-        hidden_milestone_summary=hidden_milestone_summary,
-    )
-    critic_messages = [
-        {
-            "role": "user",
-            "content": [
-                {"type": "image_url", "image_url": {"url": _encode_image_base64(image_path)}},
-                {"type": "text", "text": critic_prompt},
-            ],
-        }
-    ]
-    critic_result = run_plan_critic_stage(
-        "plan_critic",
-        critic_messages,
-        model_name=model_name,
-        fallback_model_names=fallback_model_names,
-        max_retries=max_retries,
-        allow_revised_plan=True,
-    )
-    if not critic_result["success"]:
-        return {
-            "success": False,
-            "thinking": plan_result["output"],
-            "plan_prompt": plan_prompt if verbose else None,
-            "write_prompt": None,
-            "plan_output": json.dumps(plan_result["parsed"], ensure_ascii=False, indent=2) if verbose else None,
-            "plan_parsed": plan_result["parsed"],
-            "attempts_used": plan_result["attempts_used"] + critic_result["attempts_used"],
-            "elapsed_seconds": (plan_result["elapsed_seconds"] or 0.0) + (critic_result["elapsed_seconds"] or 0.0),
-            "error": critic_result["error"],
-            "write_output": None,
-            "generation_style": "dossier_v1",
-        }
-
-    if not critic_result["parsed"].get("approved") and isinstance(critic_result["parsed"].get("revised_dossier"), dict):
-        merged_revised_dossier = dict(plan_result["parsed"])
-        merged_revised_dossier.update(critic_result["parsed"]["revised_dossier"])
-        ok, message, cleaned_plan = validate_dossier_plan_response(
-            merged_revised_dossier,
-            point_coords,
-            visible_goal=visible_goal,
-            aux_part=aux_part,
-            visible_text_facts=visible_text_facts,
+    critic_result = {
+        "success": True,
+        "output": None,
+        "parsed": {"approved": True, "issues": [], "summary": "critic skipped"},
+        "attempts_used": 0,
+        "elapsed_seconds": 0.0,
+        "error": None,
+    }
+    if plan_source == "scripted_fallback":
+        logger.info("[plan_critic] Skipping critic for validator-clean scripted fallback dossier")
+    else:
+        critic_prompt = build_dossier_critic_prompt_text(
+            record,
+            plan_result["parsed"],
+            hidden_milestone_summary=hidden_milestone_summary,
         )
-        if not ok:
+        critic_messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": _encode_image_base64(image_path)}},
+                    {"type": "text", "text": critic_prompt},
+                ],
+            }
+        ]
+        critic_result = run_plan_critic_stage(
+            "plan_critic",
+            critic_messages,
+            model_name=model_name,
+            fallback_model_names=fallback_model_names,
+            max_retries=max_retries,
+            allow_revised_plan=True,
+        )
+        if not critic_result["success"]:
             return {
                 "success": False,
-                "thinking": None,
+                "thinking": plan_result["output"],
                 "plan_prompt": plan_prompt if verbose else None,
                 "write_prompt": None,
                 "plan_output": json.dumps(plan_result["parsed"], ensure_ascii=False, indent=2) if verbose else None,
                 "plan_parsed": plan_result["parsed"],
                 "attempts_used": plan_result["attempts_used"] + critic_result["attempts_used"],
                 "elapsed_seconds": (plan_result["elapsed_seconds"] or 0.0) + (critic_result["elapsed_seconds"] or 0.0),
-                "error": f"critic revised_dossier invalid: {message}",
+                "error": critic_result["error"],
                 "write_output": None,
                 "generation_style": "dossier_v1",
             }
-        plan_result["parsed"] = cleaned_plan
+
+        if not critic_result["parsed"].get("approved") and isinstance(critic_result["parsed"].get("revised_dossier"), dict):
+            merged_revised_dossier = dict(plan_result["parsed"])
+            merged_revised_dossier.update(critic_result["parsed"]["revised_dossier"])
+            ok, message, cleaned_plan = validate_dossier_plan_response(
+                merged_revised_dossier,
+                point_coords,
+                visible_goal=visible_goal,
+                aux_part=aux_part,
+                visible_text_facts=visible_text_facts,
+            )
+            if not ok:
+                return {
+                    "success": False,
+                    "thinking": None,
+                    "plan_prompt": plan_prompt if verbose else None,
+                    "write_prompt": None,
+                    "plan_output": json.dumps(plan_result["parsed"], ensure_ascii=False, indent=2) if verbose else None,
+                    "plan_parsed": plan_result["parsed"],
+                    "attempts_used": plan_result["attempts_used"] + critic_result["attempts_used"],
+                    "elapsed_seconds": (plan_result["elapsed_seconds"] or 0.0) + (critic_result["elapsed_seconds"] or 0.0),
+                    "error": f"critic revised_dossier invalid: {message}",
+                    "write_output": None,
+                    "generation_style": "dossier_v1",
+                }
+            plan_result["parsed"] = cleaned_plan
 
     write_prompt = build_dossier_write_prompt_text(
         record,
