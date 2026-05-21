@@ -2,56 +2,87 @@
 
 这个目录用于保存 `experiments/cot_sft_generation` 长期迭代时必须稳定复用的基线资产，避免把关键回归输入和审读样本长期留在 `/tmp`。
 
-## 当前包含的资产
+## 使用边界
 
-### 1. 最小固定回归输入
+benchmark 只负责三件事：
+
+- 固定样本覆盖
+- 固定回归入口
+- 固定人审抽样入口
+
+benchmark 不负责替代数据质量判断本身。
+
+- `surface_pass_rate` 不是质量结论
+- `semantic_pass_rate` 也不是自动 acceptance rule
+- 最终判断仍要回到 [DATA_QUALITY_REQUIREMENTS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/immutable/DATA_QUALITY_REQUIREMENTS.md) 与 [SEMANTIC_REVIEW_GUIDE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/reference/SEMANTIC_REVIEW_GUIDE.md)
+
+## 当前目录结构
+
+### 当前主 benchmark
+
+- [quality_review_v1/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/quality_review_v1/README.md)
+  - 当前主线默认使用的 review-oriented benchmark
+- [quality_review_v1/quality_review_v1_input.jsonl](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/quality_review_v1/quality_review_v1_input.jsonl)
+  - 当前主 benchmark 输入
+- [quality_review_v1/quality_review_v1_manifest.json](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/quality_review_v1/quality_review_v1_manifest.json)
+  - 当前主 benchmark manifest
+
+### Legacy Support Packs
 
 - [fixed_v104sample_input.jsonl](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/fixed_v104sample_input.jsonl)
-  - 来源：`/tmp/cot_regression_v114_v104sample_rebuilt_input.jsonl`
-  - 条数：`4`
-  - 用途：
-    - 固定 surface regression
-    - 固定 semantic review baseline
-    - 复现 `v142` 这组最新完整回归输入
-
-### 2. 最小固定回归 manifest
-
+  - 历史最小稳定回放集
 - [fixed_v104sample_manifest.json](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/fixed_v104sample_manifest.json)
-  - 记录：
-    - benchmark 名称
-    - 输入文件路径
-    - 每条样本的 goal type / aux type / review focus
-    - 可复用的子集定义
-
-### 3. 分层固定回归输入
-
+  - `fixed_v104sample` manifest
 - [stratified_v1_12sample_input.jsonl](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/stratified_v1_12sample_input.jsonl)
-  - 来源：`datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl`
-  - 条数：`12`
-  - 用途：
-    - 长期固定分层回归
-    - `goal_type x aux_type` 的定向语义审读
-    - 覆盖 `eqratio` / `eqangle` / `simtri` / `simtrir` / `contri` / `contrir`
-    - 每类同时覆盖 `single_point` 与 `multi_point`
-
-### 4. 分层固定回归 manifest
-
+  - `quality_review_v1` 的 lineage source pack
 - [stratified_v1_12sample_manifest.json](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/stratified_v1_12sample_manifest.json)
-  - 记录：
-    - `sample_order`
-    - `source_index`
-    - `goal_type`
-    - `goal_text`
-    - `aux_type`
-    - `aux_shape`
-    - `image_path`
-    - `focus_tags`
-    - `notes`
-    - 可复用的子集定义
+  - 原始 12-sample stratified manifest
 
-## 使用方式
+## Which Pack To Use
 
-### 跑最小固定回归
+- 新主线迭代：用 [quality_review_v1/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/quality_review_v1/README.md)
+- 回放历史 `v142` 最小集：用 `fixed_v104sample`
+- 对照旧的 12-sample 分层顺序：用 `stratified_v1_12sample`
+
+## 推荐运行方式
+
+### quick4 smoke
+
+```bash
+python experiments/cot_sft_generation/generate_cot_sft.py \
+  -i experiments/cot_sft_generation/benchmarks/quality_review_v1/quality_review_v1_input.jsonl \
+  -n 4 \
+  -w 1 \
+  --sequential \
+  -o /tmp/cot_sft_quality_review_v1_quick4.jsonl \
+  -v
+```
+
+### quick6 balanced
+
+```bash
+python experiments/cot_sft_generation/generate_cot_sft.py \
+  -i experiments/cot_sft_generation/benchmarks/quality_review_v1/quality_review_v1_input.jsonl \
+  -n 6 \
+  -w 1 \
+  --sequential \
+  -o /tmp/cot_sft_quality_review_v1_quick6.jsonl \
+  -v
+```
+
+### full12 review
+
+```bash
+python experiments/cot_sft_generation/generate_cot_sft.py \
+  -i experiments/cot_sft_generation/benchmarks/quality_review_v1/quality_review_v1_input.jsonl \
+  -n 12 \
+  -w 1 \
+  --sequential \
+  -o /tmp/cot_sft_quality_review_v1_full12.jsonl \
+  -v
+```
+
+### fixed historical replay
 
 ```bash
 python experiments/cot_sft_generation/generate_cot_sft.py \
@@ -60,18 +91,6 @@ python experiments/cot_sft_generation/generate_cot_sft.py \
   -w 1 \
   --sequential \
   -o /tmp/cot_sft_fixed_regression_output.jsonl \
-  -v
-```
-
-### 跑分层固定回归
-
-```bash
-python experiments/cot_sft_generation/generate_cot_sft.py \
-  -i experiments/cot_sft_generation/benchmarks/stratified_v1_12sample_input.jsonl \
-  -n 12 \
-  -w 1 \
-  --sequential \
-  -o /tmp/cot_sft_stratified_regression_output.jsonl \
   -v
 ```
 
@@ -101,10 +120,10 @@ python experiments/cot_sft_generation/semantic_review.py \
    - 子集定义
    - 样本的 goal / aux 类型
    - 该回归集想监控的失败模式
-   - 分层 benchmark 还应优先补 `source_index`、`focus_tags` 和 `notes`
+   - review-oriented benchmark 还应优先补 `source_index`、`focus_tags`、`review_axes` 和 `notes`
 3. 如果某个历史固定回归集不再使用，应在 manifest 或文档中标明废弃，而不是直接静默删除
-4. 当前 `fixed_v104sample` 仍是最小稳定基线；`stratified_v1_12sample` 则是当前默认的分层长期基线
-5. `python experiments/cot_sft_generation/maintenance_smoke_check.py` 现在会校验本目录下所有 `*_manifest.json`，不是只看单个固定文件
+4. 当前 `quality_review_v1` 是默认主 benchmark；`fixed_v104sample` 和 `stratified_v1_12sample` 保留为 legacy support packs
+5. `python experiments/cot_sft_generation/maintenance_smoke_check.py` 现在会递归校验本目录下所有 `*_manifest.json`
 
 ## 定向抽查建议
 
@@ -124,11 +143,14 @@ python experiments/cot_sft_generation/semantic_review.py \
 - 单点构造相关改动：优先审 `single_point`
 - 多点构造相关改动：优先审 `multi_point`
 - 多点构造的 staged strategy、step ordering、bridge unfolding 相关改动：至少审 `multi_point_staging_priority`
+- 想看坐标 cue 是否真正进入推理链：优先审 `coordinate_integration_priority`
+- 想看是否真的覆盖整图：优先审 `whole_figure_coverage_priority`
+- 想看 visible-only 边界是否退化：优先审 `visible_only_boundary_priority`
 
 ### 按回归目的改动
 
 - 快速回放最近固定失败/成功样本：先跑 `fixed_v104sample`
-- 改的是全局 bridge 语义、goal finish 收尾、或 generation audit 这类跨 goal 规则：优先跑 `stratified_v1_12sample` 的 `all`
+- 改的是全局 bridge 语义、goal finish 收尾、或 generation audit 这类跨 goal 规则：优先跑 `quality_review_v1` 的 `quick6_goal_aux_balanced` 或 `all`
 - 改的是语义审读口径或需要人工/Codex 重点复核的规则：优先看 `semantic_review_priority`
 
 ### 当前仍未覆盖到 subset 级的维度

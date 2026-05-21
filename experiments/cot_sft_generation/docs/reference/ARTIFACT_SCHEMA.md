@@ -1,6 +1,6 @@
 # CoT SFT Artifact Schema
 
-本文档给出 `experiments/cot_sft_generation` 当前长期维护时应默认依赖的 artifacts 字段协议。它和 [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/CURRENT_DESIGN.md) 的区别是：
+本文档给出 `experiments/cot_sft_generation` 当前长期维护时应默认依赖的 artifacts 字段协议。它和 [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/CURRENT_DESIGN.md) 的区别是：
 
 - `CURRENT_DESIGN.md` 说明“代码现在怎么跑”
 - 本文档说明“落盘文件里有哪些稳定字段，以及后续怎样读它们”
@@ -9,7 +9,7 @@
 
 - [run_artifacts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/run_artifacts.py)
 - [semantic_review.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/semantic_review.py)
-- [SEMANTIC_REVIEW_GUIDE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/SEMANTIC_REVIEW_GUIDE.md)
+- [SEMANTIC_REVIEW_GUIDE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/reference/SEMANTIC_REVIEW_GUIDE.md)
 
 固定 benchmark 资产和其 manifest 见 [benchmarks/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/README.md)。
 
@@ -217,7 +217,7 @@ python experiments/cot_sft_generation/semantic_review.py \
 
    - 这两种 payload 模式都依赖 `item_records.jsonl`，因此要求原始 run 是带 `-v/--verbose` 生成的。
 3. 人工或 Codex 按样本回填 `semantic_audits.jsonl`。
-   - 具体填写口径见 [SEMANTIC_REVIEW_GUIDE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/SEMANTIC_REVIEW_GUIDE.md)
+   - 具体填写口径见 [SEMANTIC_REVIEW_GUIDE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/reference/SEMANTIC_REVIEW_GUIDE.md)
 4. 运行：
 
 ```bash

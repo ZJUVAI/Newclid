@@ -1,8 +1,8 @@
 # Current CoT SFT Design
 
-本文档描述当前代码头部实现，也就是 [generate_cot_sft.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/generate_cot_sft.py)、[audits.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/audits.py)、[geometry_text.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/geometry_text.py)、[prompt_builders.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/prompt_builders.py)、[writer_contracts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/writer_contracts.py)、[run_artifacts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/run_artifacts.py) 与 [semantic_review.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/semantic_review.py) 现在真正执行的流程；历史迭代和实验结论见 [STATUS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/STATUS.md) 与 [EXPERIMENT_LOG.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/EXPERIMENT_LOG.md)。字段表见 [ARTIFACT_SCHEMA.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/ARTIFACT_SCHEMA.md)。
+本文档描述当前代码头部实现，也就是 [generate_cot_sft.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/generate_cot_sft.py)、[audits.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/audits.py)、[geometry_text.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/geometry_text.py)、[prompt_builders.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/prompt_builders.py)、[writer_contracts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/writer_contracts.py)、[run_artifacts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/run_artifacts.py) 与 [semantic_review.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/semantic_review.py) 现在真正执行的流程；历史迭代和实验结论见 [STATUS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/STATUS.md) 与 [EXPERIMENT_LOG.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/history/EXPERIMENT_LOG.md)。字段表见 [ARTIFACT_SCHEMA.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/reference/ARTIFACT_SCHEMA.md)。
 
-如果下一会话是要继续推进 `dossier_v1` 主线，而不是理解全量历史设计，请先读 [DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/DOSSIER_V1_MAINLINE.md)。
+如果下一会话是要继续推进 `dossier_v1` 主线，而不是理解全量历史设计，请先读 [DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/DOSSIER_V1_MAINLINE.md)。
 
 ## 1. 总体目标
 
@@ -510,10 +510,14 @@ python experiments/cot_sft_generation/semantic_review.py \
 
 9. 固定 benchmark
    - 当前仓库内已经有一组固定回归基线：
+     - [benchmarks/quality_review_v1/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/quality_review_v1/README.md)
+     - [benchmarks/quality_review_v1/quality_review_v1_input.jsonl](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/quality_review_v1/quality_review_v1_input.jsonl)
+     - [benchmarks/quality_review_v1/quality_review_v1_manifest.json](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/quality_review_v1/quality_review_v1_manifest.json)
      - [benchmarks/fixed_v104sample_input.jsonl](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/fixed_v104sample_input.jsonl)
      - [benchmarks/fixed_v104sample_manifest.json](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/fixed_v104sample_manifest.json)
      - [benchmarks/stratified_v1_12sample_input.jsonl](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/stratified_v1_12sample_input.jsonl)
      - [benchmarks/stratified_v1_12sample_manifest.json](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/stratified_v1_12sample_manifest.json)
+   - 其中 `quality_review_v1` 是当前主线默认 benchmark；`fixed_v104sample` 和 `stratified_v1_12sample` 继续保留给历史回放和 lineage 对照。
    - 其用途是给长期回归和语义复核提供一个不会因 `/tmp` 被清空而消失的稳定入口。
    - 更细说明见 [benchmarks/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/README.md)。
 

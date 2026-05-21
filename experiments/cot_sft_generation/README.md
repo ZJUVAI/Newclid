@@ -16,14 +16,11 @@
 
 ## 文档导航
 
-- [DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/DOSSIER_V1_MAINLINE.md)：如果后续会话要以 `dossier_v1` 作为唯一主线继续迭代，先读这份；它收了当前有效证据、主问题和推荐迭代顺序。
-- [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/CURRENT_DESIGN.md)：当前代码真正执行的流程、`plan` 字段、脚本派生字段、writer 约束。
-- [ARTIFACT_SCHEMA.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/ARTIFACT_SCHEMA.md)：`summary.json`、`item_records.jsonl`、`item_audits.jsonl`、`semantic_audits.jsonl` 的正式字段协议。
-- [SEMANTIC_REVIEW_GUIDE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/SEMANTIC_REVIEW_GUIDE.md)：`semantic_pass` / `manual_critical_error` / `issue_codes` 的统一人审口径。
-- [MAINTENANCE_PLAYBOOK.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/MAINTENANCE_PLAYBOOK.md)：长期 Codex 迭代时的文件分工、变更地图、回归资产要求和维护检查清单。
-- [benchmarks/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/README.md)：仓库内固定 benchmark、manifest 和复用方式。
-- [STATUS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/STATUS.md)：阶段性进展、当前最好证据、已知问题、距离目标的差距。
-- [EXPERIMENT_LOG.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/EXPERIMENT_LOG.md)：按时间记录的近期实验日志和提交对应关系。
+- [docs/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/README.md)：新的文档总入口，先按用途看文档，不要直接在平铺文件里找。
+- [docs/DOC_BOUNDARIES.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/DOC_BOUNDARIES.md)：先看这个，分清楚 agent 能改什么、不能改什么。
+- [docs/immutable/DATA_QUALITY_REQUIREMENTS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/immutable/DATA_QUALITY_REQUIREMENTS.md)：不可改的数据质量要求镜像。
+- [docs/current/DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/DOSSIER_V1_MAINLINE.md)：如果后续会话要以 `dossier_v1` 作为唯一主线继续迭代，先读这份。
+- [benchmarks/quality_review_v1/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/quality_review_v1/README.md)：当前主线默认使用的 review-oriented benchmark。
 
 ## 目录结构
 
@@ -32,9 +29,9 @@
 - `README.md`
   - 入口说明，只回答“这个实验要做什么、当前默认链路是什么、从哪里开始看”。
 - `docs/`
-  - 设计、协议、状态、实验记录和主线迭代手册。
+  - 文档总入口；内部再分成 `immutable`、`current`、`reference`、`maintenance`、`history`。
 - `benchmarks/`
-  - 固定 benchmark 输入和 manifest。
+  - 固定 benchmark 输入、manifest，以及当前主线 benchmark 包。
 - `generated/`
   - 已落盘的真实 run 输出和 artifacts。
 
@@ -71,7 +68,13 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 
 长期迭代时，不应只依赖 `/tmp` 里的临时回归文件。当前已经落仓的固定基线见 [benchmarks/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/README.md)。
 
-当前最重要的固定集是：
+当前主线 benchmark 是：
+
+- [benchmarks/quality_review_v1/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/quality_review_v1/README.md)
+- [benchmarks/quality_review_v1/quality_review_v1_input.jsonl](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/quality_review_v1/quality_review_v1_input.jsonl)
+- [benchmarks/quality_review_v1/quality_review_v1_manifest.json](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/quality_review_v1/quality_review_v1_manifest.json)
+
+保留的 legacy support packs 是：
 
 - [benchmarks/fixed_v104sample_input.jsonl](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/fixed_v104sample_input.jsonl)
 - [benchmarks/fixed_v104sample_manifest.json](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/fixed_v104sample_manifest.json)
@@ -80,10 +83,9 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 
 它用于：
 
-- 固定 surface regression
-- 固定 semantic review baseline
-- 复现 `v142` 这组当前最常引用的 `4` 条回归样本
-- 为长期 Codex 维护提供按 `goal_type x aux_type` 分层的仓库内审读基线
+- 提供当前主线的 review-oriented 固定回归入口
+- 保留历史最小集和 lineage set，方便回放旧证据
+- 把 benchmark 使用重新绑定到数据质量要求的人审，而不是只看脚本通过率
 
 ## 生成目标
 
@@ -211,8 +213,8 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 
 - 固定回归优先使用仓库内 benchmark，而不是重新在 `/tmp` 手工挑样本。
 - 迭代阶段建议先运行 `semantic_review.py --print-pending --surface-pass-only`，只把已经 `surface_pass` 的样本送去 Codex 审读；完成人工/Codex 审读后，再回填 `semantic_audits.jsonl` 并运行 `semantic_review.py --write-summary` 刷新 `summary.json`。
-- `semantic_audits.jsonl` 的字段填写和 `issue_codes` 口径以 [SEMANTIC_REVIEW_GUIDE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/SEMANTIC_REVIEW_GUIDE.md) 为准。
-- schema 细节和字段解释以 [ARTIFACT_SCHEMA.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/ARTIFACT_SCHEMA.md) 为准。
+- `semantic_audits.jsonl` 的字段填写和 `issue_codes` 口径以 [SEMANTIC_REVIEW_GUIDE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/reference/SEMANTIC_REVIEW_GUIDE.md) 为准。
+- schema 细节和字段解释以 [ARTIFACT_SCHEMA.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/reference/ARTIFACT_SCHEMA.md) 为准。
 
 ## 脚本检测与 Codex 人审的分工
 
@@ -232,7 +234,7 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 
 ## 当前生成框架
 
-如果你接下来明确要以新链路为主线继续做迭代，请先读 [DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/DOSSIER_V1_MAINLINE.md)。下面这节描述的是当前实现本身，而不是“下个会话最该先做什么”。
+如果你接下来明确要以新链路为主线继续做迭代，请先读 [DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/DOSSIER_V1_MAINLINE.md)。下面这节描述的是当前实现本身，而不是“下个会话最该先做什么”。
 
 当前默认主链已经切到 `dossier_v1`，旧的 `model_evidence` 路线保留为显式 fallback：
 
@@ -307,7 +309,7 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
   - `dossier_v1` 端到端已经跑通，且比最初的 `0/4` 有明显 surface 改善。
   - 但以 README 的数据质量目标衡量，默认 `qwen` 这轮输出仍然不能直接用于批量生产，主要问题还是 bridge 语义不成立、goal 尾段未真实闭环。
 
-更细的字段说明和脚本过程见 [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/CURRENT_DESIGN.md)。
+更细的字段说明和脚本过程见 [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/CURRENT_DESIGN.md)。
 
 ## 泄露控制
 
@@ -417,7 +419,7 @@ python experiments/cot_sft_generation/generate_cot_sft.py \
 
 - `run_config.json` 用于记录当前 run 的代码版本、输入文件指纹、参数和 git 状态
 - `sampled_inputs.jsonl` 用于记录本轮实际抽中的源样本
-- 这两个文件的正式字段协议见 [ARTIFACT_SCHEMA.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/ARTIFACT_SCHEMA.md)
+- 这两个文件的正式字段协议见 [ARTIFACT_SCHEMA.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/reference/ARTIFACT_SCHEMA.md)
 
 `summary.json` 还会额外汇总：
 
@@ -515,7 +517,7 @@ python experiments/cot_sft_generation/semantic_review.py \
 - `surface_pass`
 - 校验失败信息
 
-更细的字段表见 [ARTIFACT_SCHEMA.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/ARTIFACT_SCHEMA.md)。
+更细的字段表见 [ARTIFACT_SCHEMA.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/reference/ARTIFACT_SCHEMA.md)。
 
 ## 依赖
 

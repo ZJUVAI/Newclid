@@ -112,7 +112,7 @@ def validate_benchmark_manifest(manifest_path: Path, input_jsonl_path: Path | No
 
 
 def validate_all_benchmark_manifests(benchmarks_dir: Path) -> dict:
-    manifest_paths = sorted(benchmarks_dir.glob("*_manifest.json"))
+    manifest_paths = sorted(benchmarks_dir.rglob("*_manifest.json"))
     if not manifest_paths:
         raise ValueError(f"no benchmark manifests found in {benchmarks_dir}")
 

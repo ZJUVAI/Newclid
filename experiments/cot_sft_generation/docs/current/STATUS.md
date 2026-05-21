@@ -6,9 +6,9 @@
   - 这条链路迄今为止推进到了哪里
   - 当前最好证据是什么
   - 距离可放心全量生产还有什么差距
-- 当前代码流程和字段细节见 [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/CURRENT_DESIGN.md)。
-- 按时间顺序的近期实验记录见 [EXPERIMENT_LOG.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/EXPERIMENT_LOG.md)。
-- 如果下一会话准备继续推进新链路，请先读 [DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/DOSSIER_V1_MAINLINE.md)。
+- 当前代码流程和字段细节见 [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/CURRENT_DESIGN.md)。
+- 按时间顺序的近期实验记录见 [EXPERIMENT_LOG.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/history/EXPERIMENT_LOG.md)。
+- 如果下一会话准备继续推进新链路，请先读 [DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/DOSSIER_V1_MAINLINE.md)。
 
 ## 阶段性进展
 
@@ -198,7 +198,7 @@
   - writer contract / coverage target / prefix 组装这层公共协议已经拆到 `writer_contracts.py`。
   - planner / writer prompt 与 retry feedback 已经拆到 `prompt_builders.py`，主脚本进一步从 `4124` 行降到约 `2460` 行。
 
-更细的字段格式、脚本派生字段和 writer 合同见 [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/CURRENT_DESIGN.md)。
+更细的字段格式、脚本派生字段和 writer 合同见 [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/CURRENT_DESIGN.md)。
 
 ## 实验经验
 

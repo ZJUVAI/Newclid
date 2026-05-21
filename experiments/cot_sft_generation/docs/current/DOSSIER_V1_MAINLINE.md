@@ -4,7 +4,7 @@
 
 - 以后续会话把 `dossier_v1` 当成唯一主线继续迭代。
 
-如果只是想知道当前代码做什么，读 [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/CURRENT_DESIGN.md)。
+如果只是想知道当前代码做什么，读 [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/CURRENT_DESIGN.md)。
 如果是准备继续做新链路迭代，先读这份文档。
 
 ## 1. 当前主线状态
@@ -101,13 +101,14 @@ legacy 现在只保留三种用途：
    - `python experiments/cot_sft_generation/maintenance_smoke_check.py`
 
 4. 跑新链路 live benchmark
-   - 默认先跑 stratified 4 条：
+   - 默认先跑 `quality_review_v1` 的 `quick6_goal_aux_balanced` 前缀。
+   - 如果只是很快看一眼脚本层有没有明显退化，才退回 `-n 4` 的 `quick4_balanced`。
 
 ```bash
 python experiments/cot_sft_generation/generate_cot_sft.py \
-  -i experiments/cot_sft_generation/benchmarks/stratified_v1_12sample_input.jsonl \
-  -o experiments/cot_sft_generation/generated/dossier_v1_stratified4_next.jsonl \
-  -n 4 \
+  -i experiments/cot_sft_generation/benchmarks/quality_review_v1/quality_review_v1_input.jsonl \
+  -o experiments/cot_sft_generation/generated/dossier_v1_quality_review6_next.jsonl \
+  -n 6 \
   --sequential \
   -v \
   --generation-style dossier_v1 \
