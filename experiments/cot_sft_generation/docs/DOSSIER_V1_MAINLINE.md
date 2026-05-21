@@ -4,7 +4,7 @@
 
 - 以后续会话把 `dossier_v1` 当成唯一主线继续迭代。
 
-如果只是想知道当前代码做什么，读 [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/CURRENT_DESIGN.md)。
+如果只是想知道当前代码做什么，读 [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/CURRENT_DESIGN.md)。
 如果是准备继续做新链路迭代，先读这份文档。
 
 ## 1. 当前主线状态

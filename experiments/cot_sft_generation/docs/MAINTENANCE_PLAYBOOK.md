@@ -1,6 +1,6 @@
 # CoT SFT Maintenance Playbook
 
-本文档描述 `experiments/cot_sft_generation` 这条链路在长期 Codex 迭代时的维护约定。它不替代 [README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/README.md) 的目标说明，也不替代 [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/CURRENT_DESIGN.md) 的当前实现说明；它回答的是：
+本文档描述 `experiments/cot_sft_generation` 这条链路在长期 Codex 迭代时的维护约定。它不替代 [README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/README.md) 的目标说明，也不替代 [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/CURRENT_DESIGN.md) 的当前实现说明；它回答的是：
 
 - 这套代码和文档现在如何分工
 - 改某一类逻辑时，必须同步检查哪些文件
@@ -22,7 +22,7 @@
     - 验收协议变化
     - 长期适用的流程变化
 
-- [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/CURRENT_DESIGN.md)
+- [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/CURRENT_DESIGN.md)
   - 回答：
     - 当前代码实际跑了哪些阶段
     - `plan`、`coverage_targets`、writer contract 等字段现在是什么意思
@@ -33,7 +33,7 @@
     - 新增/删除阶段
     - summary 或 audit schema 变化
 
-- [ARTIFACT_SCHEMA.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/ARTIFACT_SCHEMA.md)
+- [ARTIFACT_SCHEMA.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/ARTIFACT_SCHEMA.md)
   - 回答：
     - `summary.json`
     - `item_records.jsonl`
@@ -46,7 +46,7 @@
     - 新增/废弃兼容字段
     - 语义审读刷新协议变化
 
-- [SEMANTIC_REVIEW_GUIDE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/SEMANTIC_REVIEW_GUIDE.md)
+- [SEMANTIC_REVIEW_GUIDE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/SEMANTIC_REVIEW_GUIDE.md)
   - 回答：
     - `semantic_pass` 的统一判定口径
     - `manual_critical_error` 的使用边界
@@ -56,7 +56,7 @@
     - 新增 / 废弃 issue code
     - 不同 Codex 会话之间需要统一语义审读口径
 
-- [STATUS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/STATUS.md)
+- [STATUS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/STATUS.md)
   - 回答：
     - 当前最好证据是什么
     - 离目标还有什么差距
@@ -66,7 +66,7 @@
     - 新的人审结论推翻了旧结论
     - 下一轮修改方向改变
 
-- [EXPERIMENT_LOG.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/EXPERIMENT_LOG.md)
+- [EXPERIMENT_LOG.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/EXPERIMENT_LOG.md)
   - 回答：
     - 某一天具体跑了什么
     - 某个提交对应哪次回归
