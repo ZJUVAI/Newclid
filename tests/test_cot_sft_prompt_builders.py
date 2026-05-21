@@ -227,6 +227,7 @@ class CotSftPromptBuildersTest(unittest.TestCase):
                 "aux_immediate_effects": ["h, b, c are collinear"],
                 "bridge_chain": [{"claim": "ab equals ac", "supports": ["visible_facts[1]"], "why_next": "this helps."}],
                 "goal_closure": [{"claim": "angle abc equals angle dcb", "supports": ["bridge_chain[1]"], "why_next": "this is the target."}],
+                "bridge_steps": [{"relation": "ab equals ac", "support_refs": ["visible_facts[1]"], "why_it_helps": "this helps."}],
             },
             "<aux>x00 h : midp h b c</aux>",
             "- No explicit coordinate computation is required.",
@@ -234,17 +235,30 @@ class CotSftPromptBuildersTest(unittest.TestCase):
 
         self.assertIn("[Approved Dossier]", prompt)
         self.assertIn("You may omit coordinates entirely", prompt)
+        self.assertIn("Do not quote schema keys", prompt)
+        self.assertNotIn('"supports"', prompt)
+        self.assertNotIn('"support_refs"', prompt)
 
     def test_build_dossier_writer_retry_feedback_mentions_goal_closure(self):
         feedback = build_dossier_writer_retry_feedback(
             "Writer body must explicitly realize goal_closure[0]",
             {
-                "bridge_chain": [{"supports": ["visible_facts[1]", "coordinate_checks[1]"]}],
+                "bridge_chain": [
+                    {
+                        "supports": ["visible_facts[1]", "coordinate_checks[1]"],
+                        "resolved_supports": [
+                            "line ab is parallel to line cd",
+                            "point h looks like the midpoint of bc",
+                        ],
+                        "claim": "ab equals ac",
+                    }
+                ],
             },
         )
 
         self.assertIn("goal-side closing claim", feedback)
-        self.assertIn("visible_facts[1]", feedback)
+        self.assertIn("line ab is parallel to line cd", feedback)
+        self.assertNotIn("visible_facts[1]", feedback)
 
 
 if __name__ == "__main__":

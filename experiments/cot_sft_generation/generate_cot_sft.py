@@ -258,6 +258,18 @@ FORBIDDEN_THINKING_PATTERNS = [
     re.compile(r"\$[^$]+\$"),
     re.compile(r"`[^`]+`"),
 ]
+INTERNAL_REASONING_REF_RE = re.compile(
+    r"\b(?:visible_facts|image_scan|coordinate_checks|aux_immediate_effects|bridge_chain|goal_closure|"
+    r"bridge_steps|selected_text_fact_ids|selected_coordinate_candidate_ids|coordinate_derivations|"
+    r"text_facts_used)\[\d+\]",
+    re.IGNORECASE,
+)
+
+
+def find_internal_reasoning_ref(text: str):
+    if not isinstance(text, str) or not text.strip():
+        return None
+    return INTERNAL_REASONING_REF_RE.search(text)
 POINT_TAG_RE = re.compile(
     r"<point>\s*([a-z]\w*)\s*</point>\s*<coord>\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)</coord>",
     re.IGNORECASE,
@@ -501,6 +513,10 @@ def validate_thinking_response(
         return False, f"<thinking> content too short ({len(thinking_text)} chars, minimum 80)"
     if len(thinking_text) > max_total_len:
         return False, f"<thinking> content too long ({len(thinking_text)} chars, maximum {max_total_len})"
+
+    internal_ref_hit = find_internal_reasoning_ref(thinking_text)
+    if internal_ref_hit:
+        return False, f"Internal planning reference detected: {internal_ref_hit.group(0)}"
 
     for pattern in FORBIDDEN_THINKING_PATTERNS:
         hit = pattern.search(thinking_text)
@@ -3708,6 +3724,35 @@ def validate_dossier_plan_response(
                 if support_error:
                     return False, f"{field_name}[{idx}].supports invalid: {support_error}", None
                 resolved_supports.append(resolved)
+            step_contract = {
+                "relation": cleaned_claim,
+                "approved_route_relation": cleaned_claim,
+                "depends_on": resolved_supports[:],
+            }
+            support_cap = min(
+                compute_bridge_step_required_support_cap(step_contract),
+                max(1, len(resolved_supports)),
+            )
+            required_supports = choose_required_supports_for_bridge_step(
+                step_contract,
+                known_points,
+                max_supports=support_cap,
+            ) or resolved_supports[:support_cap]
+            unsupported_segments = find_unsupported_bridge_relation_segments(
+                step_contract,
+                required_supports,
+            )
+            if len(unsupported_segments) > 1:
+                return False, (
+                    f"{field_name}[{idx}].claim introduces unsupported angle/ratio/similar segments "
+                    f"before its cited supports ground them: {unsupported_segments}"
+                ), None
+            min_support_mentions = compute_bridge_step_min_support_mentions(
+                {
+                    **step_contract,
+                    "required_supports": required_supports,
+                }
+            )
             ok, message, cleaned_why_next = validate_descriptive_text(
                 step.get("why_next"),
                 f"{field_name}[{idx}].why_next",
@@ -3722,6 +3767,8 @@ def validate_dossier_plan_response(
                     "claim": cleaned_claim,
                     "supports": supports,
                     "resolved_supports": resolved_supports,
+                    "required_supports": required_supports,
+                    "min_support_mentions": min_support_mentions,
                     "why_next": cleaned_why_next,
                 }
             )
@@ -3816,8 +3863,11 @@ def validate_dossier_plan_response(
             "relation": step["claim"],
             "support_refs": step["supports"],
             "depends_on": step["resolved_supports"],
-            "required_supports": step["resolved_supports"][: min(2, len(step["resolved_supports"]))],
-            "min_support_mentions": 1,
+            "required_supports": step.get(
+                "required_supports",
+                step["resolved_supports"][: min(2, len(step["resolved_supports"]))],
+            ),
+            "min_support_mentions": step.get("min_support_mentions", 1),
             "why_it_helps": step["why_next"],
             "proof_alignment": "bridge",
             "focus_points": sorted(extract_point_mentions(step["claim"], known_points)),
@@ -3839,6 +3889,9 @@ def validate_dossier_writer_body(output_text: str, visible_goal="", injected_pre
         return False, "Writer body must be plain text only, without <thinking> tags"
     if RAW_POINT_TAG_RE.search(body) or POINT_TAG_RE.search(body) or "<coord>" in body:
         return False, "Writer body must not contain point/coord tags"
+    internal_ref_hit = find_internal_reasoning_ref(body)
+    if internal_ref_hit:
+        return False, f"Internal planning reference detected: {internal_ref_hit.group(0)}"
     if len(body) < 120:
         return False, f"Writer body too short ({len(body)} chars, minimum 120)"
     if len(body) > compute_writer_body_budget(plan=plan):
@@ -4585,6 +4638,9 @@ def validate_writer_body(output_text: str, visible_goal="", injected_prefix="", 
         return False, "Writer body must be plain text only, without <thinking> tags"
     if RAW_POINT_TAG_RE.search(body) or POINT_TAG_RE.search(body) or "<coord>" in body:
         return False, "Writer body must not contain point/coord tags"
+    internal_ref_hit = find_internal_reasoning_ref(body)
+    if internal_ref_hit:
+        return False, f"Internal planning reference detected: {internal_ref_hit.group(0)}"
     if len(body) < 160:
         return False, f"Writer body too short ({len(body)} chars, minimum 160)"
     if len(body) > compute_writer_body_budget(plan=plan):

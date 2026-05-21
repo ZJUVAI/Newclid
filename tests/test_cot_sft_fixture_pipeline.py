@@ -7,6 +7,7 @@ from unittest.mock import patch
 from experiments.cot_sft_generation.generate_cot_sft import (
     process_and_generate_sft,
     validate_dossier_plan_response,
+    validate_dossier_writer_body,
 )
 from experiments.cot_sft_generation.run_artifacts import build_run_config
 
@@ -128,7 +129,7 @@ DOSSIER_WRITER_BODY = (
 class CotSftFixturePipelineTest(unittest.TestCase):
     def test_validate_dossier_plan_response_accepts_zero_based_supports_and_canonicalizes_aux(self):
         dossier = {
-            "visible_facts": ["line ab is perpendicular to line bc", "g is the midpoint of be"],
+            "visible_facts": ["ad equals bc", "g is the midpoint of be"],
             "image_scan": [
                 "points a, c, and e lie on a straight line",
                 "lines ae and cf intersect at right angles",
@@ -142,21 +143,21 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             ],
             "bridge_chain": [
                 {
-                    "claim": "triangle ahb is congruent to triangle dhc",
-                    "supports": ["aux_immediate_effects[0]", "visible_facts[1]"],
-                    "why_next": "this gives one transfer from the helper frame to the old figure.",
+                    "claim": "ah equals dh",
+                    "supports": ["aux_immediate_effects[0]"],
+                    "why_next": "this states the first local balance from the midpoint construction.",
                 },
                 {
-                    "claim": "bh equals ch",
+                    "claim": "dh equals ah",
                     "supports": ["bridge_chain[0]"],
-                    "why_next": "this extracts the local equality needed before the final ratio close.",
+                    "why_next": "this keeps the same helper equality available when we return to the visible target.",
                 },
             ],
             "goal_closure": [
                 {
-                    "claim": "ratio ae to bd equals ratio eg to bf",
-                    "supports": ["bridge_chain[1]", "visible_facts[2]"],
-                    "why_next": "this is the target ratio relation.",
+                    "claim": "ad equals bc",
+                    "supports": ["visible_facts[0]", "bridge_chain[0]"],
+                    "why_next": "this is the target equality relation.",
                 }
             ],
         }
@@ -172,7 +173,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
                 "f": [247, 146],
                 "g": [206, 164],
             },
-            visible_goal="eqratio a e b d e g b f",
+            visible_goal="cong a d b c",
             aux_part="<aux> x00 h : midp h a d [008] ; </aux>",
         )
 
@@ -182,7 +183,93 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertEqual(cleaned["construction"], "construct point h such that h is the midpoint of ad")
         self.assertEqual(cleaned["aux_immediate_effects"][1], "a, d, h are collinear")
         self.assertEqual(cleaned["bridge_chain"][0]["resolved_supports"][0], "ah equals dh")
-        self.assertEqual(cleaned["bridge_chain"][1]["resolved_supports"][0], "triangles ahb and dhc are congruent")
+        self.assertEqual(cleaned["bridge_chain"][1]["resolved_supports"][0], "ah equals dh")
+
+    def test_validate_dossier_plan_response_rejects_unsupported_similarity_bridge(self):
+        dossier = {
+            "visible_facts": [
+                "line ac is perpendicular to line be",
+                "a, c, e are collinear",
+                "line ae is perpendicular to line cf",
+                "g is the midpoint of be",
+            ],
+            "image_scan": [
+                "a, c, e are collinear",
+                "line ae is perpendicular to line cf",
+                "line bd is perpendicular to line bf",
+            ],
+            "goal_obstacle": "the target ratio still lacks one grounded helper route back to the visible figure.",
+            "aux_motivation": "a midpoint helper should first create a local balance and then reconnect it to the visible outer frame.",
+            "construction": "construct point h as the midpoint of ad.",
+            "aux_immediate_effects": ["ah equals dh", "a, d, h are collinear"],
+            "bridge_chain": [
+                {
+                    "claim": "triangles ahe and bhf are similar",
+                    "supports": ["visible_facts[2]", "visible_facts[3]", "aux_immediate_effects[1]"],
+                    "why_next": "this would start the ratio transfer.",
+                },
+                {
+                    "claim": "ratio ae to bd equals ratio eh to fh",
+                    "supports": ["bridge_chain[1]"],
+                    "why_next": "this would push the helper ratio toward the goal.",
+                },
+            ],
+            "goal_closure": [
+                {
+                    "claim": "ratio ae to bd equals ratio eg to bf",
+                    "supports": ["bridge_chain[2]", "visible_facts[4]"],
+                    "why_next": "this is the target ratio relation.",
+                }
+            ],
+        }
+
+        ok, message, _ = validate_dossier_plan_response(
+            dossier,
+            point_coords={
+                "a": [134, 196],
+                "b": [226, 184],
+                "c": [217, 115],
+                "d": [124, 128],
+                "e": [187, 144],
+                "f": [247, 146],
+                "g": [206, 164],
+            },
+            visible_goal="eqratio a e b d e g b f",
+            aux_part="<aux> x00 h : midp h a d [008] ; </aux>",
+        )
+
+        self.assertFalse(ok)
+        self.assertIn("unsupported angle/ratio/similar segments", message)
+
+    def test_validate_dossier_writer_body_rejects_internal_planning_refs(self):
+        ok, message, cleaned = validate_dossier_plan_response(
+            DOSSIER_PLAN_OUTPUT,
+            point_coords={
+                "a": [0, 0],
+                "b": [4, 0],
+                "c": [0, 2],
+                "d": [4, 2],
+            },
+            visible_goal="cong a d b c",
+            aux_part="<aux>x00 h : cong a h d h; cong b h c h</aux>",
+        )
+        self.assertTrue(ok, message)
+
+        bad_body = (
+            "The obstacle is to transfer the d-side and c-side through one helper frame before the target equality closes. "
+            "Construct point h such that ah equals dh and bh equals ch. "
+            "From aux_immediate_effects[0], ah equals dh, and bridge_chain[0] then gives ah equals bh inside the helper frame. "
+            "Finally goal_closure[0] gives ad equals bc."
+        )
+
+        writer_ok, writer_message = validate_dossier_writer_body(
+            bad_body,
+            visible_goal="cong a d b c",
+            plan=cleaned,
+        )
+
+        self.assertFalse(writer_ok)
+        self.assertIn("Internal planning reference detected", writer_message)
 
     def test_process_and_generate_sft_runs_offline_dossier_pipeline(self):
         record = {

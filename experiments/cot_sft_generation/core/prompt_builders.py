@@ -35,6 +35,35 @@ def build_supervisor_payload(record, aux_part, sanitized_rest):
     return json.dumps(public_fields, ensure_ascii=False, indent=2)
 
 
+def build_writer_visible_dossier(dossier):
+    if not isinstance(dossier, dict):
+        return dossier
+    cleaned = json.loads(json.dumps(dossier, ensure_ascii=False))
+    for field_name in ["bridge_chain", "goal_closure"]:
+        steps = cleaned.get(field_name)
+        if not isinstance(steps, list):
+            continue
+        visible_steps = []
+        for step in steps:
+            if not isinstance(step, dict):
+                visible_steps.append(step)
+                continue
+            visible_step = {key: value for key, value in step.items() if key != "supports"}
+            visible_steps.append(visible_step)
+        cleaned[field_name] = visible_steps
+    bridge_steps = cleaned.get("bridge_steps")
+    if isinstance(bridge_steps, list):
+        visible_bridge_steps = []
+        for step in bridge_steps:
+            if not isinstance(step, dict):
+                visible_bridge_steps.append(step)
+                continue
+            visible_step = {key: value for key, value in step.items() if key != "support_refs"}
+            visible_bridge_steps.append(visible_step)
+        cleaned["bridge_steps"] = visible_bridge_steps
+    return cleaned
+
+
 def build_plan_json_example():
     return json.dumps(
         {
@@ -435,6 +464,7 @@ def build_plan_critic_prompt(record, plan, hidden_route_hints):
 def build_dossier_write_prompt(record, dossier, aux_part, coordinate_derivation_block):
     public_problem = build_public_problem_text(record)
     visible_goal = extract_problem_goal(record)
+    writer_dossier = build_writer_visible_dossier(dossier)
     return (
         "You are writing the final geometry thinking trace for SFT from an approved reasoning dossier.\n\n"
         "[Visible Inputs]\n"
@@ -443,7 +473,7 @@ def build_dossier_write_prompt(record, dossier, aux_part, coordinate_derivation_
         "[Visible Goal]\n"
         f"{visible_goal}\n\n"
         "[Approved Dossier]\n"
-        f"{json.dumps(dossier, ensure_ascii=False, indent=2)}\n\n"
+        f"{json.dumps(writer_dossier, ensure_ascii=False, indent=2)}\n\n"
         "[Approved Coordinate Snippets]\n"
         "These snippets are optional. Use one only when the dossier really depends on it, and keep it exactly as written.\n"
         f"{coordinate_derivation_block}\n\n"
@@ -456,6 +486,7 @@ def build_dossier_write_prompt(record, dossier, aux_part, coordinate_derivation_
         "- Distinguish public givens from figure observations in wording.\n"
         "- You may omit coordinates entirely. If you use coordinates, reuse one approved snippet verbatim.\n"
         "- Never assign coordinates to auxiliary points.\n"
+        "- Treat support refs as private bookkeeping. Do not quote schema keys or bracketed refs such as visible_facts[1], aux_immediate_effects[0], bridge_chain[2], or goal_closure[0]; restate the underlying geometry relation instead.\n"
         "- Do not mention hidden proofs, hidden hints, a coordinate table, or external supervision.\n"
         "- Do not use LaTeX, $...$, backticks, or XML tags.\n"
         "- Make the auxiliary effects, bridge chain, and goal closure explicit.\n"
@@ -507,13 +538,18 @@ def build_dossier_writer_retry_feedback(validation_message, dossier):
         hints.append("State the goal-side closing claim explicitly near the end.")
     if "first-person" in validation_message:
         hints.append("Use impersonal phrasing such as 'the obstacle is' or 'this gives'.")
-    focus_points = []
+    if "internal planning reference" in validation_message.lower():
+        hints.append("Do not quote schema keys such as visible_facts[1] or bridge_chain[2]; rewrite them as plain geometry relations.")
+    grounded_relations = []
     for step in dossier.get("bridge_chain", []) if isinstance(dossier, dict) else []:
-        for support in step.get("supports", []) or []:
-            if isinstance(support, str) and support not in focus_points:
-                focus_points.append(support)
-    if focus_points:
-        hints.append(f"Keep the body grounded in dossier items such as {', '.join(focus_points[:5])}.")
+        for support in step.get("resolved_supports", []) or []:
+            if isinstance(support, str) and support not in grounded_relations:
+                grounded_relations.append(support)
+        claim = step.get("claim")
+        if isinstance(claim, str) and claim and claim not in grounded_relations:
+            grounded_relations.append(claim)
+    if grounded_relations:
+        hints.append(f"Keep the body grounded in relations such as {', '.join(grounded_relations[:5])}.")
     return "\n".join(f"- {hint}" for hint in hints)
 
 

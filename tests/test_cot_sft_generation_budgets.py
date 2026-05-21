@@ -243,6 +243,26 @@ class CotSftGenerationBudgetsTest(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("Inline coordinate mismatch", message)
 
+    def test_validate_thinking_response_rejects_internal_planning_refs(self):
+        thinking = (
+            "<thinking>"
+            "The obstacle is to transfer the d-side and c-side into one local helper frame before the final equality closes. "
+            "Construct point h such that ah equals dh and bh equals ch. "
+            "From aux_immediate_effects[0], ah equals dh, and bridge_chain[0] then gives ah equals bh before the final close. "
+            "Therefore ad equals bc."
+            "</thinking>"
+        )
+
+        ok, message = validate_thinking_response(
+            thinking,
+            self.point_coords,
+            require_coord_tags=False,
+            max_total_len=2600,
+        )
+
+        self.assertFalse(ok)
+        self.assertIn("Internal planning reference detected", message)
+
     def test_validate_raw_plan_response_accepts_relation_first_schema(self):
         ok, message, cleaned = validate_raw_plan_response(
             self.raw_plan,
