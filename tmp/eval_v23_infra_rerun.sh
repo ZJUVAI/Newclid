@@ -66,7 +66,7 @@ run_one() {
     --log_dir "$RESULTS_DIR"
 }
 
-run_one "$REPO_ROOT/tmp/imo95_score_diff_11_epu2let4/0001_imo_sl_2002_g7_variant.txt"
-run_one "$REPO_ROOT/tmp/imo95_score_diff_11_epu2let4/0006_imo_sl_2013_g2.txt"
+run_one "$REPO_ROOT/tmp/imo95_score_diff_11_v22_infra_rerun/0001_imo_sl_2002_g7_variant.txt"
+run_one "$REPO_ROOT/tmp/imo95_score_diff_11_v22_infra_rerun/0006_imo_sl_2013_g2.txt"
 
 echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] Infra rerun finished"
