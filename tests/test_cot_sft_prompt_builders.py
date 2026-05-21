@@ -185,17 +185,28 @@ class CotSftPromptBuildersTest(unittest.TestCase):
         self.assertIn("coordinate_checks", prompt)
         self.assertIn("visible_facts[i]", prompt)
         self.assertIn("Do not invent a different helper condition", prompt)
+        self.assertIn("support-local", prompt)
+        self.assertIn("several fresh goal-side objects", prompt)
 
     def test_build_dossier_plan_retry_feedback_mentions_dossier_supports(self):
         feedback = build_dossier_plan_retry_feedback(
-            "goal_closure must finish on the correct goal relation family",
+            "goal_closure[0].claim introduces unsupported angle/ratio/similar segments before its cited supports ground them",
             "<aux>x00 h : coll h a b; x00 k : perp k h a b</aux>",
         )
 
         self.assertIn("visible_facts[i]", feedback)
-        self.assertIn("goal closure", feedback.lower())
+        self.assertIn("support-local", feedback)
+        self.assertIn("smaller predecessor claim", feedback)
         self.assertIn("staged strategy", feedback.lower())
         self.assertIn("hidden aux target", feedback.lower())
+
+    def test_build_dossier_plan_retry_feedback_mentions_goal_family_match(self):
+        feedback = build_dossier_plan_retry_feedback(
+            "goal_closure must finish on the correct goal relation family",
+            "<aux>x00 h : midp h b c</aux>",
+        )
+
+        self.assertIn("Match the closure predicate to the visible goal exactly", feedback)
 
     def test_build_dossier_critic_prompt_requests_optional_revised_dossier(self):
         prompt = build_dossier_critic_prompt(

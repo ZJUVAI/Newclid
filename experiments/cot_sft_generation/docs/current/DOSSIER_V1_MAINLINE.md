@@ -57,6 +57,32 @@ legacy 现在只保留三种用途：
 5. writer 长度不稳
    - 当前 stratified4 第 4 条失败直接原因仍然是 length budget。
 
+## 3.1 2026-05-22 最新 live 跟进
+
+- 本轮先做了两类 runtime 收紧：
+  - `07888a2`：writer / final thinking 禁止泄露内部 dossier refs，例如 `visible_facts[1]`、`bridge_chain[2]`
+  - dossier validator 新增 support-grounding 检查，直接拦截把 full similarity / ratio / angle closure 建在未铺垫 supports 上的 plan
+- 随后跑了两轮 live benchmark：
+  - `generated/dossier_v1_quality_review6_20260522.jsonl`
+  - `generated/dossier_v1_quality_review6_20260522_artifacts_20260521_164105/summary.json`
+  - 结果：`0/6 surface_pass`
+  - 主要失败：
+    - `5/6` 是 planner 被 `unsupported angle/ratio/similar segments` 打回
+    - 剩余 `1/6` 是 writer length overflow
+  - 样本级最常见错误：
+    - `eqratio`: `bridge_chain[0]` 直接引入 `bh/ch`
+    - `simtrir`: `goal_closure[0]` 直接引入 `bd/ce/cg/de/eg`
+    - `simtri`: `goal_closure[0]` 直接引入 `ag/cg/fg`
+    - `contri` / `contrir`: 中后段 bridge 或 closure 直接引入整组 fresh helper segments
+  - prompt-only 跟进：
+    - `generated/dossier_v1_quality_review4_prompttight_20260522.jsonl`
+    - `generated/dossier_v1_quality_review4_prompttight_20260522_artifacts_20260521_165216/summary.json`
+    - 结果：`0/4 surface_pass`
+    - 结论：仅靠 planner prompt / retry feedback 强调 support-local claim，仍不足以让默认 `qwen` 稳定改写成小步 route
+- 当前结论已经更明确：
+  - 新 validator 没有“误杀”语义好样本；它主要是在把原本会伪装成 `surface_pass` 的坏 route 显式打回
+  - 下一轮主线不应继续只加 prompt 约束，而应优先把 smaller-claim decomposition 更前置地脚本化，例如进入 planner skeleton / bridge staging
+
 ## 4. 下个会话最应该看的样本
 
 优先看这三个 `surface_pass` 但 `semantic_fail` 的样本：
@@ -95,6 +121,13 @@ legacy 现在只保留三种用途：
    - critic prompt
    - writer validator
    - 不要同时大改多层
+
+- 2026-05-22 的补充判断：
+  - `not_visible_only` 已经通过 runtime boundary checks 明显收紧
+  - 但 `bridge_unsupported` 仍然是绝对主问题，而且 prompt-only tightening 没有显著改善 live 结果
+  - 因此下一轮更推荐：
+    - planner skeleton / scripted bridge decomposition
+    - 再考虑 critic 或 writer
 
 3. 跑最小回归
    - `python -m unittest discover -s tests -p 'test_cot_sft_*.py'`

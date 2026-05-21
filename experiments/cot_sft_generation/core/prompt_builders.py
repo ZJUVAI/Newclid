@@ -344,6 +344,10 @@ def build_dossier_plan_prompt(
         "- `construction` must match the hidden aux target itself. Do not invent a different helper condition.\n"
         "- `aux_immediate_effects` must be direct consequences of the construction itself.\n"
         "- `bridge_chain` and `goal_closure` must use supports of the form `visible_facts[i]`, `image_scan[i]`, `coordinate_checks[i]`, `aux_immediate_effects[i]`, or earlier `bridge_chain[i]`.\n"
+        "- Every `bridge_chain` or `goal_closure` claim must stay support-local: the cited supports should already mention most of the same segments, angles, triangles, or points that appear in the claim.\n"
+        "- Do not jump straight to a full similarity, ratio equality, or angle equality if the supports have not already introduced those same goal-side objects in smaller earlier relations.\n"
+        "- `goal_closure` should usually be the final restatement of a route that is already almost complete; it must not be the first place where several fresh goal-side objects appear together.\n"
+        "- If a claim would introduce several fresh segment or angle objects beyond its supports, replace it with a smaller predecessor relation and let a later step finish the route.\n"
         "- Multi-point auxiliary constructions must explain the stages explicitly.\n"
         "- Avoid vague phrases such as desired angle equality, desired ratio, specific angle conditions, necessary relationships, or this point is crucial.\n"
         "- Do not mention proof ids, rule names, hidden hints, or coordinate-table wording.\n"
@@ -378,6 +382,7 @@ def build_dossier_plan_retry_feedback(validation_message, aux_part):
         "Use only support strings of the form visible_facts[i], image_scan[i], coordinate_checks[i], aux_immediate_effects[i], or earlier bridge_chain[i].",
         "Keep the route visible-only in tone and avoid proof-engine phrasing.",
         "Construction should match the hidden aux target instead of inventing a different helper condition.",
+        "Keep every bridge or closure claim support-local: the cited supports should already mention most of the same segments, angles, triangles, or points.",
     ]
     if "image_scan" in validation_message:
         hints.append("Each image_scan item should name a concrete geometric relation cue, not a generic description of the scene or the target.")
@@ -389,10 +394,16 @@ def build_dossier_plan_retry_feedback(validation_message, aux_part):
         hints.append("Mirror the hidden aux target exactly instead of inventing a different condition for the new point.")
     if "goal_closure" in validation_message:
         hints.append("Goal closure must end on the correct goal-side relation family and must mention the goal-side points.")
+        hints.append("Goal closure should only restate a route that is already almost finished; do not make it the first step that introduces several fresh goal-side objects.")
     if "construction" in validation_message:
         hints.append("Construction must mention the auxiliary point names explicitly, match the hidden aux target, and keep staged wording for multi-point constructions.")
     if "forbidden pattern" in validation_message:
         hints.append("Avoid phrases like desired angle equality, desired ratio, specific angle conditions, necessary relationships, or this point is crucial.")
+    if "unsupported angle/ratio/similar segments" in validation_message:
+        hints.append("The rejected claim introduced too many fresh angle or segment objects beyond its supports. Replace it with a smaller predecessor claim that reuses the same support objects first.")
+        hints.append("Before claiming a full similarity, ratio equality, or final angle relation, add earlier bridge steps that explicitly introduce those exact triangles, segments, or rays.")
+    if "correct goal relation family" in validation_message:
+        hints.append("Match the closure predicate to the visible goal exactly: eqratio to ratio equality, eqangle to angle equality, simtri/simtrir to triangle similarity, and contri/contrir to triangle congruence.")
     if aux_part and aux_part.count("x00") > 1:
         hints.append("Because the auxiliary target introduces multiple points, the construction and follow-up should say first/then/finally or an equivalent staged strategy.")
     return "\n".join(f"- {hint}" for hint in hints)

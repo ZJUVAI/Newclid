@@ -2,6 +2,70 @@
 
 本文件用于实时记录 `experiments/cot_sft_generation` 近期实验、证据和当前运行状态。
 
+## 2026-05-22 boundary checks 生效，但 prompt-only tightening 仍不足
+
+### 本轮实现
+
+- `07888a2` `Tighten dossier writer boundary checks`
+  - 新增内容：
+    - writer / final thinking 禁止输出内部 dossier refs，例如 `visible_facts[1]`、`aux_immediate_effects[0]`、`bridge_chain[2]`
+    - dossier `bridge_chain` / `goal_closure` 新增 support-grounding 检查，拦截把 similarity / ratio / angle claim 建在未铺垫 supports 上的 plan
+  - 目的：
+    - 把 `not_visible_only` 和 `bridge_unsupported` 更早转成显式失败，而不是让它们继续伪装成 `surface_pass`
+
+- 随后又只动 planner prompt / retry feedback：
+  - 明确要求 `bridge_chain` / `goal_closure` claim 必须 `support-local`
+  - 明确禁止在 closure 里第一次同时引入多组 fresh goal-side objects
+  - 明确要求 full similarity / ratio / angle claim 之前先写更小的 predecessor relation
+
+### 自动验证
+
+- `python -m unittest discover -s tests -p 'test_cot_sft_*.py'`
+  - 当前结果：`Ran 75 tests ... OK`
+- `python experiments/cot_sft_generation/maintenance_smoke_check.py`
+  - 当前结果：全部检查通过
+
+### live run 记录
+
+- 第一次跟进：
+  - `generated/dossier_v1_quality_review6_20260522.jsonl`
+  - `generated/dossier_v1_quality_review6_20260522_artifacts_20260521_164105/summary.json`
+  - 模型：`qwen/qwen2.5-vl-72b-instruct`
+  - 结果：
+    - `surface_pass`: `0/6`
+    - `surface_fail`: `6/6`
+    - `5/6` 直接失败在 planner 的 `unsupported angle/ratio/similar segments`
+    - `1/6` 失败在 writer length budget
+  - 样本级错误摘录：
+    - sample0 `eqratio`：`bridge_chain[0]` 直接引入 `bh/ch`
+    - sample2 `simtrir`：`goal_closure[0]` 直接引入 `bd/ce/cg/de/eg`
+    - sample3 `simtri`：`goal_closure[0]` 直接引入 `ag/cg/fg`
+    - sample5 `contrir`：`goal_closure[0]` 直接引入 `bi/di/fi`
+
+- prompt-only rerun：
+  - `generated/dossier_v1_quality_review4_prompttight_20260522.jsonl`
+  - `generated/dossier_v1_quality_review4_prompttight_20260522_artifacts_20260521_165216/summary.json`
+  - 结果：
+    - `surface_pass`: `0/4`
+    - `surface_fail`: `4/4`
+  - 代表性错误：
+    - sample0 `eqratio`：仍然是 `bridge_chain[0]` 直接引入 `bh/ch`
+    - sample1 `eqangle`：曾尝试把 closure 拆更多步，但错误地堆进 `goal_closure`
+    - sample2 `simtrir`：仍然在中后段硬编 `bd/bf/bh/df/fh`
+    - sample3 `simtri`：仍然在 bridge/closure 中硬编 `cg/gh` 或 `ag/cg/fg`
+
+### 当前判断
+
+- boundary checks 是有效的：
+  - 它们把原本会伪装成 `surface_pass` 的坏 route 更早打回
+  - 当前 `0/6` 不是单纯退化，更像是把真实 semantic 问题显式化
+- 但 planner prompt / retry feedback 的加强还不够：
+  - 默认 `qwen` 仍然倾向直接写 full similarity / ratio / angle closure
+  - 即使 prompt 强调 `support-local`，模型也没有稳定改写成更小步的 bridge decomposition
+- 因此，下个阶段不应继续只做 prompt-only tightening：
+  - 更值得推进的是 planner skeleton / scripted bridge decomposition
+  - 把 smaller-claim staging 更前置地交给脚本，而不是等模型自由生成后再打回
+
 ## 2026-05-20 dossier_v1 默认化与第一次 live 语义审读
 
 ### 本轮实现
