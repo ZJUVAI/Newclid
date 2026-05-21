@@ -15,39 +15,19 @@
 
 using namespace std;
 
-DDARSolver::DDARSolver(Problem *problem, bool log_enabled, bool exp_enabled) : _problem(problem), _log_enabled(log_enabled), _exp_enabled(exp_enabled)
+DDARSolver::DDARSolver(Problem *problem, const std::map<std::string, bool> &config)
+    : _problem(problem), _config(config)
 {
-    // std::cout << "\n=== DDARSolver Constructor Timing ===" << std::endl;
-    // auto t_total = std::chrono::steady_clock::now();
+    Matcher matcher(problem, config);
 
-    // auto t0 = std::chrono::steady_clock::now();
-    Matcher matcher(problem);
-    // auto t1 = std::chrono::steady_clock::now();
-    // std::cout << "Matcher construction    : "
-    //           << std::chrono::duration<double, std::milli>(t1 - t0).count()
-    //           << " ms" << std::endl;
-
-    // t0 = t1;
     for (const auto &thm : matcher.theorems())
     {
         insert_application(thm.clone());
     }
-    // auto t2 = std::chrono::steady_clock::now();
-    // std::cout << "insert_application      : "
-            //   << std::chrono::duration<double, std::milli>(t2 - t0).count()
-            //   << " ms (theorems: " << matcher.theorems().size() << ")" << std::endl;
-
-    // t0 = t2;
     for (const auto &hyp : problem->hypotheses())
     {
         this->insert_statement(hyp->normalize())->prove_by_assumption();
     }
-    // auto t3 = std::chrono::steady_clock::now();
-    // std::cout << "insert hypotheses       : "
-    //           << std::chrono::duration<double, std::milli>(t3 - t0).count()
-    //           << " ms (count: " << problem->hypotheses().size() << ")" << std::endl;
-
-    // t0 = t3;
     if (!problem->goals().empty())
     {
         for (const auto &goal : problem->goals())
@@ -55,31 +35,13 @@ DDARSolver::DDARSolver(Problem *problem, bool log_enabled, bool exp_enabled) : _
             _goals.push_back(this->insert_statement(goal->normalize()));
         }
     }
-    // auto t4 = std::chrono::steady_clock::now();
-    // std::cout << "insert goals            : "
-    //           << std::chrono::duration<double, std::milli>(t4 - t0).count()
-    //           << " ms (count: " << problem->goals().size() << ")" << std::endl;
-
-    // t0 = t4;
-    // int ar_count = 0;
     for (const auto &stmt : matcher.stmts())
     {
         if (stmt->check_numerically())
         {
             _ars.push_back(this->insert_statement(stmt));
-            // ar_count++;
         }
     }
-    // auto t5 = std::chrono::steady_clock::now();
-    // std::cout << "insert AR statements    : "
-    //           << std::chrono::duration<double, std::milli>(t5 - t0).count()
-    //           << " ms (count: " << ar_count << "/" << matcher.stmts().size() << ")" << std::endl;
-
-    // auto t_end = std::chrono::steady_clock::now();
-    // std::cout << "TOTAL DDARSolver init   : "
-    //           << std::chrono::duration<double, std::milli>(t_end - t_total).count()
-    //           << " ms" << std::endl;
-    // std::cout << "======================================\n" << std::endl;
 }
 
 bool DDARSolver::run_level(const Point &max_pt)
@@ -209,23 +171,26 @@ void DDARSolver::insert_application(Theorem thm)
 
 void DDARSolver::add_custom_theorems(const vector<CustomRule> &rules)
 {
-    CustomTheoremMatcher matcher(_problem, rules);
+    CustomTheoremMatcher matcher(_problem, rules, _config);
 
     // cout << "\n=== Matched Custom Theorems ===" << endl;
-    // size_t idx = 0;
+    size_t idx = 0;
     for (const auto &thm : matcher.theorems())
     {
-        // cout << "[" << idx++ << "] " << thm.name() << " (" << thm.rule() << ")" << endl;
+        if (get_config("verbose", false))
+        {
+            cout << "[" << idx++ << "] " << thm.name() << " (" << thm.rule() << ")" << endl;
 
-        // cout << "  Hypotheses:" << endl;
-        // for (const auto &hyp : thm.hypotheses())
-        //     cout << "    " << hyp->to_string() << endl;
+            cout << "  Hypotheses:" << endl;
+            for (const auto &hyp : thm.hypotheses())
+                cout << "    " << hyp->to_string() << endl;
 
-        // cout << "  Conclusions:" << endl;
-        // for (const auto &con : thm.conclusions())
-        //     cout << "    " << con->to_string() << endl;
+            cout << "  Conclusions:" << endl;
+            for (const auto &con : thm.conclusions())
+                cout << "    " << con->to_string() << endl;
 
-        // cout << endl;
+            cout << endl;
+        }
         insert_application(thm.clone());
     }
     // cout << "Total: " << matcher.theorems().size() << " custom theorems added" << endl;
@@ -329,7 +294,7 @@ vector<ReducedEquation *> DDARSolver::insert_equation(const unique_ptr<Statement
 
     if (type == "dist")
     {
-        auto eqn_ptrs = pf->as_equation_dist(_exp_enabled);
+        auto eqn_ptrs = pf->as_equation_dist(get_config("using_exp"));
         if (!eqn_ptrs.empty())
         {
             for (const auto &eqn_ptr : eqn_ptrs)
@@ -349,7 +314,7 @@ vector<ReducedEquation *> DDARSolver::insert_equation(const unique_ptr<Statement
     }
     if (type == "slope")
     {
-        auto eqn_ptrs = pf->as_equation_slope(_exp_enabled);
+        auto eqn_ptrs = pf->as_equation_slope(get_config("using_exp"));
         if (!eqn_ptrs.empty())
         {
             for (const auto &eqn_ptr : eqn_ptrs)
@@ -367,9 +332,9 @@ vector<ReducedEquation *> DDARSolver::insert_equation(const unique_ptr<Statement
         }
         return res;
     }
-    if (type == "distlog" && _log_enabled)
+    if (type == "distlog")
     {
-        auto eqn_ptrs = pf->as_equation_distlog(_exp_enabled);
+        auto eqn_ptrs = pf->as_equation_distlog(get_config("using_exp"));
         if (!eqn_ptrs.empty())
         {
             for (const auto &eqn_ptr : eqn_ptrs)

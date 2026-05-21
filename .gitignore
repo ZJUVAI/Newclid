@@ -59,7 +59,7 @@ src/newclid/test.py
 results/
 !site/app/results/
 datasets/
-core*
+core.[0-9]*
 temp/
 experiments/*
 outputs/

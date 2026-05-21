@@ -230,26 +230,62 @@ class GeometricSolverBuilder:
 class CSolver:
     def __init__(
         self,
-        problem: str,
+        problem: str = "",
         problem_name: str = "anonymity",
         seed: int = 123,
         solver: GeometricSolver = None,
-        using_log: bool = False,
-        using_exp: bool = False,
-        light: bool = False,
+        config_path: Path = None,
+        points: List[Tuple[str, Any, Any]] = None,
+        premises: List[Tuple[str, List[str]]] = None,
+        goals: List[Tuple[str, List[str]]] = None,
+        **overrides
     ):
+        """
+        Initialize CSolver with configuration.
+
+        Args:
+            problem: Problem string
+            problem_name: Name of the problem
+            seed: Random seed
+            solver: Optional pre-built GeometricSolver
+            config_path: Path to config file (default: None, uses default config)
+            points: Pre-built points list (lowest priority, used only when no other init path applies)
+            premises: Pre-built premises list (used together with points/goals)
+            goals: Pre-built goals list (used together with points/premises)
+            **overrides: Config overrides (e.g., using_log=True, using_exp=False, light=True)
+
+        Examples:
+            # Use default config
+            CSolver(fl_statement, solver=solver)
+
+            # Use custom config file
+            CSolver(fl_statement, solver=solver, config_path=Path("my_config.json"))
+
+            # Override config
+            CSolver(fl_statement, solver=solver, using_log=True)
+
+            # Custom config + override
+            CSolver(fl_statement, solver=solver, config_path=Path("my_config.json"), using_log=True)
+
+            # Directly supply pre-built data (lowest priority)
+            CSolver(points=pts, premises=prems, goals=gls)
+        """
+        from newclid.configs import load_solver_config
+
+        # Load config with overrides
+        final_config = load_solver_config(config_path, **overrides)
+
         self.problem = problem
         self.problem_name = problem_name
         self.seed = seed
-        self.log_enabled = using_log
-        self.exp_enabled = using_exp
+        self.config = final_config
 
         self.points: List[Tuple[str, Any, Any]] = []
         self.premises: List[Tuple[str, List[str]]] = []
         self.goals: List[Tuple[str, List[str]]] = []
         self.useful_points: List[str] = []
 
-        if light:
+        if final_config.get('light', False):
             # 轻量化路径：跳过 dep_graph、Matcher、rely 等符号推理开销
             self.solver = None
             problemJGEX = ProblemJGEX.from_text(self.problem)
@@ -264,20 +300,30 @@ class CSolver:
                 for a in args:
                     if a and a not in self.useful_points:
                         self.useful_points.append(a)
-        else:
-            # 完整路径
-            if solver is None:
-                self.solver = (
-                    GeometricSolverBuilder(self.seed)
-                    .load_problem_from_txt(self.problem)
-                    .build()
-                )
-            else:
-                self.solver = solver
-
+        elif solver is None and problem:
+            self.solver = (
+                GeometricSolverBuilder(self.seed)
+                .load_problem_from_txt(self.problem)
+                .build()
+            )
             self._extract_premises()
             self._extract_goals()
             self._extract_points()
+        elif solver is not None:
+            self.solver = solver
+            self._extract_premises()
+            self._extract_goals()
+            self._extract_points()
+        elif points is not None and premises is not None and goals is not None:
+            # 直接传入预构建数据，跳过所有解析和推理初始化
+            self.solver = None
+            self.points = list(points) if points is not None else []
+            self.premises = list(premises) if premises is not None else []
+            self.goals = list(goals) if goals is not None else []
+            for _, args in self.premises:
+                for a in args:
+                    if a and a not in self.useful_points:
+                        self.useful_points.append(a)
 
     # -------------------- 内部方法 -------------------- #
     def _extract_points(self):
@@ -337,8 +383,7 @@ class CSolver:
                 self.goals,
                 custom_rules,
                 max_level,
-                self.log_enabled,
-                self.exp_enabled,
+                self.config,
             )
         else:
             solved, dep_graph = DDAR.run_ddar(
@@ -347,8 +392,7 @@ class CSolver:
                 self.premises,
                 self.goals,
                 max_level,
-                self.log_enabled,
-                self.exp_enabled,
+                self.config,
             )
 
         if self.solver is not None:

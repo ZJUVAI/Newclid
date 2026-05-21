@@ -48,7 +48,7 @@ def test_benchmark_regression(filename: str, min_solved: int):
 
     for name, stmt in problems:
         try:
-            solver = CSolver(problem=stmt, problem_name=name, seed=123, using_log=True)
+            solver = CSolver(problem=stmt, problem_name=name, seed=123)
             if solver.run(max_level=500):
                 solved += 1
         except Exception:

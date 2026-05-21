@@ -174,6 +174,7 @@ def build_ddar_input(
             ValueError,
             KeyError,
             AssertionError,
+            ConstructionError
         ) as e:
             err = e
             continue

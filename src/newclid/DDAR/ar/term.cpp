@@ -284,7 +284,21 @@ bool Term::operator==(const Term &other) const
 
 bool Term::operator<(const Term &other) const
 {
-    return _vars < other._vars;
+    if (this->_vars.empty())
+        return !other._vars.empty();
+    if (other._vars.empty())
+        return false;
+    const auto &max_kv1 = *(this->_vars.rbegin());
+    const auto &max_kv2 = *(other._vars.rbegin());
+    if (max_kv1.first != max_kv2.first)
+    {
+        return max_kv1.first < max_kv2.first;
+    }
+    if (max_kv1.second != max_kv2.second)
+    {
+        return max_kv1.second < max_kv2.second;
+    }
+    return this->_vars < other._vars;
 }
 
 bool Term::operator>(const Term &other) const

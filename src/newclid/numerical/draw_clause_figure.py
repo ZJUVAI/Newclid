@@ -48,6 +48,8 @@ def draw_clause_figure(
             savefig_kwargs["format"] = save_format
         if dpi is not None:
             savefig_kwargs["dpi"] = dpi
+        savefig_kwargs["facecolor"] = fig.get_facecolor()
+        savefig_kwargs["edgecolor"] = "none"
         fig.savefig(save_to, **savefig_kwargs)
 
 

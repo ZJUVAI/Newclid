@@ -10,6 +10,8 @@
 #include "predicate/para.hpp"
 #include "predicate/perp.hpp"
 #include <algorithm>
+#include <chrono>
+#include <iostream>
 #include <tuple>
 #include <vector>
 #include <set>
@@ -21,7 +23,8 @@
 
 using namespace std;
 
-Matcher::Matcher(Problem *prob) : _problem(prob)
+Matcher::Matcher(Problem *prob, const std::map<std::string, bool> &config)
+    : _problem(prob), _config(config)
 {
     match_similar_triangles();
     match_between();
@@ -80,7 +83,12 @@ void Matcher::on_similar_triangles(const SimilarTriangles &simtri)
     CongruentTriangles const congtri(simtri.left(), simtri.right(), simtri.sameclock());
     if (congtri.check_numerically())
     {
-        insert_theorem(Theorem::congruent_triangles_of_cong(congtri));
+        // Use SSS and SAS to derive congruent triangles
+        for (const auto &rotated : congtri.cyclic_rotations())
+        {
+            insert_theorem(Theorem::congruent_triangles_of_sas(rotated));
+        }
+        insert_theorem(Theorem::congruent_triangles_of_sss(congtri));
         insert_theorem(Theorem::congruent_triangles_properties(congtri));
     }
 }
@@ -764,6 +772,21 @@ void Matcher::insert_theorem(const Theorem &thm)
 {
     if (!thm.check_numerically())
     {
+        // cout << "定理未通过数值检测: " << thm.name() << endl;
+        // cout << "前提: " << endl;
+        // for (const auto &stmt : thm.hypotheses())
+        // {
+        //     cout << "  " << *stmt << endl;
+        // }
+        // cout << "结论: " << endl;
+        // for (const auto &stmt : thm.conclusions())
+        // {
+        //     cout << "  " << *stmt << endl;
+        // }
+        return;
+    }
+    if (!get_config(thm.rule(), false))
+    {
         return;
     }
     _theorems.push_back(thm.normalize());
@@ -773,60 +796,88 @@ void Matcher::insert_theorem(const Theorem &thm)
 // CustomTheoremMatcher 实现 - 独立的自定义定理匹配功能
 // ============================================================================
 
-// 收集 stmt 参数中尚未在 mapping 中出现的新点代号（去重，保序）
-static vector<string> new_vars(const Stmt &stmt, const Mapping &mapping)
+namespace
 {
-    vector<string> vars;
-    for (const auto &arg : stmt.second)
+    // 内部工具：判断谓词是否包含尾部常量参数
+    bool HasTrailingConstant(const string &pred)
     {
-        bool known = false;
-        for (const auto &kv : mapping)
-            if (kv.first == arg)
-            {
-                known = true;
-                break;
-            }
-        if (!known)
-        {
-            bool dup = false;
-            for (const auto &v : vars)
-                if (v == arg)
-                {
-                    dup = true;
-                    break;
-                }
-            if (!dup)
-                vars.push_back(arg);
-        }
+        return pred == "rconst" || pred == "aconst";
     }
-    return vars;
+
+    // 内部工具：获取谓词中“点”参数的数量
+    size_t GetPointArgsCount(const Stmt &stmt)
+    {
+        size_t n = stmt.second.size();
+        return (HasTrailingConstant(stmt.first) && n > 0) ? n - 1 : n;
+    }
+
+    // 内部工具：在 Mapping 中查找变量绑定的点索引
+    int FindBinding(const Mapping &mapping, const string &var)
+    {
+        for (const auto &kv : mapping)
+        {
+            if (kv.first == var)
+                return kv.second;
+        }
+        return -1;
+    }
 }
 
-// 将 mapping 中的代号替换为实际点名，构造 Statement 并做数值检测
-static bool check_stmt_numerically(const Stmt &stmt, const Mapping &mapping, Problem *problem)
+// ----------------------------------------------------------------------------
+// 辅助成员函数
+// ----------------------------------------------------------------------------
+
+void CustomTheoremMatcher::DebugLog(const string &msg) const
+{
+    if (get_config("verbose", false))
+    {
+        cout << "[DEBUG] " << msg << endl;
+    }
+}
+
+vector<string> CustomTheoremMatcher::collect_new_vars(const Stmt &stmt, const Mapping &current) const
+{
+    vector<string> new_vars;
+    size_t n_point_args = GetPointArgsCount(stmt);
+
+    for (size_t i = 0; i < n_point_args; ++i)
+    {
+        const string &arg = stmt.second[i];
+        // 如果当前 mapping 中没有，且 new_vars 中也没加入过，则视为新变量
+        if (FindBinding(current, arg) == -1 &&
+            std::find(new_vars.begin(), new_vars.end(), arg) == std::end(new_vars))
+        {
+            new_vars.push_back(arg);
+        }
+    }
+    return new_vars;
+}
+
+bool CustomTheoremMatcher::verify_stmt(const Stmt &stmt, const Mapping &mapping) const
 {
     vector<string> real_args;
-    for (const auto &arg : stmt.second)
+    size_t n_point_args = GetPointArgsCount(stmt);
+
+    for (size_t i = 0; i < stmt.second.size(); ++i)
     {
-        bool found = false;
-        for (const auto &kv : mapping)
+        const string &arg = stmt.second[i];
+        if (i < n_point_args)
         {
-            if (kv.first == arg)
-            {
-                real_args.push_back(problem->point(kv.second).name());
-                found = true;
-                break;
-            }
+            int pt_idx = FindBinding(mapping, arg);
+            if (pt_idx == -1)
+                return false;
+            real_args.push_back(_problem->point(pt_idx).name());
         }
-        if (!found)
-            return false;
+        else
+        {
+            real_args.push_back(arg); // 透传常量参数
+        }
     }
+
     try
     {
-        auto s = problem->create_statement(stmt.first, real_args);
-        if (!s)
-            return false;
-        return s->check_numerically();
+        auto s = _problem->create_statement(stmt.first, real_args);
+        return s && s->check_numerically();
     }
     catch (...)
     {
@@ -834,137 +885,360 @@ static bool check_stmt_numerically(const Stmt &stmt, const Mapping &mapping, Pro
     }
 }
 
-void CustomTheoremMatcher::backtrack(
-    const vector<Stmt> &stmts,
-    size_t idx,
-    Mapping &current,
-    vector<Mapping> &out) const
+// ----------------------------------------------------------------------------
+// 核心逻辑：谓词索引构建
+// ----------------------------------------------------------------------------
+
+void CustomTheoremMatcher::build_triangle_indices(size_t n)
 {
-    if (idx == stmts.size())
+    struct TriangleInfo
     {
-        out.push_back(current);
-        return;
-    }
+        double ratio1, ratio2; // 形状签名：ab/ac, ab/bc
+        int a, b, c;           // 原始点索引
+    };
 
-    const Stmt &stmt = stmts[idx];
-    vector<string> vars = new_vars(stmt, current);
+    vector<TriangleInfo> triangles;
+    const double eps = 1e-8;
 
-    if (vars.empty())
+    // 1. 遍历并过滤所有合法三角形
+    for (int a = 0; a < n; ++a)
     {
-        if (check_stmt_numerically(stmt, current, _problem))
-            backtrack(stmts, idx + 1, current, out);
-        return;
-    }
-
-    size_t n_pts = _problem->num_points();
-    size_t n_vars = vars.size();
-    vector<size_t> indices(n_vars, 0);
-
-    while (true)
-    {
-        for (size_t i = 0; i < n_vars; i++)
-            current.push_back({vars[i], (int)indices[i]});
-
-        if (check_stmt_numerically(stmt, current, _problem))
-            backtrack(stmts, idx + 1, current, out);
-
-        for (size_t i = 0; i < n_vars; i++)
-            current.pop_back();
-
-        // 进位
-        size_t carry = n_vars;
-        while (carry > 0)
+        for (int b = 0; b < n; ++b)
         {
-            carry--;
-            indices[carry]++;
-            if (indices[carry] < n_pts)
-                break;
-            indices[carry] = 0;
-            if (carry == 0)
-                goto done;
+            if (a == b)
+                continue;
+            for (int c = 0; c < n; ++c)
+            {
+                if (c == a || c == b)
+                    continue;
+
+                auto pt_a = _problem->point(a);
+                auto pt_b = _problem->point(b);
+                auto pt_c = _problem->point(c);
+
+                // 排除共线三角形
+                if (Coll(pt_a, pt_b, pt_c).check_equations())
+                    continue;
+
+                double ab = Dist(pt_a, pt_b).to_double();
+                double ac = Dist(pt_a, pt_c).to_double();
+                double bc = Dist(pt_b, pt_c).to_double();
+
+                // 使用 Canonical Order 过滤：ab ≤ bc ≤ ac 以去重并统一对应关系
+                // 这里的 REL_TOL 建议定义在配置类中
+                if (ab > (1 + 1e-6) * bc || bc > (1 + 1e-6) * ac)
+                    continue;
+
+                triangles.push_back({ab / ac, ab / bc, a, b, c});
+            }
         }
     }
-done:;
+
+    // 2. 按形状签名排序
+    std::sort(triangles.begin(), triangles.end(), [eps](const TriangleInfo &t1, const TriangleInfo &t2)
+              {
+        if (std::abs(t1.ratio1 - t2.ratio1) > eps) return t1.ratio1 < t2.ratio1;
+        return t1.ratio2 < t2.ratio2; });
+
+    // 3. 桶内配对
+    auto &idx_simtri = _index["simtri"];
+    auto &idx_simtrir = _index["simtrir"];
+
+    for (size_t i = 0; i < triangles.size(); ++i)
+    {
+        for (size_t j = i + 1; j < triangles.size(); ++j)
+        {
+            // 检查形状是否相同（是否在同一个桶）
+            if (std::abs(triangles[i].ratio1 - triangles[j].ratio1) > eps ||
+                std::abs(triangles[i].ratio2 - triangles[j].ratio2) > eps)
+            {
+                break;
+            }
+
+            const auto &t1 = triangles[i];
+            const auto &t2 = triangles[j];
+
+            // 判断方向：利用面积正负判断是相似(simtri)还是反相似(simtrir)
+            double area1 = Triangle(_problem->point(t1.a), _problem->point(t1.b), _problem->point(t1.c)).area();
+            double area2 = Triangle(_problem->point(t2.a), _problem->point(t2.b), _problem->point(t2.c)).area();
+            bool same_orientation = (area1 > 0) == (area2 > 0);
+
+            auto &target_idx = same_orientation ? idx_simtri : idx_simtrir;
+
+            // 注入所有可能的对应排列（共 12 种：2 个三角形交换 × 6 种顶点置换）
+            // 这里封装一个 lambda 简化代码
+            auto push_all_perms = [&](int a, int b, int c, int d, int e, int f)
+            {
+                target_idx.push_back({a, b, c, d, e, f});
+                target_idx.push_back({b, c, a, e, f, d});
+                target_idx.push_back({c, a, b, f, d, e});
+                target_idx.push_back({a, c, b, d, f, e});
+                target_idx.push_back({b, a, c, e, d, f});
+                target_idx.push_back({c, b, a, f, e, d});
+            };
+
+            push_all_perms(t1.a, t1.b, t1.c, t2.a, t2.b, t2.c);
+            push_all_perms(t2.a, t2.b, t2.c, t1.a, t1.b, t1.c);
+        }
+    }
+}
+
+void CustomTheoremMatcher::build_predicate_index()
+{
+    auto t_total = chrono::steady_clock::now();
+    const size_t n = _problem->num_points();
+
+    // 辅助检查函数
+    auto quick_check = [&](const string &pred, const vector<int> &p_indices)
+    {
+        vector<string> names;
+        for (int i : p_indices)
+            names.push_back(_problem->point(i).name());
+        try
+        {
+            auto s = _problem->create_statement(pred, names);
+            return s && s->check_numerically();
+        }
+        catch (...)
+        {
+            return false;
+        }
+    };
+
+    // 1. 处理简单谓词 (midp, coll, cong, para, perp)
+    auto add_simple_indices = [&](const string &pred, int arity)
+    {
+        auto &idx = _index[pred];
+        // 这里可以根据 arity 使用通用的组合枚举逻辑，为了性能此处保持展开
+        if (arity == 3)
+        {
+            for (int a = 0; a < n; ++a)
+                for (int b = 0; b < n; ++b)
+                {
+                    if (a == b)
+                        continue;
+                    for (int c = 0; c < n; ++c)
+                    {
+                        if (c == a || c == b)
+                            continue;
+                        if (quick_check(pred, {a, b, c}))
+                            idx.push_back({a, b, c});
+                    }
+                }
+        }
+        else if (arity == 4)
+        {
+            for (int a = 0; a < n; ++a)
+                for (int b = 0; b < n; ++b)
+                {
+                    if (a == b)
+                        continue;
+                    for (int c = 0; c < n; ++c)
+                        for (int d = 0; d < n; ++d)
+                        {
+                            if (c == d)
+                                continue;
+                            if (quick_check(pred, {a, b, c, d}))
+                                idx.push_back({a, b, c, d});
+                        }
+                }
+        }
+    };
+
+    for (auto &p : {make_pair("midp", 3), {"coll", 3}, {"cong", 4}, {"para", 4}, {"perp", 4}})
+    {
+        add_simple_indices(p.first, p.second);
+    }
+
+    // 2. 处理三角形相似 (simtri/simtrir) - 保持原有形状签名算法，但逻辑更紧凑
+    build_triangle_indices(n);
+
+    auto ms = chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - t_total).count();
+    DebugLog("Predicate cache built in " + to_string(ms) + "ms");
+}
+
+// ----------------------------------------------------------------------------
+// 核心逻辑：回溯匹配
+// ----------------------------------------------------------------------------
+
+void CustomTheoremMatcher::enumerate_brute_force(
+    const vector<Stmt> &stmts,
+    size_t stmt_idx,
+    const vector<string> &new_vars,
+    Mapping &current,
+    vector<bool> &used,
+    vector<Mapping> &results) const
+{
+    const size_t n_pts = _problem->num_points();
+    const size_t n_vars = new_vars.size();
+
+    // 内部递归 Lambda 函数用于生成笛卡尔积
+    std::function<void(size_t)> generate_combinations = [&](size_t v_idx)
+    {
+        // 所有新变量都已绑定
+        if (v_idx == n_vars)
+        {
+            if (verify_stmt(stmts[stmt_idx], current))
+            {
+                // 当前谓词数值校验通过，进入下一条 Stmt 的匹配
+                backtrack(stmts, stmt_idx + 1, current, used, results);
+            }
+            return;
+        }
+
+        // 为第 v_idx 个新变量尝试绑定每一个点
+        for (size_t p = 0; p < n_pts; ++p)
+        {
+            if (used[p]) continue;
+            current.push_back({new_vars[v_idx], (int)p});
+            used[p] = true;
+            generate_combinations(v_idx + 1);
+            used[p] = false;
+            current.pop_back();
+        }
+    };
+
+    generate_combinations(0);
+}
+
+void CustomTheoremMatcher::backtrack(const vector<Stmt> &stmts, size_t stmt_idx,
+                                     Mapping &current, vector<bool> &used,
+                                     vector<Mapping> &results) const
+{
+    if (stmt_idx == stmts.size())
+    {
+        results.push_back(current);
+        return;
+    }
+
+    const auto &stmt = stmts[stmt_idx];
+    auto new_vars = collect_new_vars(stmt, current);
+
+    // 情况 A：没有新变量，直接验证当前谓词
+    if (new_vars.empty())
+    {
+        if (verify_stmt(stmt, current))
+        {
+            backtrack(stmts, stmt_idx + 1, current, used, results);
+        }
+        return;
+    }
+
+    // 情况 B：利用预计算索引快速匹配
+    if (auto it = _index.find(stmt.first); it != _index.end())
+    {
+        for (const auto &combo : it->second)
+        {
+            size_t added_count = 0;
+            bool conflict = false;
+
+            for (size_t i = 0; i < stmt.second.size(); ++i)
+            {
+                int bound_val = FindBinding(current, stmt.second[i]);
+                if (bound_val != -1)
+                {
+                    if (bound_val != combo[i])
+                    {
+                        conflict = true;
+                        break;
+                    }
+                }
+                else
+                {
+                    if (used[combo[i]])
+                    {
+                        conflict = true;
+                        break;
+                    }
+                    current.push_back({stmt.second[i], combo[i]});
+                    used[combo[i]] = true;
+                    added_count++;
+                }
+            }
+
+            if (!conflict)
+                backtrack(stmts, stmt_idx + 1, current, used, results);
+
+            // 回溯清理
+            while (added_count--)
+            {
+                used[current.back().second] = false;
+                current.pop_back();
+            }
+        }
+    }
+    // 情况 C：暴力枚举（仅针对无索引谓词）
+    else
+    {
+        enumerate_brute_force(stmts, stmt_idx, new_vars, current, used, results);
+    }
 }
 
 void CustomTheoremMatcher::match_rule(const CustomRule &rule)
 {
-    // 按新变量数量升序排列前提，优先匹配约束强的
-    vector<Stmt> sorted_premises = rule.premises;
-    sort(sorted_premises.begin(), sorted_premises.end(), [](const Stmt &a, const Stmt &b)
-         {
-        set<string> sa(a.second.begin(), a.second.end());
-        set<string> sb(b.second.begin(), b.second.end());
-        return sa.size() < sb.size(); });
+    // 1. 准备并排序前提 (约束强的优先)
+    vector<Stmt> sorted_stmts = rule.premises;
+    sorted_stmts.insert(sorted_stmts.end(), rule.conclusions.begin(), rule.conclusions.end());
 
+    std::sort(sorted_stmts.begin(), sorted_stmts.end(), [this](const Stmt &a, const Stmt &b)
+              {
+        auto it_a = _index.find(a.first), it_b = _index.find(b.first);
+        size_t size_a = (it_a != _index.end()) ? it_a->second.size() : 999999;
+        size_t size_b = (it_b != _index.end()) ? it_b->second.size() : 999999;
+        return size_a < size_b; });
+
+    // 2. 执行匹配
     Mapping current;
-    vector<Mapping> mappings;
-    backtrack(sorted_premises, 0, current, mappings);
+    vector<bool> used(_problem->num_points(), false);
+    vector<Mapping> raw_results;
+    backtrack(sorted_stmts, 0, current, used, raw_results);
 
-    // 去重
-    set<map<string, int>> seen;
-    for (auto &mapping : mappings)
+    // 3. 结果转换与去重
+    std::set<map<string, int>> unique_mappings;
+    for (auto &m : raw_results)
     {
-        map<string, int> mm(mapping.begin(), mapping.end());
-        if (!seen.insert(mm).second)
+        map<string, int> m_map(m.begin(), m.end());
+        if (!unique_mappings.insert(m_map).second)
             continue;
 
         Theorem thm(rule.name, rule.rule);
-
-        // 添加前提
-        for (const auto &stmt : rule.premises)
+        auto fill_thm = [&](const vector<Stmt> &source, bool is_hypo)
         {
-            vector<string> real_args;
-            for (const auto &arg : stmt.second)
+            for (const auto &s_stmt : source)
             {
-                auto it = mm.find(arg);
-                if (it != mm.end())
-                    real_args.push_back(_problem->point(it->second).name());
-                else
-                    real_args.push_back(arg);
+                vector<string> args;
+                for (const auto &arg : s_stmt.second)
+                {
+                    auto it = m_map.find(arg);
+                    args.push_back(it != m_map.end() ? _problem->point(it->second).name() : arg);
+                }
+                auto res_stmt = _problem->create_statement(s_stmt.first, args);
+                if (res_stmt)
+                {
+                    is_hypo ? thm.add_hypothesis(move(res_stmt)) : thm.add_conclusion(move(res_stmt));
+                }
             }
-            try
-            {
-                auto s = _problem->create_statement(stmt.first, real_args);
-                if (s)
-                    thm.add_hypothesis(move(s));
-            }
-            catch (...)
-            {
-            }
-        }
+        };
 
-        // 添加结论
-        for (const auto &stmt : rule.conclusions)
-        {
-            vector<string> real_args;
-            for (const auto &arg : stmt.second)
-            {
-                auto it = mm.find(arg);
-                if (it != mm.end())
-                    real_args.push_back(_problem->point(it->second).name());
-                else
-                    real_args.push_back(arg);
-            }
-            try
-            {
-                auto s = _problem->create_statement(stmt.first, real_args);
-                if (s)
-                    thm.add_conclusion(move(s));
-            }
-            catch (...)
-            {
-            }
-        }
+        fill_thm(rule.premises, true);
+        fill_thm(rule.conclusions, false);
 
         if (thm.check_numerically())
+        {
             _theorems.push_back(thm.normalize());
+        }
     }
 }
 
-CustomTheoremMatcher::CustomTheoremMatcher(Problem *prob, const vector<CustomRule> &rules)
-    : _problem(prob)
+CustomTheoremMatcher::CustomTheoremMatcher(Problem *prob, const vector<CustomRule> &rules,
+                                           const map<string, bool> &config)
+    : _problem(prob), _config(config)
 {
+    // 默认启用预计算索引
+    bool use_cache = get_config("use_predicate_cache", true);
+    if (use_cache)
+        build_predicate_index();
+
     for (const auto &rule : rules)
     {
         match_rule(rule);

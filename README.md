@@ -78,6 +78,8 @@ python src/newclid/generation/pipeline.py \
 |-----------|---------|-------------|
 | `--dir` | `./datasets` | Output directory |
 | `--img` | `0` | Image mode: `0` = none, `1` = annotated only, `2` = plain only, `3` = both |
+| `--direct_png` / `--no-direct_png` | `enabled` | Save PNG directly or keep the legacy `svg -> png` pipeline |
+| `--img_pixels` | `512` | Output image width in pixels |
 | `--prune` / `--no-prune` | `enabled` | Prune clauses to keep only the deepest clause chain |
 | `--remove_coords` | `off` | Remove coordinate information from output |
 | `--clear` | `off` | Clear old dataset files before generation |

@@ -72,6 +72,8 @@ class ProblemWorker:
                 seed,
                 n_clauses,
                 max_level,
+                using_log,
+                using_exp,
                 img,
                 aux_only,
                 add_auxiliary,
@@ -119,7 +121,13 @@ class ProblemWorker:
                 return [], {}
 
             n_clauses = len(fl_statement.split(";"))
-            csolver = CSolver(fl_statement, seed=seed, solver=solver, using_log=True)
+            csolver = CSolver(
+                fl_statement,
+                seed=seed,
+                solver=solver,
+                using_log=using_log,
+                using_exp=using_exp,
+            )
 
             # Run solver
             ddar_start = time.time()
@@ -480,7 +488,7 @@ class ProblemWorker:
         timings["build_solver_time"] = time.time() - t0
 
         t0 = time.time()
-        csolver_no_aux = CSolver(problem="", solver=solver_no_aux, using_log=True)
+        csolver_no_aux = CSolver(problem="", solver=solver_no_aux)
         csolver_no_aux.run()
         timings["run_solver_time"] = time.time() - t0
 
@@ -518,7 +526,7 @@ class ProblemWorker:
             )
             timings["build_solver_time"] += time.time() - t0
 
-            csolver_all_aux = CSolver(problem="", solver=solver_all_aux, using_log=True)
+            csolver_all_aux = CSolver(problem="", solver=solver_all_aux)
             t0 = time.time()
             csolver_all_aux.run()
             timings["run_solver_time"] += time.time() - t0
@@ -608,7 +616,7 @@ class ProblemWorker:
                 timings["build_solver_time"] += time.time() - t0
 
                 t0 = time.time()
-                csolver_test = CSolver(problem="", solver=solver_test, using_log=True)
+                csolver_test = CSolver(problem="", solver=solver_test)
                 csolver_test.run()
                 timings["run_solver_time"] += time.time() - t0
 
@@ -687,7 +695,7 @@ class ProblemWorker:
             )
             timings["build_solver_time"] += time.time() - t0
 
-            csolver_all_aux = CSolver(problem="", solver=solver_all_aux, using_log=True)
+            csolver_all_aux = CSolver(problem="", solver=solver_all_aux)
             t0 = time.time()
             csolver_all_aux.run()
             timings["run_solver_time"] += time.time() - t0
@@ -790,7 +798,14 @@ class ProblemWorker:
             proof_steps = res["proof_steps"]
 
             # llm data generation
-            llm_renamed, clauses, mapping, n_premises, n_proof_steps = (
+            (
+                llm_renamed,
+                clauses,
+                mapping,
+                premise_point_names,
+                n_premises,
+                n_proof_steps,
+            ) = (
                 ProblemWorker.llm_solution_renamed(
                     clause2basics.copy(),
                     clause2args.copy(),
@@ -840,6 +855,7 @@ class ProblemWorker:
                 result["draw_data"] = {
                     "clauses": [(c.points, c.sentences) for c in clauses],
                     "mapping": mapping,
+                    "premise_point_names": premise_point_names,
                     "goal_tokens": goal_new.to_str().split(" "),
                     "point_coords": point_coords,
                     "seed": solver_builder.seed,
@@ -960,6 +976,7 @@ class ProblemWorker:
                 },
                 essential_premise_clauses,
                 mp,
+                sorted(set(essential_premise_point_names)),
                 n_premises,
                 len(proof_steps),
             )
@@ -1117,10 +1134,25 @@ class ProblemWorker:
         essential_aux_point_names: list[str],
     ) -> dict[str, str]:
         """Create point name mapping"""
+        # 1. 合并两个列表
+        combined_points = essential_premise_point_names + essential_aux_point_names
+
+        # 2. 定义排序规则：把 "a0" 拆成 (0, 'a')，把 "a" 拆成 (-1, 'a')
+        def point_sort_key(name: str):
+            letter = name[0]        # 规则里前缀是一个字母
+            number_part = name[1:]  # 字母后面的数字部分
+            
+            # 如果没有数字，给它一个最小的权重 -1，确保排在所有带数字的字母前面
+            num = int(number_part) if number_part.isdigit() else -1
+            
+            return (num, letter)
+
+        # 3. 在构建映射前进行排序
+        sorted_points = sorted(combined_points, key=point_sort_key)
+
+        # 4. 构建映射
         mp: dict[str, str] = {}
-        for idx, p in enumerate(
-            essential_premise_point_names + essential_aux_point_names
-        ):
+        for idx, p in enumerate(sorted_points):
             assert p not in mp
             mp[p] = ProblemWorker._get_apha_geo_solver_var(idx)
         return mp
