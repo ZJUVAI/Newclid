@@ -34,23 +34,25 @@
   - 固定 benchmark 输入、manifest，以及当前主线 benchmark 包。
 - `generated/`
   - 已落盘的真实 run 输出和 artifacts。
+- `core/`
+  - 通用实现模块；根目录同名 `.py` 文件现在只保留兼容入口，方便旧 `import` 路径和脚本继续工作。
 
-代码文件继续留在根目录，按职责划分：
+根目录代码文件现在只保留入口与兼容层，按职责划分：
 
 - `generate_cot_sft.py`
   - 主入口和编排。
 - `audits.py`
-  - source/generation audit 与句级关系检查。
+  - `core/audits.py` 的兼容 re-export；source/generation audit 与句级关系检查的真实实现放在 `core/`。
 - `geometry_text.py`
-  - 几何文本归一化、relation parsing、aux helper。
+  - `core/geometry_text.py` 的兼容 re-export；几何文本归一化、relation parsing、aux helper 的真实实现放在 `core/`。
 - `prompt_builders.py`
-  - planner / critic / writer prompt 与 retry feedback。
+  - `core/prompt_builders.py` 的兼容 re-export；planner / critic / writer prompt 与 retry feedback 的真实实现放在 `core/`。
 - `run_artifacts.py`
-  - run 级和 item 级 artifacts 组装。
+  - `core/run_artifacts.py` 的兼容 re-export；run 级和 item 级 artifacts 组装的真实实现放在 `core/`。
 - `semantic_review.py`
   - 语义审读队列、汇总与 summary 刷新。
 - `writer_contracts.py`
-  - writer handoff、坐标片段和正文合同。
+  - `core/writer_contracts.py` 的兼容 re-export；writer handoff、坐标片段和正文合同的真实实现放在 `core/`。
 - `maintenance_smoke_check.py` / `prepare_metadata.py` / `replay_artifact_checks.py`
   - 维护、输入准备和 artifact 回放工具。
 
