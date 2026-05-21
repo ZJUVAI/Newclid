@@ -308,6 +308,38 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertGreaterEqual(len(dossier["bridge_chain"]), 3)
         self.assertEqual(dossier["goal_closure"][-1]["claim"], "triangles acg and fag are similar")
 
+    def test_build_scripted_dossier_skeleton_accepts_real_eqratio_benchmark_sample(self):
+        record = self._load_quality_review_record(0)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+
+        ok, message, dossier = build_scripted_dossier_skeleton(
+            record,
+            aux_part,
+            sanitized_rest,
+            record["point_coords_grid"],
+            "eqratio a e b d e g b f",
+        )
+
+        self.assertTrue(ok, message)
+        self.assertGreaterEqual(len(dossier["coordinate_checks"]), 1)
+        self.assertEqual(dossier["goal_closure"][-1]["claim"], "ratio ae to bd equals ratio eg to bf")
+
+    def test_build_scripted_dossier_skeleton_accepts_real_simtrir_benchmark_sample(self):
+        record = self._load_quality_review_record(2)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+
+        ok, message, dossier = build_scripted_dossier_skeleton(
+            record,
+            aux_part,
+            sanitized_rest,
+            record["point_coords_grid"],
+            "simtrir b d e c e g",
+        )
+
+        self.assertTrue(ok, message)
+        self.assertGreaterEqual(len(dossier["coordinate_checks"]), 1)
+        self.assertEqual(dossier["goal_closure"][-1]["claim"], "triangles bde and ceg are similar")
+
     def test_build_scripted_dossier_skeleton_prunes_unused_tail_steps_for_real_eqangle_sample(self):
         record = self._load_quality_review_record(1)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)

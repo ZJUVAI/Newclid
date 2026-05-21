@@ -157,6 +157,36 @@ class CotSftAuditsTest(unittest.TestCase):
             )
         )
 
+    def test_relation_mentioned_in_text_accepts_equaling_ratio_surface(self):
+        sentence = "This leads to the ratio ac to ae equaling the ratio cf to eg."
+
+        self.assertTrue(
+            relation_mentioned_in_text(
+                sentence,
+                "ratio ac to ae equals ratio cf to eg",
+            )
+        )
+
+    def test_relation_mentioned_in_text_accepts_midpoint_construction_paraphrase(self):
+        sentence = "Construct point h as the midpoint of ad so the helper sits on the needed segment."
+
+        self.assertTrue(
+            relation_mentioned_in_text(
+                sentence,
+                "h is the midpoint of ad",
+            )
+        )
+
+    def test_relation_mentioned_in_text_accepts_collinear_and_variant(self):
+        sentence = "Since a, d, and h are collinear, the helper stays on the old side line."
+
+        self.assertTrue(
+            relation_mentioned_in_text(
+                sentence,
+                "a, d, h are collinear",
+            )
+        )
+
     def test_audit_generation_quality_flags_unused_coordinate_cues(self):
         record = {
             "point_coords_grid": {

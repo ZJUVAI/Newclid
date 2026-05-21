@@ -400,6 +400,17 @@ def split_into_sentences(text: str) -> list[str]:
 
 def _normalize_relation_surface_for_mention_match(text: str) -> str:
     lowered = (text or "").lower()
+    lowered = re.sub(r"\bequaling\b", "equals", lowered)
+    lowered = re.sub(
+        r"\b(?:construct\s+)?point\s+([a-z])\s+as\s+the midpoint of\s+([a-z]{2})\b",
+        r"\1 is the midpoint of \2",
+        lowered,
+    )
+    lowered = re.sub(
+        r"\b([a-z])\s*,\s*([a-z])\s*,\s*and\s*([a-z])\s+are collinear\b",
+        r"\1, \2, \3 are collinear",
+        lowered,
+    )
     lowered = re.sub(
         r"\bthe\s+(ratio|angle|line|segment|segments|triangle|triangles|point|points)\b",
         r"\1",

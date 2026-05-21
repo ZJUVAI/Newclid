@@ -633,6 +633,28 @@ def build_coordinate_candidate_witness(candidate, point_coords):
     return {}
 
 
+def build_canonical_coordinate_relation(candidate):
+    if not isinstance(candidate, dict):
+        return ""
+    relation_type = str(candidate.get("relation_type") or "").strip().lower()
+    points = [
+        str(point).lower()
+        for point in (candidate.get("points") or [])
+        if isinstance(point, str) and point.strip()
+    ]
+    if relation_type == "parallel" and len(points) >= 4:
+        return f"line {points[0]}{points[1]} is parallel to line {points[2]}{points[3]}"
+    if relation_type == "perpendicular" and len(points) >= 4:
+        return f"line {points[0]}{points[1]} is perpendicular to line {points[2]}{points[3]}"
+    if relation_type == "equal_length" and len(points) >= 4:
+        return f"{points[0]}{points[1]} equals {points[2]}{points[3]}"
+    if relation_type == "midpoint" and len(points) >= 3:
+        return f"{points[0]} is the midpoint of {points[1]}{points[2]}"
+    if relation_type == "collinear" and len(points) >= 3:
+        return f"{points[0]}, {points[1]}, and {points[2]} are collinear"
+    return normalize_relation_surface((candidate.get("summary") or "").strip())
+
+
 def build_image_coordinate_candidates(point_coords, visible_text_facts, max_items=10):
     raw_candidates = build_hidden_coordinate_candidates(
         point_coords,
@@ -1725,7 +1747,9 @@ def compute_bridge_step_required_support_cap(step):
         return 2
     relation_text = step.get("approved_route_relation") or step.get("relation", "")
     relation_keywords = relation_text_keywords(relation_text)
-    if relation_keywords & {"angle", "similar", "ratio"}:
+    if relation_keywords & {"similar", "ratio"}:
+        return 4 if len(extract_relation_segment_tokens(relation_text)) >= 4 else 3
+    if relation_keywords & {"angle"}:
         return 3
     return 2
 
@@ -3545,7 +3569,164 @@ def select_dossier_support_refs_for_relation(
             combined.append(ref)
         if len(combined) >= max_supports:
             break
+    relation_segments = extract_relation_segment_tokens(relation_text)
+    if relation_segments and len(combined) < max_supports:
+        grounded_segments = set()
+        for item in support_catalog:
+            if item.get("ref") in combined:
+                grounded_segments.update(extract_relation_segment_tokens(item.get("relation", "")))
+        missing_segments = relation_segments - grounded_segments
+        while missing_segments and len(combined) < max_supports:
+            best_item = None
+            best_key = None
+            for item in support_catalog:
+                ref = item.get("ref", "")
+                relation = item.get("relation", "")
+                if ref in combined:
+                    continue
+                candidate_segments = extract_relation_segment_tokens(relation)
+                if not candidate_segments or not (candidate_segments & missing_segments):
+                    continue
+                candidate_keywords = relation_text_keywords(relation)
+                if candidate_keywords & {"ratio", "similar"}:
+                    continue
+                key = (
+                    len(candidate_segments & missing_segments),
+                    len(candidate_segments & relation_segments),
+                    1 if ref.lower().startswith("coordinate_checks[") else 0,
+                    1 if candidate_keywords & {"collinear", "equal", "parallel", "perpendicular", "angle", "circle"} else 0,
+                    -len(str(relation)),
+                    ref.lower(),
+                )
+                if best_key is None or key > best_key:
+                    best_key = key
+                    best_item = item
+            if best_item is None:
+                break
+            combined.append(best_item.get("ref", ""))
+            grounded_segments.update(extract_relation_segment_tokens(best_item.get("relation", "")))
+            missing_segments = relation_segments - grounded_segments
     return combined
+
+
+def build_scripted_dossier_coordinate_checks(
+    coordinate_candidates,
+    point_coords,
+    visible_relations,
+    image_scan,
+    target_relations,
+    max_items=4,
+):
+    allowed_types = {"parallel", "perpendicular", "equal_length", "midpoint", "collinear"}
+    visible_points = extract_visible_point_names(point_coords)
+    target_relations = [
+        relation
+        for relation in (target_relations or [])
+        if isinstance(relation, str) and relation.strip()
+    ]
+    target_points = extract_point_mentions(" ".join(target_relations), visible_points)
+    target_segments = set()
+    for relation in target_relations:
+        target_segments.update(extract_relation_segment_tokens(relation))
+
+    existing_relations = [
+        relation
+        for relation in list(visible_relations or []) + list(image_scan or [])
+        if isinstance(relation, str) and relation.strip()
+    ]
+    existing_lower = {
+        normalize_relation_surface(relation).strip().lower()
+        for relation in existing_relations
+    }
+
+    ranked_candidates = []
+    for idx, raw_candidate in enumerate(coordinate_candidates or []):
+        if not isinstance(raw_candidate, dict):
+            continue
+        relation_type = str(raw_candidate.get("relation_type") or "").strip().lower()
+        if relation_type not in allowed_types:
+            continue
+        relation = build_canonical_coordinate_relation(raw_candidate)
+        if not relation:
+            continue
+        relation = normalize_relation_surface(relation).strip()
+        lowered_relation = relation.lower()
+        if lowered_relation in existing_lower:
+            continue
+        if any(
+            relations_semantically_match(relation, existing_relation, visible_points)
+            for existing_relation in existing_relations
+        ):
+            continue
+        points = [
+            point.lower()
+            for point in (raw_candidate.get("points") or [])
+            if isinstance(point, str) and point.lower() in point_coords
+        ]
+        if len(points) < 2:
+            continue
+        candidate_segments = extract_relation_segment_tokens(relation)
+        ranked_candidates.append(
+            {
+                "relation": relation,
+                "points": points,
+                "calc_type": relation_type,
+                "score": float(raw_candidate.get("score", 9999.0)),
+                "segments": candidate_segments,
+                "point_overlap": len(set(points) & target_points),
+                "segment_overlap": len(candidate_segments & target_segments),
+                "index": idx,
+            }
+        )
+
+    selected = []
+    selected_lower = set()
+    covered_segments = set()
+    route_keywords = relation_text_keywords(" ".join(target_relations))
+    while ranked_candidates and len(selected) < max_items:
+        best_idx = None
+        best_key = None
+        for idx, candidate in enumerate(ranked_candidates):
+            lowered = candidate["relation"].lower()
+            if lowered in selected_lower:
+                continue
+            new_segment_overlap = len((candidate["segments"] & target_segments) - covered_segments)
+            key = (
+                new_segment_overlap,
+                candidate["segment_overlap"],
+                candidate["point_overlap"],
+                1 if candidate["calc_type"] in {"midpoint", "collinear", "equal_length", "parallel", "perpendicular"} else 0,
+                -candidate["score"],
+                -len(candidate["relation"]),
+                -candidate["index"],
+            )
+            if best_key is None or key > best_key:
+                best_key = key
+                best_idx = idx
+        if best_idx is None:
+            break
+        candidate = ranked_candidates.pop(best_idx)
+        if best_key[0] <= 0 and selected:
+            break
+        why_it_matters = "this gives one concrete coordinate-backed cue that the later route can reuse."
+        if route_keywords & {"ratio"}:
+            why_it_matters = "this gives one concrete segment cue that the later ratio route can reuse."
+        elif route_keywords & {"similar"}:
+            why_it_matters = "this gives one concrete triangle-side cue that the later similarity route can reuse."
+        elif route_keywords & {"angle"}:
+            why_it_matters = "this gives one concrete direction cue that the later angle route can reuse."
+        selected.append(
+            {
+                "relation": candidate["relation"],
+                "points": candidate["points"],
+                "calc_type": candidate["calc_type"],
+                "why_it_matters": why_it_matters,
+            }
+        )
+        selected_lower.add(candidate["relation"].lower())
+        covered_segments.update(candidate["segments"])
+
+    return selected
 
 
 def _extract_bridge_chain_ref_index(ref_text, bridge_chain_len):
@@ -3645,6 +3826,65 @@ def prune_unreferenced_dossier_bridge_chain(bridge_chain, goal_support_refs, aux
 
     rewritten_goal_support_refs = rewrite_support_refs(goal_support_refs or [])
     return pruned_bridge_chain, rewritten_goal_support_refs
+
+
+def prune_unreferenced_dossier_coordinate_checks(coordinate_checks, bridge_chain, goal_support_refs):
+    if not isinstance(coordinate_checks, list) or not coordinate_checks:
+        return coordinate_checks, bridge_chain, goal_support_refs or []
+
+    keep_indices = set()
+    coordinate_check_len = len(coordinate_checks)
+
+    def collect_ref(ref_text):
+        match = DOSSIER_SUPPORT_REF_RE.fullmatch(str(ref_text or "").strip())
+        if not match or match.group(1).lower() != "coordinate_checks":
+            return None
+        index, index_error = _resolve_dossier_support_index(int(match.group(2)), coordinate_check_len)
+        if index_error:
+            return None
+        return index
+
+    for step in bridge_chain or []:
+        for ref in step.get("supports", []) or []:
+            index = collect_ref(ref)
+            if index is not None:
+                keep_indices.add(index)
+    for ref in goal_support_refs or []:
+        index = collect_ref(ref)
+        if index is not None:
+            keep_indices.add(index)
+
+    if not keep_indices:
+        return [], bridge_chain, goal_support_refs or []
+
+    sorted_keep_indices = sorted(keep_indices)
+    old_to_new_index = {
+        old_index: new_index
+        for new_index, old_index in enumerate(sorted_keep_indices)
+    }
+
+    def rewrite_refs(refs):
+        rewritten = []
+        for ref in refs or []:
+            index = collect_ref(ref)
+            if index is None:
+                rewritten.append(ref)
+                continue
+            if index in old_to_new_index:
+                rewritten.append(f"coordinate_checks[{old_to_new_index[index] + 1}]")
+        return rewritten
+
+    pruned_bridge_chain = []
+    for step in bridge_chain or []:
+        pruned_bridge_chain.append(
+            {
+                **step,
+                "supports": rewrite_refs(step.get("supports", [])),
+            }
+        )
+    pruned_goal_support_refs = rewrite_refs(goal_support_refs or [])
+    pruned_coordinate_checks = [coordinate_checks[index] for index in sorted_keep_indices]
+    return pruned_coordinate_checks, pruned_bridge_chain, pruned_goal_support_refs
 
 
 def build_scripted_dossier_skeleton(
@@ -3753,6 +3993,21 @@ def build_scripted_dossier_skeleton(
             }
         )
 
+    coordinate_check_targets = [normalized_goal_finish]
+    if goal_tail_relations:
+        coordinate_check_targets.insert(0, goal_tail_relations[-1])
+    elif selected_bridge_specs:
+        coordinate_check_targets.insert(0, selected_bridge_specs[-1].get("relation", ""))
+
+    coordinate_checks = build_scripted_dossier_coordinate_checks(
+        coordinate_candidates,
+        point_coords,
+        visible_facts,
+        image_scan,
+        coordinate_check_targets,
+        max_items=4,
+    )
+
     raw_bridge_chain = []
     prior_bridge_claims = []
     for step_idx, step in enumerate(selected_bridge_specs):
@@ -3761,7 +4016,7 @@ def build_scripted_dossier_skeleton(
         support_catalog = build_dossier_relation_ref_catalog(
             visible_facts,
             image_scan,
-            [],
+            coordinate_checks,
             aux_immediate_effects,
             prior_bridge_claims,
         )
@@ -3809,7 +4064,7 @@ def build_scripted_dossier_skeleton(
     goal_support_catalog = build_dossier_relation_ref_catalog(
         visible_facts,
         image_scan,
-        [],
+        coordinate_checks,
         aux_immediate_effects,
         prior_bridge_claims,
     )
@@ -3827,11 +4082,16 @@ def build_scripted_dossier_skeleton(
         goal_support_refs,
         aux_points=extract_aux_new_points(aux_part or ""),
     )
+    coordinate_checks, raw_bridge_chain, goal_support_refs = prune_unreferenced_dossier_coordinate_checks(
+        coordinate_checks,
+        raw_bridge_chain,
+        goal_support_refs,
+    )
 
     raw_dossier = {
         "visible_facts": visible_facts,
         "image_scan": image_scan,
-        "coordinate_checks": [],
+        "coordinate_checks": coordinate_checks,
         "goal_obstacle": scripted_plan.get("goal_bottleneck") or build_canonical_goal_bottleneck(visible_goal),
         "aux_motivation": scripted_plan.get("helper_idea") or build_safe_dossier_aux_motivation(aux_part or "", visible_goal),
         "construction": scripted_plan.get("construction") or build_canonical_construction(aux_part or ""),
