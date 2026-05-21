@@ -9,6 +9,7 @@ from experiments.cot_sft_generation.audits import (
     count_relation_mentions,
     extract_visible_formal_facts,
     get_point_coords,
+    relation_mentioned_in_text,
 )
 
 
@@ -143,6 +144,18 @@ class CotSftAuditsTest(unittest.TestCase):
         mentions = count_relation_mentions(text, relations, point_names=["a", "c", "d", "f", "g"])
 
         self.assertEqual(mentions, 2)
+
+    def test_relation_mentioned_in_text_accepts_article_wrapped_ratio_surface(self):
+        sentence = (
+            "Then the ratio ac to af equals the ratio cg to ag, which is the side comparison needed next."
+        )
+
+        self.assertTrue(
+            relation_mentioned_in_text(
+                sentence,
+                "ratio ac to af equals ratio cg to ag",
+            )
+        )
 
     def test_audit_generation_quality_flags_unused_coordinate_cues(self):
         record = {

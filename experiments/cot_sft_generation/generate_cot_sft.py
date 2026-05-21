@@ -3548,6 +3548,105 @@ def select_dossier_support_refs_for_relation(
     return combined
 
 
+def _extract_bridge_chain_ref_index(ref_text, bridge_chain_len):
+    match = DOSSIER_SUPPORT_REF_RE.fullmatch(str(ref_text or "").strip())
+    if not match or match.group(1).lower() != "bridge_chain":
+        return None
+    index, index_error = _resolve_dossier_support_index(int(match.group(2)), bridge_chain_len)
+    if index_error:
+        return None
+    return index
+
+
+def prune_unreferenced_dossier_bridge_chain(bridge_chain, goal_support_refs, aux_points=None):
+    if not isinstance(bridge_chain, list) or not bridge_chain:
+        return bridge_chain, goal_support_refs or []
+
+    aux_points = [
+        str(point).lower()
+        for point in (aux_points or [])
+        if isinstance(point, str) and point.strip()
+    ]
+    keep_indices = set()
+    bridge_chain_len = len(bridge_chain)
+
+    for ref in goal_support_refs or []:
+        index = _extract_bridge_chain_ref_index(ref, bridge_chain_len)
+        if index is not None:
+            keep_indices.add(index)
+    if not keep_indices:
+        keep_indices.add(bridge_chain_len - 1)
+
+    def step_reconnects_aux(step):
+        claim_text = str((step or {}).get("claim", "")).lower()
+        if any(point in claim_text for point in aux_points):
+            return True
+        for ref in step.get("supports", []) or []:
+            match = DOSSIER_SUPPORT_REF_RE.fullmatch(str(ref or "").strip())
+            if match and match.group(1).lower() == "aux_immediate_effects":
+                return True
+        return False
+
+    changed = True
+    while changed:
+        changed = False
+        for step_index in list(keep_indices):
+            step = bridge_chain[step_index]
+            for ref in step.get("supports", []) or []:
+                dependency_index = _extract_bridge_chain_ref_index(ref, bridge_chain_len)
+                if dependency_index is None or dependency_index in keep_indices:
+                    continue
+                keep_indices.add(dependency_index)
+                changed = True
+
+    if aux_points and not any(step_reconnects_aux(bridge_chain[idx]) for idx in keep_indices):
+        for idx, step in enumerate(bridge_chain):
+            if step_reconnects_aux(step):
+                keep_indices.add(idx)
+                changed = True
+                break
+        while changed:
+            changed = False
+            for step_index in list(keep_indices):
+                step = bridge_chain[step_index]
+                for ref in step.get("supports", []) or []:
+                    dependency_index = _extract_bridge_chain_ref_index(ref, bridge_chain_len)
+                    if dependency_index is None or dependency_index in keep_indices:
+                        continue
+                    keep_indices.add(dependency_index)
+                    changed = True
+
+    sorted_keep_indices = sorted(keep_indices)
+    old_to_new_index = {
+        old_index: new_index
+        for new_index, old_index in enumerate(sorted_keep_indices)
+    }
+
+    def rewrite_support_refs(refs):
+        rewritten = []
+        for ref in refs or []:
+            dependency_index = _extract_bridge_chain_ref_index(ref, bridge_chain_len)
+            if dependency_index is None:
+                rewritten.append(ref)
+                continue
+            if dependency_index in old_to_new_index:
+                rewritten.append(f"bridge_chain[{old_to_new_index[dependency_index] + 1}]")
+        return rewritten
+
+    pruned_bridge_chain = []
+    for old_index in sorted_keep_indices:
+        original_step = bridge_chain[old_index]
+        pruned_bridge_chain.append(
+            {
+                **original_step,
+                "supports": rewrite_support_refs(original_step.get("supports", [])),
+            }
+        )
+
+    rewritten_goal_support_refs = rewrite_support_refs(goal_support_refs or [])
+    return pruned_bridge_chain, rewritten_goal_support_refs
+
+
 def build_scripted_dossier_skeleton(
     record,
     aux_part,
@@ -3723,6 +3822,11 @@ def build_scripted_dossier_skeleton(
     )
     if not goal_support_refs and goal_support_catalog:
         goal_support_refs = [goal_support_catalog[-1]["ref"]]
+    raw_bridge_chain, goal_support_refs = prune_unreferenced_dossier_bridge_chain(
+        raw_bridge_chain,
+        goal_support_refs,
+        aux_points=extract_aux_new_points(aux_part or ""),
+    )
 
     raw_dossier = {
         "visible_facts": visible_facts,

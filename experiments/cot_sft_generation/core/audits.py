@@ -398,9 +398,20 @@ def split_into_sentences(text: str) -> list[str]:
     return [part.strip() for part in re.split(r"(?<=[.!?])\s+", text or "") if part.strip()]
 
 
+def _normalize_relation_surface_for_mention_match(text: str) -> str:
+    lowered = (text or "").lower()
+    lowered = re.sub(
+        r"\bthe\s+(ratio|angle|line|segment|segments|triangle|triangles|point|points)\b",
+        r"\1",
+        lowered,
+    )
+    lowered = re.sub(r"\s+", " ", lowered)
+    return lowered.strip()
+
+
 def relation_mentioned_in_text(text: str, relation: str) -> bool:
-    lowered_text = (text or "").lower()
-    lowered_relation = (relation or "").lower().strip()
+    lowered_text = _normalize_relation_surface_for_mention_match(text)
+    lowered_relation = _normalize_relation_surface_for_mention_match(relation)
     if not lowered_relation:
         return False
     if lowered_relation in lowered_text:

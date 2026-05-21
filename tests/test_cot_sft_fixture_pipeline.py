@@ -308,6 +308,26 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertGreaterEqual(len(dossier["bridge_chain"]), 3)
         self.assertEqual(dossier["goal_closure"][-1]["claim"], "triangles acg and fag are similar")
 
+    def test_build_scripted_dossier_skeleton_prunes_unused_tail_steps_for_real_eqangle_sample(self):
+        record = self._load_quality_review_record(1)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+
+        ok, message, dossier = build_scripted_dossier_skeleton(
+            record,
+            aux_part,
+            sanitized_rest,
+            record["point_coords_grid"],
+            "eqangle a b a c a d a e",
+        )
+
+        self.assertTrue(ok, message)
+        bridge_claims = [step["claim"] for step in dossier["bridge_chain"]]
+        self.assertNotIn("ratio ad to cf equals ratio df to df", bridge_claims)
+        self.assertNotIn("ad equals cf", bridge_claims)
+        self.assertNotIn("bc equals cf", bridge_claims)
+        self.assertLessEqual(len(bridge_claims), 3)
+        self.assertEqual(dossier["goal_closure"][-1]["claim"], "angle ab/ac equals angle ad/ae")
+
     def test_generate_dossier_thinking_plan_only_falls_back_to_scripted_skeleton(self):
         record = self._load_quality_review_record(3)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
