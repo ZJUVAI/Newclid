@@ -258,6 +258,15 @@ FORBIDDEN_THINKING_PATTERNS = [
     re.compile(r"\$[^$]+\$"),
     re.compile(r"`[^`]+`"),
 ]
+DOSSIER_WRITER_SEMANTIC_PENALTY_PATTERNS = [
+    re.compile(r"\bmoving us closer to the goal\b", re.IGNORECASE),
+    re.compile(r"\bthis construction allows\b", re.IGNORECASE),
+    re.compile(r"\bfacilitates?\b", re.IGNORECASE),
+    re.compile(r"\bbridging the necessary\b", re.IGNORECASE),
+    re.compile(r"\bprovides? the necessary bridge\b", re.IGNORECASE),
+    re.compile(r"\bachieving the target relation\b", re.IGNORECASE),
+    re.compile(r"\bthis completes the route to the visible goal\b", re.IGNORECASE),
+]
 INTERNAL_REASONING_REF_RE = re.compile(
     r"\b(?:visible_facts|image_scan|coordinate_checks|aux_immediate_effects|bridge_chain|goal_closure|"
     r"bridge_steps|selected_text_fact_ids|selected_coordinate_candidate_ids|coordinate_derivations|"
@@ -4199,6 +4208,85 @@ def build_scripted_dossier_writer_body(plan):
     return " ".join(sentence.strip() for sentence in sentences if sentence.strip())
 
 
+def score_dossier_writer_body_plan_faithfulness(plan, body):
+    if not isinstance(plan, dict) or not isinstance(body, str) or not body.strip():
+        return (-1, -1, -1, -1, -1, -1, -1, -1, 0)
+
+    sentences = split_into_sentences(body)
+    search_start = 0
+    bridge_quota_satisfied = 0
+    bridge_support_mentions = 0
+    bridge_realized = 0
+
+    for step in plan.get("bridge_chain", []) if isinstance(plan.get("bridge_chain"), list) else []:
+        claim = step.get("claim", "")
+        required_supports = step.get("required_supports") or step.get("resolved_supports") or []
+        min_support_mentions = int(step.get("min_support_mentions") or (1 if required_supports else 0))
+        match_idx = None
+        for sentence_idx in range(search_start, len(sentences)):
+            if relation_mentioned_in_text(sentences[sentence_idx], claim):
+                match_idx = sentence_idx
+                break
+        if match_idx is None:
+            continue
+        bridge_realized += 1
+        grounded_supports = count_support_relation_mentions(
+            sentences[match_idx],
+            required_supports,
+            target_relation=claim,
+        )
+        bridge_support_mentions += grounded_supports
+        if grounded_supports >= min_support_mentions:
+            bridge_quota_satisfied += 1
+        search_start = match_idx + 1
+
+    goal_quota_satisfied = 0
+    goal_support_mentions = 0
+    goal_realized = 0
+    for step in plan.get("goal_closure", []) if isinstance(plan.get("goal_closure"), list) else []:
+        claim = step.get("claim", "")
+        required_supports = step.get("required_supports") or step.get("resolved_supports") or []
+        min_support_mentions = int(step.get("min_support_mentions") or (1 if required_supports else 0))
+        match_idx = None
+        for sentence_idx in range(search_start, len(sentences)):
+            if relation_mentioned_in_text(sentences[sentence_idx], claim):
+                match_idx = sentence_idx
+                break
+        if match_idx is None:
+            continue
+        goal_realized += 1
+        grounded_supports = count_support_relation_mentions(
+            sentences[match_idx],
+            required_supports,
+            target_relation=claim,
+        )
+        goal_support_mentions += grounded_supports
+        if grounded_supports >= min_support_mentions:
+            goal_quota_satisfied += 1
+        search_start = match_idx + 1
+
+    aux_mentions = count_relation_mentions(body, plan.get("aux_immediate_effects") or [])
+    observation_mentions = count_relation_mentions(body, plan.get("image_scan") or [])
+    coordinate_mentions = count_relation_mentions(body, plan.get("coordinate_relations") or [])
+    generic_penalty_count = sum(
+        1
+        for pattern in DOSSIER_WRITER_SEMANTIC_PENALTY_PATTERNS
+        if pattern.search(body)
+    )
+
+    return (
+        goal_quota_satisfied,
+        bridge_quota_satisfied,
+        goal_support_mentions,
+        bridge_support_mentions,
+        goal_realized,
+        bridge_realized,
+        aux_mentions + observation_mentions + coordinate_mentions,
+        -generic_penalty_count,
+        -len(body),
+    )
+
+
 def maybe_choose_scripted_dossier_writer_body(record, aux_part, visible_goal, plan, write_result, logger):
     if not isinstance(plan, dict):
         return write_result
@@ -4250,6 +4338,19 @@ def maybe_choose_scripted_dossier_writer_body(record, aux_part, visible_goal, pl
             "[write] Replacing live dossier writer body with scripted fallback body (%d audit issues -> %d)",
             live_issue_count,
             scripted_issue_count,
+        )
+        updated_result = dict(write_result)
+        updated_result["output"] = scripted_body
+        updated_result["error"] = None
+        return updated_result
+
+    live_score = score_dossier_writer_body_plan_faithfulness(plan, write_result.get("output") or "")
+    scripted_score = score_dossier_writer_body_plan_faithfulness(plan, scripted_body)
+    if scripted_score > live_score:
+        logger.warning(
+            "[write] Replacing live dossier writer body with scripted fallback body based on stronger plan grounding (%s -> %s)",
+            live_score,
+            scripted_score,
         )
         updated_result = dict(write_result)
         updated_result["output"] = scripted_body
@@ -5873,19 +5974,44 @@ def generate_dossier_thinking(
             allow_revised_plan=True,
         )
         if not critic_result["success"]:
-            return {
-                "success": False,
-                "thinking": plan_result["output"],
-                "plan_prompt": plan_prompt if verbose else None,
-                "write_prompt": None,
-                "plan_output": json.dumps(plan_result["parsed"], ensure_ascii=False, indent=2) if verbose else None,
-                "plan_parsed": plan_result["parsed"],
-                "attempts_used": plan_result["attempts_used"] + critic_result["attempts_used"],
-                "elapsed_seconds": (plan_result["elapsed_seconds"] or 0.0) + (critic_result["elapsed_seconds"] or 0.0),
-                "error": critic_result["error"],
-                "write_output": None,
-                "generation_style": "dossier_v1",
-            }
+            skeleton_ok, skeleton_message, scripted_dossier = build_scripted_dossier_skeleton(
+                record,
+                aux_part,
+                sanitized_rest,
+                point_coords,
+                visible_goal,
+                visible_text_facts=visible_text_facts,
+                visible_premise_summaries=[fact["relation"] for fact in visible_text_facts],
+            )
+            if skeleton_ok:
+                logger.warning(
+                    "[plan_critic] Falling back to scripted dossier skeleton after critic failure: %s",
+                    critic_result["error"],
+                )
+                plan_result["parsed"] = scripted_dossier
+                plan_source = "scripted_fallback"
+                critic_result = {
+                    "success": True,
+                    "output": critic_result["output"],
+                    "parsed": {"approved": True, "issues": [], "summary": "critic fallback to scripted skeleton"},
+                    "attempts_used": critic_result["attempts_used"],
+                    "elapsed_seconds": critic_result["elapsed_seconds"] or 0.0,
+                    "error": None,
+                }
+            else:
+                return {
+                    "success": False,
+                    "thinking": plan_result["output"],
+                    "plan_prompt": plan_prompt if verbose else None,
+                    "write_prompt": None,
+                    "plan_output": json.dumps(plan_result["parsed"], ensure_ascii=False, indent=2) if verbose else None,
+                    "plan_parsed": plan_result["parsed"],
+                    "attempts_used": plan_result["attempts_used"] + critic_result["attempts_used"],
+                    "elapsed_seconds": (plan_result["elapsed_seconds"] or 0.0) + (critic_result["elapsed_seconds"] or 0.0),
+                    "error": f"{critic_result['error']}; {skeleton_message}",
+                    "write_output": None,
+                    "generation_style": "dossier_v1",
+                }
 
         if not critic_result["parsed"].get("approved") and isinstance(critic_result["parsed"].get("revised_dossier"), dict):
             merged_revised_dossier = dict(plan_result["parsed"])

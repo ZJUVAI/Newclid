@@ -88,6 +88,12 @@ DOSSIER_INVALID_CRITIC_PATCH_OUTPUT = {
     },
 }
 
+DOSSIER_CRITIC_REJECTION_OUTPUT = {
+    "approved": False,
+    "issues": ["the route does not directly prove the goal yet."],
+    "summary": "reject and request a cleaner route.",
+}
+
 WRITER_BODY = (
     "The obstacle is to transfer the d-side and c-side into one local helper frame before the final equality closes. "
     "Using a=(0,0), b=(4,0), and c=(0,2), the midpoint of bc is (2.0, 1.0), which differs from a by residual 2.2361 and the collinearity residual is 1.7889, so point a looks like the midpoint of bc. "
@@ -492,6 +498,54 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertTrue(result["success"])
         self.assertIn("ratio ae to bd equals ratio eg to bf", result["thinking"])
 
+    def test_generate_dossier_thinking_falls_back_to_scripted_skeleton_after_critic_rejection(self):
+        record = self._load_quality_review_record(1)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+        ok, message, dossier = build_scripted_dossier_skeleton(
+            record,
+            aux_part,
+            sanitized_rest,
+            record["point_coords_grid"],
+            "eqangle a b a c a d a e",
+        )
+        self.assertTrue(ok, message)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            image_path = Path(temp_dir) / "fixture.png"
+            image_path.write_bytes(b"fixture-image")
+
+            with patch(
+                "experiments.cot_sft_generation.generate_cot_sft.call_model",
+                side_effect=[
+                    json.dumps(dossier),
+                    json.dumps(DOSSIER_CRITIC_REJECTION_OUTPUT),
+                ],
+            ), patch(
+                "experiments.cot_sft_generation.generate_cot_sft.run_writer_stage",
+                return_value={
+                    "success": False,
+                    "output": None,
+                    "attempts_used": 1,
+                    "elapsed_seconds": 0.01,
+                    "error": "Writer body must explicitly realize goal_closure[0]",
+                },
+            ), patch(
+                "experiments.cot_sft_generation.generate_cot_sft.validate_thinking_response",
+                return_value=(True, "Valid thinking"),
+            ):
+                result = generate_dossier_thinking(
+                    record=record,
+                    image_path=image_path,
+                    aux_part=aux_part,
+                    sanitized_rest=sanitized_rest,
+                    model_name="fixture-model",
+                    max_retries=1,
+                    verbose=True,
+                )
+
+        self.assertTrue(result["success"])
+        self.assertIn("angle ab/ac equals angle ad/ae", result["thinking"])
+
     def test_generate_dossier_thinking_scripted_fallback_prefers_scripted_writer_when_audit_is_better(self):
         record = self._load_quality_review_record(0)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
@@ -538,6 +592,54 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertTrue(result["success"])
         self.assertIn("the figure also shows segments ae and bg look perpendicular", result["thinking"])
         self.assertNotIn("AE appears perpendicular to BG", result["thinking"])
+
+    def test_generate_dossier_thinking_scripted_fallback_prefers_scripted_writer_when_plan_grounding_is_stronger(self):
+        record = self._load_quality_review_record(2)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+        live_writer_body = (
+            "The target triangle comparison around B, D, E, C, E, and G lacks enough direct side or angle correspondences. "
+            "To connect the missing angle relation, construct point H such that line BD is parallel to line FH and line BD is perpendicular to line BH. "
+            "This creates a perpendicular link and a parallel link. "
+            "Since AB is parallel to EF and AF is parallel to BE, angle AB/AF equals angle BH/FH, moving us closer to the goal. "
+            "Given BC equals BE and CE equals CF, along with CF being parallel to CG, the ratio BD to BE equals the ratio CE to CG. "
+            "Line DE is perpendicular to line EG, and angle AB/BC equals angle BC/BD. "
+            "Therefore, triangles BDE and CEG are similar by these angle and side ratios. "
+            "The construction of H facilitates this similarity proof by bridging the necessary angle relations."
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            image_path = Path(temp_dir) / "fixture.png"
+            image_path.write_bytes(b"fixture-image")
+
+            with patch(
+                "experiments.cot_sft_generation.generate_cot_sft.call_model",
+                side_effect=["not a json plan"],
+            ), patch(
+                "experiments.cot_sft_generation.generate_cot_sft.run_writer_stage",
+                return_value={
+                    "success": True,
+                    "output": live_writer_body,
+                    "attempts_used": 1,
+                    "elapsed_seconds": 0.01,
+                    "error": None,
+                },
+            ), patch(
+                "experiments.cot_sft_generation.generate_cot_sft.validate_thinking_response",
+                return_value=(True, "Valid thinking"),
+            ):
+                result = generate_dossier_thinking(
+                    record=record,
+                    image_path=image_path,
+                    aux_part=aux_part,
+                    sanitized_rest=sanitized_rest,
+                    model_name="fixture-model",
+                    max_retries=1,
+                    verbose=True,
+                )
+
+        self.assertTrue(result["success"])
+        self.assertIn("This immediately gives line bd is parallel to line fh and line bd is perpendicular to line bh", result["thinking"])
+        self.assertNotIn("facilitates this similarity proof", result["thinking"])
 
     def test_build_scripted_dossier_writer_body_validates_for_real_eqratio_sample(self):
         record = self._load_quality_review_record(0)
