@@ -360,9 +360,12 @@ class CotSftFixturePipelineTest(unittest.TestCase):
 
         self.assertTrue(ok, message)
         self.assertGreaterEqual(len(dossier["coordinate_checks"]), 1)
+        bridge_claims = [step["claim"] for step in dossier["bridge_chain"]]
+        self.assertIn("triangles bch and cfh are similar", bridge_claims)
+        self.assertIn("ratio bh to ch equals ratio ch to fh", bridge_claims)
         self.assertEqual(dossier["goal_closure"][-1]["claim"], "triangles bde and ceg are similar")
 
-    def test_build_scripted_dossier_skeleton_prunes_unused_tail_steps_for_real_eqangle_sample(self):
+    def test_build_scripted_dossier_skeleton_preserves_goal_side_tail_steps_for_real_eqangle_sample(self):
         record = self._load_quality_review_record(1)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
 
@@ -376,10 +379,15 @@ class CotSftFixturePipelineTest(unittest.TestCase):
 
         self.assertTrue(ok, message)
         bridge_claims = [step["claim"] for step in dossier["bridge_chain"]]
-        self.assertNotIn("ratio ad to cf equals ratio df to df", bridge_claims)
-        self.assertNotIn("ad equals cf", bridge_claims)
-        self.assertNotIn("bc equals cf", bridge_claims)
-        self.assertLessEqual(len(bridge_claims), 3)
+        self.assertEqual(
+            bridge_claims,
+            [
+                "angle ac/ad equals angle cf/df",
+                "ratio ad to cf equals ratio df to df",
+                "ad equals cf",
+                "bc equals cf",
+            ],
+        )
         self.assertEqual(dossier["goal_closure"][-1]["claim"], "angle ab/ac equals angle ad/ae")
 
     def test_generate_dossier_thinking_plan_only_falls_back_to_scripted_skeleton(self):

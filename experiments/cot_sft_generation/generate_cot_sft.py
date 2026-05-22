@@ -3764,6 +3764,9 @@ def prune_unreferenced_dossier_bridge_chain(bridge_chain, goal_support_refs, aux
         index = _extract_bridge_chain_ref_index(ref, bridge_chain_len)
         if index is not None:
             keep_indices.add(index)
+    for idx, step in enumerate(bridge_chain):
+        if step.get("_script_source") == "tail":
+            keep_indices.add(idx)
     if not keep_indices:
         keep_indices.add(bridge_chain_len - 1)
 
@@ -3826,9 +3829,14 @@ def prune_unreferenced_dossier_bridge_chain(bridge_chain, goal_support_refs, aux
     pruned_bridge_chain = []
     for old_index in sorted_keep_indices:
         original_step = bridge_chain[old_index]
+        cleaned_step = {
+            key: value
+            for key, value in original_step.items()
+            if not str(key).startswith("_")
+        }
         pruned_bridge_chain.append(
             {
-                **original_step,
+                **cleaned_step,
                 "supports": rewrite_support_refs(original_step.get("supports", [])),
             }
         )
@@ -4067,6 +4075,7 @@ def build_scripted_dossier_skeleton(
                 "claim": step.get("relation", ""),
                 "supports": support_refs,
                 "why_next": step.get("why_it_helps", "this moves the route one step closer to the visible goal."),
+                "_script_source": step.get("source", "base"),
             }
         )
         prior_bridge_claims.append(step.get("relation", ""))
