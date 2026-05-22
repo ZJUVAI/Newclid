@@ -704,6 +704,38 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertTrue(writer_ok, writer_message)
         self.assertIn("ratio ae to bd equals ratio eg to bf", body)
 
+    def test_build_scripted_dossier_writer_body_prefers_non_coordinate_supports_for_real_simtri_sample(self):
+        record = self._load_quality_review_record(3)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+        ok, message, dossier = build_scripted_dossier_skeleton(
+            record,
+            aux_part,
+            sanitized_rest,
+            record["point_coords_grid"],
+            "simtri a c g f a g",
+        )
+        self.assertTrue(ok, message)
+
+        body = build_scripted_dossier_writer_body(dossier)
+        writer_ok, writer_message = validate_dossier_writer_body(
+            body,
+            visible_goal="simtri a c g f a g",
+            plan=dossier,
+        )
+
+        self.assertTrue(writer_ok, writer_message)
+        self.assertIn("triangles afh and ehg are similar", body)
+        self.assertIn("a, c, g, h are concyclic", body)
+        coordinate_mentions = [
+            relation
+            for relation in [
+                "line af is perpendicular to line ag",
+                "line ac is perpendicular to line cg",
+            ]
+            if relation in body
+        ]
+        self.assertEqual(len(coordinate_mentions), 1)
+
     def test_process_and_generate_sft_runs_offline_dossier_pipeline(self):
         record = {
             "nl_problem": "Observe the diagram and justify the target relation.",

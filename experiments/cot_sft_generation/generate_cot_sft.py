@@ -87,6 +87,7 @@ try:
         relation_keyword_present,
         relation_text_keywords,
         relations_semantically_match,
+        score_support_relation,
         select_support_relations_for_step,
         split_formal_relation_chain,
         summarize_aux_clause,
@@ -175,6 +176,7 @@ except ImportError:  # pragma: no cover - script execution path
         relation_keyword_present,
         relation_text_keywords,
         relations_semantically_match,
+        score_support_relation,
         select_support_relations_for_step,
         split_formal_relation_chain,
         summarize_aux_clause,
@@ -4215,17 +4217,198 @@ def build_scripted_dossier_writer_body(plan):
             return ""
         return value.strip().rstrip(".")
 
-    def choose_support_texts(step, max_items=3):
+    coordinate_relations = [
+        clean_text(relation)
+        for relation in (plan.get("coordinate_relations") or [])
+        if clean_text(relation)
+    ]
+
+    def relation_matches_coordinate(relation, point_names):
+        cleaned_relation = clean_text(relation)
+        if not cleaned_relation:
+            return False
+        for coordinate_relation in coordinate_relations:
+            if cleaned_relation.lower() == coordinate_relation.lower():
+                return True
+            if relations_semantically_match(cleaned_relation, coordinate_relation, point_names):
+                return True
+        return False
+
+    def choose_support_texts(step, max_items=3, force_coordinate=False):
+        claim = clean_text(step.get("claim"))
         required = [
             clean_text(relation)
             for relation in (step.get("required_supports") or step.get("resolved_supports") or [])
             if clean_text(relation)
         ]
-        if not required:
+        resolved_supports = [
+            clean_text(relation)
+            for relation in (step.get("resolved_supports") or [])
+            if clean_text(relation)
+        ]
+        support_refs = [
+            str(ref).strip()
+            for ref in (step.get("supports") or [])
+            if str(ref).strip()
+        ]
+        if not claim or not (required or resolved_supports):
             return []
+
+        def ref_priority(ref):
+            lowered = str(ref or "").lower()
+            if lowered.startswith("bridge_chain["):
+                return 3
+            if lowered.startswith("aux_immediate_effects["):
+                return 2
+            if lowered.startswith("visible_facts["):
+                return 1
+            if lowered.startswith("image_scan["):
+                return 0
+            if lowered.startswith("coordinate_checks["):
+                return -2
+            return 0
+
+        candidate_map = {}
+        source_pairs = (
+            list(zip(support_refs, resolved_supports))
+            if resolved_supports
+            else [("", relation) for relation in required]
+        )
+        for ref, relation in source_pairs:
+            lowered_relation = relation.lower()
+            candidate = {
+                "ref": ref,
+                "relation": relation,
+                "segments": extract_relation_segment_tokens(relation),
+            }
+            candidate_key = (
+                ref_priority(ref),
+                -len(relation),
+                relation.lower(),
+            )
+            if (
+                lowered_relation not in candidate_map
+                or candidate_key > candidate_map[lowered_relation][0]
+            ):
+                candidate_map[lowered_relation] = (candidate_key, candidate)
+        candidates = [candidate for _, candidate in candidate_map.values()]
+        if not candidates:
+            return []
+
+        point_names = extract_relation_point_names(
+            " ".join(
+                [claim]
+                + required
+                + [candidate.get("relation", "") for candidate in candidates]
+            )
+        )
+        claim_segments = extract_relation_segment_tokens(claim)
+        complex_claim = bool(relation_text_keywords(claim) & {"angle", "ratio", "similar"})
         min_mentions = int(step.get("min_support_mentions") or 1)
-        target_count = min(len(required), max(max(1, min_mentions), min(max_items, len(required))))
-        return required[:target_count]
+        base_target = max(
+            min_mentions,
+            2 if complex_claim and len(candidates) >= 2 else 1,
+        )
+        target_cap = min(len(candidates), max_items)
+
+        def select_next_candidate(remaining, covered_segments):
+            best_candidate = None
+            best_key = None
+            for candidate in remaining:
+                relation = candidate.get("relation", "")
+                relation_segments = candidate.get("segments") or set()
+                new_segments = len((relation_segments & claim_segments) - covered_segments)
+                required_match = 0
+                for required_relation in required:
+                    if relation.lower() == required_relation.lower():
+                        required_match = 1
+                        break
+                    if relations_semantically_match(relation, required_relation, point_names):
+                        required_match = 1
+                        break
+                key = (
+                    new_segments,
+                    required_match,
+                    ref_priority(candidate.get("ref", "")),
+                    score_support_relation(relation, claim, point_names),
+                    -len(relation),
+                    relation.lower(),
+                )
+                if best_key is None or key > best_key:
+                    best_key = key
+                    best_candidate = candidate
+            return best_candidate
+
+        selected_relations = []
+        covered_segments = set()
+        remaining = candidates[:]
+
+        initial_target = min(base_target, target_cap)
+        while remaining and len(selected_relations) < initial_target:
+            best_candidate = select_next_candidate(remaining, covered_segments)
+            if best_candidate is None:
+                break
+            selected_relations.append(best_candidate.get("relation", ""))
+            covered_segments.update((best_candidate.get("segments") or set()) & claim_segments)
+            remaining = [
+                candidate
+                for candidate in remaining
+                if candidate.get("relation", "").lower() != best_candidate.get("relation", "").lower()
+            ]
+
+        min_segment_coverage = 0
+        if complex_claim and claim_segments:
+            min_segment_coverage = 3 if len(claim_segments) >= 4 else min(2, len(claim_segments))
+        while (
+            remaining
+            and len(selected_relations) < target_cap
+            and len(covered_segments) < min_segment_coverage
+        ):
+            best_candidate = select_next_candidate(remaining, covered_segments)
+            if best_candidate is None:
+                break
+            selected_relations.append(best_candidate.get("relation", ""))
+            covered_segments.update((best_candidate.get("segments") or set()) & claim_segments)
+            remaining = [
+                candidate
+                for candidate in remaining
+                if candidate.get("relation", "").lower() != best_candidate.get("relation", "").lower()
+            ]
+
+        if (
+            force_coordinate
+            and coordinate_relations
+            and not any(relation_matches_coordinate(relation, point_names) for relation in selected_relations)
+        ):
+            coordinate_candidates = [
+                candidate
+                for candidate in candidates
+                if relation_matches_coordinate(candidate.get("relation", ""), point_names)
+                and candidate.get("relation", "") not in selected_relations
+            ]
+            if coordinate_candidates:
+                coordinate_candidates.sort(
+                    key=lambda candidate: (
+                        score_support_relation(candidate.get("relation", ""), claim, point_names),
+                        len((candidate.get("segments") or set()) & claim_segments),
+                        ref_priority(candidate.get("ref", "")),
+                        -len(candidate.get("relation", "")),
+                        candidate.get("relation", "").lower(),
+                    ),
+                    reverse=True,
+                )
+                if len(selected_relations) < target_cap:
+                    selected_relations.append(coordinate_candidates[0].get("relation", ""))
+                else:
+                    replace_idx = None
+                    for idx, relation in enumerate(selected_relations):
+                        if not relation_matches_coordinate(relation, point_names):
+                            replace_idx = idx
+                            break
+                    if replace_idx is not None:
+                        selected_relations[replace_idx] = coordinate_candidates[0].get("relation", "")
+
+        return selected_relations
 
     def make_support_clause(relations):
         cleaned_relations = [clean_text(relation) for relation in relations if clean_text(relation)]
@@ -4263,11 +4446,30 @@ def build_scripted_dossier_writer_body(plan):
         else:
             sentences.append(f"This immediately gives {make_support_clause(aux_effects[:2])}.")
 
-    for step in plan.get("bridge_chain", []) if isinstance(plan.get("bridge_chain"), list) else []:
+    coordinate_reused = False
+    bridge_steps = plan.get("bridge_chain", []) if isinstance(plan.get("bridge_chain"), list) else []
+    for step_idx, step in enumerate(bridge_steps):
         claim = clean_text(step.get("claim"))
         if not claim:
             continue
-        support_clause = make_support_clause(choose_support_texts(step))
+        force_coordinate = (
+            bool(coordinate_relations)
+            and not coordinate_reused
+            and step_idx == len(bridge_steps) - 1
+        )
+        selected_supports = choose_support_texts(
+            step,
+            force_coordinate=force_coordinate,
+        )
+        if any(
+            relation_matches_coordinate(
+                relation,
+                extract_relation_point_names(" ".join([claim] + selected_supports)),
+            )
+            for relation in selected_supports
+        ):
+            coordinate_reused = True
+        support_clause = make_support_clause(selected_supports)
         if support_clause:
             sentences.append(f"Because {support_clause}, {claim}.")
         else:
@@ -4278,7 +4480,24 @@ def build_scripted_dossier_writer_body(plan):
         claim = clean_text(step.get("claim"))
         if not claim:
             continue
-        support_clause = make_support_clause(choose_support_texts(step))
+        force_coordinate = (
+            bool(coordinate_relations)
+            and not coordinate_reused
+            and idx == len(goal_steps) - 1
+        )
+        selected_supports = choose_support_texts(
+            step,
+            force_coordinate=force_coordinate,
+        )
+        if any(
+            relation_matches_coordinate(
+                relation,
+                extract_relation_point_names(" ".join([claim] + selected_supports)),
+            )
+            for relation in selected_supports
+        ):
+            coordinate_reused = True
+        support_clause = make_support_clause(selected_supports)
         prefix = "Finally" if idx == len(goal_steps) - 1 else "Next"
         if support_clause:
             sentences.append(f"{prefix}, because {support_clause}, {claim}.")
