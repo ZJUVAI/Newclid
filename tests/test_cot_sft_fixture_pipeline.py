@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from experiments.cot_sft_generation.generate_cot_sft import (
+    build_scripted_dossier_writer_body,
     build_scripted_dossier_skeleton,
     generate_dossier_thinking,
     process_and_generate_sft,
@@ -438,6 +439,65 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         critic_mock.assert_not_called()
         writer_mock.assert_called_once()
         self.assertIn("triangles acg and fag are similar", result["thinking"])
+
+    def test_generate_dossier_thinking_scripted_fallback_uses_scripted_writer_after_writer_failure(self):
+        record = self._load_quality_review_record(0)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            image_path = Path(temp_dir) / "fixture.png"
+            image_path.write_bytes(b"fixture-image")
+
+            with patch(
+                "experiments.cot_sft_generation.generate_cot_sft.call_model",
+                side_effect=["not a json plan"],
+            ), patch(
+                "experiments.cot_sft_generation.generate_cot_sft.run_writer_stage",
+                return_value={
+                    "success": False,
+                    "output": None,
+                    "attempts_used": 1,
+                    "elapsed_seconds": 0.01,
+                    "error": "Writer body must explicitly realize bridge_chain[1]",
+                },
+            ), patch(
+                "experiments.cot_sft_generation.generate_cot_sft.validate_thinking_response",
+                return_value=(True, "Valid thinking"),
+            ):
+                result = generate_dossier_thinking(
+                    record=record,
+                    image_path=image_path,
+                    aux_part=aux_part,
+                    sanitized_rest=sanitized_rest,
+                    model_name="fixture-model",
+                    max_retries=1,
+                    verbose=True,
+                )
+
+        self.assertTrue(result["success"])
+        self.assertIn("ratio ae to bd equals ratio eg to bf", result["thinking"])
+
+    def test_build_scripted_dossier_writer_body_validates_for_real_eqratio_sample(self):
+        record = self._load_quality_review_record(0)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+        ok, message, dossier = build_scripted_dossier_skeleton(
+            record,
+            aux_part,
+            sanitized_rest,
+            record["point_coords_grid"],
+            "eqratio a e b d e g b f",
+        )
+        self.assertTrue(ok, message)
+
+        body = build_scripted_dossier_writer_body(dossier)
+        writer_ok, writer_message = validate_dossier_writer_body(
+            body,
+            visible_goal="eqratio a e b d e g b f",
+            plan=dossier,
+        )
+
+        self.assertTrue(writer_ok, writer_message)
+        self.assertIn("ratio ae to bd equals ratio eg to bf", body)
 
     def test_process_and_generate_sft_runs_offline_dossier_pipeline(self):
         record = {

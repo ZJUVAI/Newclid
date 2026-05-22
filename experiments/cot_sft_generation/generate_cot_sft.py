@@ -4117,6 +4117,88 @@ def build_scripted_dossier_skeleton(
     return True, "Valid scripted dossier skeleton", cleaned_dossier
 
 
+def build_scripted_dossier_writer_body(plan):
+    if not isinstance(plan, dict):
+        return ""
+
+    def clean_text(value):
+        if not isinstance(value, str):
+            return ""
+        return value.strip().rstrip(".")
+
+    def choose_support_texts(step, max_items=3):
+        required = [
+            clean_text(relation)
+            for relation in (step.get("required_supports") or step.get("resolved_supports") or [])
+            if clean_text(relation)
+        ]
+        if not required:
+            return []
+        min_mentions = int(step.get("min_support_mentions") or 1)
+        target_count = min(len(required), max(max(1, min_mentions), min(max_items, len(required))))
+        return required[:target_count]
+
+    def make_support_clause(relations):
+        cleaned_relations = [clean_text(relation) for relation in relations if clean_text(relation)]
+        if not cleaned_relations:
+            return ""
+        if len(cleaned_relations) == 1:
+            return cleaned_relations[0]
+        return join_natural_list(cleaned_relations)
+
+    sentences = []
+    obstacle = clean_text(plan.get("goal_obstacle") or plan.get("goal_bottleneck"))
+    observation_cues = [
+        clean_text(relation)
+        for relation in (plan.get("image_scan") or [])
+        if clean_text(relation)
+    ]
+    if obstacle:
+        if observation_cues:
+            sentences.append(f"{obstacle}, and the figure also shows {observation_cues[0]}.")
+        else:
+            sentences.append(f"{obstacle}.")
+
+    construction = clean_text(plan.get("construction"))
+    if construction:
+        sentences.append(f"{construction.capitalize()}.")
+
+    aux_effects = [
+        clean_text(relation)
+        for relation in (plan.get("aux_immediate_effects") or [])
+        if clean_text(relation)
+    ]
+    if aux_effects:
+        if len(aux_effects) == 1:
+            sentences.append(f"This immediately gives {aux_effects[0]}.")
+        else:
+            sentences.append(f"This immediately gives {make_support_clause(aux_effects[:2])}.")
+
+    for step in plan.get("bridge_chain", []) if isinstance(plan.get("bridge_chain"), list) else []:
+        claim = clean_text(step.get("claim"))
+        if not claim:
+            continue
+        support_clause = make_support_clause(choose_support_texts(step))
+        if support_clause:
+            sentences.append(f"Because {support_clause}, {claim}.")
+        else:
+            sentences.append(f"{claim.capitalize()}.")
+
+    goal_steps = plan.get("goal_closure", []) if isinstance(plan.get("goal_closure"), list) else []
+    for idx, step in enumerate(goal_steps):
+        claim = clean_text(step.get("claim"))
+        if not claim:
+            continue
+        support_clause = make_support_clause(choose_support_texts(step))
+        prefix = "Finally" if idx == len(goal_steps) - 1 else "Next"
+        if support_clause:
+            sentences.append(f"{prefix}, because {support_clause}, {claim}.")
+        else:
+            sentences.append(f"{prefix}, {claim}.")
+
+    return " ".join(sentence.strip() for sentence in sentences if sentence.strip())
+
+
 def canonicalize_dossier_image_scan(items, visible_points, min_len=1, max_len=4):
     raw_items = items if isinstance(items, list) else []
     cleaned = []
@@ -5799,6 +5881,27 @@ def generate_dossier_thinking(
         validator_fn=validate_dossier_writer_body,
         retry_feedback_builder=build_dossier_writer_retry_feedback,
     )
+    if not write_result["success"] and plan_source == "scripted_fallback":
+        scripted_body = build_scripted_dossier_writer_body(plan_result["parsed"])
+        scripted_ok, scripted_message = validate_dossier_writer_body(
+            scripted_body,
+            visible_goal=visible_goal,
+            plan=plan_result["parsed"],
+        )
+        if scripted_ok:
+            logger.warning(
+                "[write] Falling back to scripted dossier writer after writer failure: %s",
+                write_result["error"],
+            )
+            write_result = {
+                "success": True,
+                "output": scripted_body,
+                "attempts_used": write_result["attempts_used"],
+                "elapsed_seconds": write_result["elapsed_seconds"],
+                "error": None,
+            }
+        else:
+            logger.warning("[write] Scripted dossier writer fallback invalid: %s", scripted_message)
     assembled_thinking = None
     if write_result["output"]:
         assembled_thinking = f"<thinking>{write_result['output'].strip()}</thinking>"

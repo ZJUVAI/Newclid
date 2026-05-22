@@ -401,6 +401,7 @@ def split_into_sentences(text: str) -> list[str]:
 def _normalize_relation_surface_for_mention_match(text: str) -> str:
     lowered = (text or "").lower()
     lowered = re.sub(r"\bequaling\b", "equals", lowered)
+    lowered = re.sub(r"\bratio of ([a-z]{2}) to ([a-z]{2})\b", r"ratio \1 to \2", lowered)
     lowered = re.sub(
         r"\b(?:construct\s+)?point\s+([a-z])\s+as\s+the midpoint of\s+([a-z]{2})\b",
         r"\1 is the midpoint of \2",

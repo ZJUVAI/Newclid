@@ -167,6 +167,16 @@ class CotSftAuditsTest(unittest.TestCase):
             )
         )
 
+    def test_relation_mentioned_in_text_accepts_ratio_of_surface(self):
+        sentence = "This leads to the ratio of ac to ae equals the ratio of cf to eg."
+
+        self.assertTrue(
+            relation_mentioned_in_text(
+                sentence,
+                "ratio ac to ae equals ratio cf to eg",
+            )
+        )
+
     def test_relation_mentioned_in_text_accepts_midpoint_construction_paraphrase(self):
         sentence = "Construct point h as the midpoint of ad so the helper sits on the needed segment."
 
