@@ -73,6 +73,21 @@ DOSSIER_PARTIAL_CRITIC_OUTPUT = {
     },
 }
 
+DOSSIER_INVALID_CRITIC_PATCH_OUTPUT = {
+    "approved": False,
+    "issues": ["the bridge support refs need cleanup."],
+    "summary": "the route is close, but this patch is malformed.",
+    "revised_dossier": {
+        "bridge_chain": [
+            {
+                "claim": "ah equals bh",
+                "supports": ["aux_direct_relations[1]"],
+                "why_next": "this malformed patch should be ignored in favor of the original validated dossier.",
+            }
+        ]
+    },
+}
+
 WRITER_BODY = (
     "The obstacle is to transfer the d-side and c-side into one local helper frame before the final equality closes. "
     "Using a=(0,0), b=(4,0), and c=(0,2), the midpoint of bc is (2.0, 1.0), which differs from a by residual 2.2361 and the collinearity residual is 1.7889, so point a looks like the midpoint of bc. "
@@ -477,6 +492,53 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertTrue(result["success"])
         self.assertIn("ratio ae to bd equals ratio eg to bf", result["thinking"])
 
+    def test_generate_dossier_thinking_scripted_fallback_prefers_scripted_writer_when_audit_is_better(self):
+        record = self._load_quality_review_record(0)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+        live_writer_body = (
+            "The target ratio around segments AE, BD, EG, and BF lacks a clear bridge. "
+            "To connect these segments, construct point H as the midpoint of AD. "
+            "Since AD is parallel to BC, A, D, and H are collinear. "
+            "Next, observe that CF is parallel to EG and AC equals BD. "
+            "With AC perpendicular to BE and AE perpendicular to CF, the ratio AC to AE equals the ratio CF to EG. "
+            "Since BD is perpendicular to BF and AE appears perpendicular to BG, the ratio AE to BD equals the ratio EG to BF. "
+            "This completes the route by linking all necessary segment comparisons."
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            image_path = Path(temp_dir) / "fixture.png"
+            image_path.write_bytes(b"fixture-image")
+
+            with patch(
+                "experiments.cot_sft_generation.generate_cot_sft.call_model",
+                side_effect=["not a json plan"],
+            ), patch(
+                "experiments.cot_sft_generation.generate_cot_sft.run_writer_stage",
+                return_value={
+                    "success": True,
+                    "output": live_writer_body,
+                    "attempts_used": 1,
+                    "elapsed_seconds": 0.01,
+                    "error": None,
+                },
+            ), patch(
+                "experiments.cot_sft_generation.generate_cot_sft.validate_thinking_response",
+                return_value=(True, "Valid thinking"),
+            ):
+                result = generate_dossier_thinking(
+                    record=record,
+                    image_path=image_path,
+                    aux_part=aux_part,
+                    sanitized_rest=sanitized_rest,
+                    model_name="fixture-model",
+                    max_retries=1,
+                    verbose=True,
+                )
+
+        self.assertTrue(result["success"])
+        self.assertIn("the figure also shows segments ae and bg look perpendicular", result["thinking"])
+        self.assertNotIn("AE appears perpendicular to BG", result["thinking"])
+
     def test_build_scripted_dossier_writer_body_validates_for_real_eqratio_sample(self):
         record = self._load_quality_review_record(0)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
@@ -675,6 +737,90 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             ]
             self.assertTrue(item_records[0]["surface_pass"])
             self.assertEqual(item_records[0]["plan_parsed"]["goal_closure"][0]["claim"], "ad equals bc")
+
+    def test_process_and_generate_sft_ignores_invalid_dossier_critic_revision_patch(self):
+        record = {
+            "nl_problem": "Observe the diagram and justify the target relation.",
+            "llm_input_renamed": (
+                "<problem>g1: para a b c d [000]; g2: cong a c b d [001] ? cong a d b c</problem>"
+            ),
+            "llm_output_renamed": (
+                "<aux>x00 h : cong a h d h; cong b h c h</aux> "
+                "<proof>cong a h b h; cong d h c h; cong a d b c</proof>"
+            ),
+            "point_coords_grid": {
+                "a": [0, 0],
+                "b": [4, 0],
+                "c": [0, 2],
+                "d": [4, 2],
+            },
+            "image_path": "fixture.png",
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_dir_path = Path(temp_dir)
+            input_path = temp_dir_path / "input.jsonl"
+            output_path = temp_dir_path / "out.jsonl"
+            run_dir = temp_dir_path / "artifacts"
+
+            input_path.write_text(json.dumps(record, ensure_ascii=False) + "\n", encoding="utf-8")
+            (temp_dir_path / "fixture.png").write_bytes(b"fixture-image")
+
+            run_metadata = build_run_config(
+                args_dict={
+                    "input": str(input_path),
+                    "output": str(output_path),
+                    "num_samples": 1,
+                    "num_workers": 1,
+                    "model_name": "fixture-model",
+                    "max_retries": 1,
+                    "sequential": True,
+                    "verbose": True,
+                    "generation_style": "dossier_v1",
+                },
+                output_jsonl=str(output_path),
+                run_dir=str(run_dir),
+                model_name="fixture-model",
+                script_path="experiments/cot_sft_generation/generate_cot_sft.py",
+                cwd=str(temp_dir_path),
+                repo_root=str(Path.cwd()),
+                default_input_jsonl=str(input_path),
+                api_base_url="https://example.invalid/v1",
+                api_timeout_seconds=180,
+                api_call_retries=3,
+                api_retry_backoff_seconds=3,
+            )
+
+            with patch(
+                "experiments.cot_sft_generation.generate_cot_sft.call_model",
+                side_effect=[
+                    json.dumps(DOSSIER_PLAN_OUTPUT),
+                    json.dumps(DOSSIER_INVALID_CRITIC_PATCH_OUTPUT),
+                    DOSSIER_WRITER_BODY,
+                ],
+            ):
+                result = process_and_generate_sft(
+                    input_jsonl=str(input_path),
+                    output_jsonl=str(output_path),
+                    sample_size=1,
+                    num_workers=1,
+                    model_name="fixture-model",
+                    verbose=True,
+                    random_sample=False,
+                    process_all=False,
+                    max_retries=1,
+                    run_metadata=run_metadata,
+                    run_dir=run_dir,
+                )
+
+            self.assertEqual(result["summary"]["surface_pass_items"], 1)
+            item_records = [
+                json.loads(line)
+                for line in (run_dir / "item_records.jsonl").read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            self.assertTrue(item_records[0]["surface_pass"])
+            self.assertEqual(item_records[0]["plan_parsed"]["goal_closure"][0]["claim"], DOSSIER_PLAN_OUTPUT["goal_closure"][0]["claim"])
 
     def test_process_and_generate_sft_routes_to_legacy_pipeline_when_requested(self):
         record = {

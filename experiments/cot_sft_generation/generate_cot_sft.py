@@ -4199,6 +4199,65 @@ def build_scripted_dossier_writer_body(plan):
     return " ".join(sentence.strip() for sentence in sentences if sentence.strip())
 
 
+def maybe_choose_scripted_dossier_writer_body(record, aux_part, visible_goal, plan, write_result, logger):
+    if not isinstance(plan, dict):
+        return write_result
+
+    scripted_body = build_scripted_dossier_writer_body(plan)
+    scripted_ok, scripted_message = validate_dossier_writer_body(
+        scripted_body,
+        visible_goal=visible_goal,
+        plan=plan,
+    )
+    if not scripted_ok:
+        logger.warning("[write] Scripted dossier writer fallback invalid: %s", scripted_message)
+        return write_result
+
+    if not write_result["success"]:
+        logger.warning(
+            "[write] Falling back to scripted dossier writer after writer failure: %s",
+            write_result["error"],
+        )
+        return {
+            "success": True,
+            "output": scripted_body,
+            "attempts_used": write_result["attempts_used"],
+            "elapsed_seconds": write_result["elapsed_seconds"],
+            "error": None,
+        }
+
+    coordinate_candidates = build_hidden_coordinate_candidates(
+        get_point_coords(record),
+        max_items=64,
+        relax_type_limits=True,
+    )
+    live_audit = audit_generation_quality(
+        record,
+        {"plan_parsed": plan, "write_output": write_result.get("output") or ""},
+        aux_part,
+        coordinate_candidates=coordinate_candidates,
+    )
+    scripted_audit = audit_generation_quality(
+        record,
+        {"plan_parsed": plan, "write_output": scripted_body},
+        aux_part,
+        coordinate_candidates=coordinate_candidates,
+    )
+    live_issue_count = len(live_audit.get("issues") or [])
+    scripted_issue_count = len(scripted_audit.get("issues") or [])
+    if scripted_issue_count < live_issue_count:
+        logger.warning(
+            "[write] Replacing live dossier writer body with scripted fallback body (%d audit issues -> %d)",
+            live_issue_count,
+            scripted_issue_count,
+        )
+        updated_result = dict(write_result)
+        updated_result["output"] = scripted_body
+        updated_result["error"] = None
+        return updated_result
+    return write_result
+
+
 def canonicalize_dossier_image_scan(items, visible_points, min_len=1, max_len=4):
     raw_items = items if isinstance(items, list) else []
     cleaned = []
@@ -5839,20 +5898,12 @@ def generate_dossier_thinking(
                 visible_text_facts=visible_text_facts,
             )
             if not ok:
-                return {
-                    "success": False,
-                    "thinking": None,
-                    "plan_prompt": plan_prompt if verbose else None,
-                    "write_prompt": None,
-                    "plan_output": json.dumps(plan_result["parsed"], ensure_ascii=False, indent=2) if verbose else None,
-                    "plan_parsed": plan_result["parsed"],
-                    "attempts_used": plan_result["attempts_used"] + critic_result["attempts_used"],
-                    "elapsed_seconds": (plan_result["elapsed_seconds"] or 0.0) + (critic_result["elapsed_seconds"] or 0.0),
-                    "error": f"critic revised_dossier invalid: {message}",
-                    "write_output": None,
-                    "generation_style": "dossier_v1",
-                }
-            plan_result["parsed"] = cleaned_plan
+                logger.warning(
+                    "[plan_critic] Ignoring invalid revised_dossier patch and keeping original validated dossier: %s",
+                    message,
+                )
+            else:
+                plan_result["parsed"] = cleaned_plan
 
     write_prompt = build_dossier_write_prompt_text(
         record,
@@ -5881,27 +5932,15 @@ def generate_dossier_thinking(
         validator_fn=validate_dossier_writer_body,
         retry_feedback_builder=build_dossier_writer_retry_feedback,
     )
-    if not write_result["success"] and plan_source == "scripted_fallback":
-        scripted_body = build_scripted_dossier_writer_body(plan_result["parsed"])
-        scripted_ok, scripted_message = validate_dossier_writer_body(
-            scripted_body,
+    if plan_source == "scripted_fallback":
+        write_result = maybe_choose_scripted_dossier_writer_body(
+            record=record,
+            aux_part=aux_part,
             visible_goal=visible_goal,
             plan=plan_result["parsed"],
+            write_result=write_result,
+            logger=logger,
         )
-        if scripted_ok:
-            logger.warning(
-                "[write] Falling back to scripted dossier writer after writer failure: %s",
-                write_result["error"],
-            )
-            write_result = {
-                "success": True,
-                "output": scripted_body,
-                "attempts_used": write_result["attempts_used"],
-                "elapsed_seconds": write_result["elapsed_seconds"],
-                "error": None,
-            }
-        else:
-            logger.warning("[write] Scripted dossier writer fallback invalid: %s", scripted_message)
     assembled_thinking = None
     if write_result["output"]:
         assembled_thinking = f"<thinking>{write_result['output'].strip()}</thinking>"

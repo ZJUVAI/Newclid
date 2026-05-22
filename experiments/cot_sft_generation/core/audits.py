@@ -321,6 +321,15 @@ def _visible_fact_coordinate_conflict(
 def coordinate_relation_matches_candidate(relation_text: str, candidate: Dict[str, Any]) -> bool:
     relation_type = infer_relation_type_from_text(relation_text)
     if not relation_type:
+        lowered_relation = (relation_text or "").lower()
+        if (
+            candidate.get("relation_type") == "equal_length"
+            and "angle" not in lowered_relation
+            and "ratio" not in lowered_relation
+            and re.search(r"\b[a-z]{2}\s+equals\s+[a-z]{2}\b", lowered_relation)
+        ):
+            relation_type = "equal_length"
+    if not relation_type:
         return False
 
     candidate_type = candidate.get("relation_type", "")

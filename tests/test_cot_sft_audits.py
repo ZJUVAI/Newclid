@@ -7,6 +7,7 @@ from experiments.cot_sft_generation.audits import (
     bridge_step_relation_realized,
     build_visible_premise_summaries,
     count_relation_mentions,
+    coordinate_relation_matches_candidate,
     extract_visible_formal_facts,
     get_point_coords,
     relation_mentioned_in_text,
@@ -196,6 +197,15 @@ class CotSftAuditsTest(unittest.TestCase):
                 "a, d, h are collinear",
             )
         )
+
+    def test_coordinate_relation_matches_candidate_accepts_verbal_segment_equals_surface(self):
+        candidate = {
+            "relation_type": "equal_length",
+            "points": ["a", "c", "b", "d"],
+            "summary": "segments ac and bd look equal in length",
+        }
+
+        self.assertTrue(coordinate_relation_matches_candidate("ac equals bd", candidate))
 
     def test_audit_generation_quality_flags_unused_coordinate_cues(self):
         record = {
