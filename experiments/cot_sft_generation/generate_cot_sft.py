@@ -1893,6 +1893,57 @@ def high_level_step_lacks_directional_support(step, support_relations, point_nam
     return not saw_symbolic_directional_support
 
 
+def high_level_step_lacks_symbolic_directional_coverage(
+    step,
+    support_relations,
+    point_names,
+    support_refs=None,
+):
+    if not isinstance(step, dict):
+        return False
+    relation_text = step.get("approved_route_relation") or step.get("relation", "")
+    relation_keywords = relation_text_keywords(relation_text)
+    if "angle" not in relation_keywords or relation_keywords & {"ratio", "similar"}:
+        return False
+
+    claim_segments = extract_relation_segment_tokens(relation_text)
+    if not claim_segments:
+        return False
+    claim_points = extract_point_mentions(relation_text, point_names)
+    support_refs = list(support_refs or [])
+    directional_keywords = {
+        "angle",
+        "ratio",
+        "similar",
+        "parallel",
+        "perpendicular",
+        "circle",
+        "collinear",
+    }
+    symbolic_directional_segments = set()
+    for idx, support in enumerate(support_relations or []):
+        if not isinstance(support, str) or not support.strip():
+            continue
+        support_ref = str(support_refs[idx]).lower() if idx < len(support_refs) else ""
+        if (
+            support_ref.startswith("image_scan[")
+            or support_ref.startswith("coordinate_checks[")
+        ):
+            continue
+        support_keywords = relation_text_keywords(support)
+        support_triangle_family = triangle_relation_family(support)
+        if support_triangle_family not in {"similar", "congruent"} and not (
+            support_keywords & directional_keywords
+        ):
+            continue
+        support_points = extract_point_mentions(support, point_names)
+        if len(claim_points & support_points) < 2:
+            continue
+        support_segments = extract_relation_segment_tokens(support)
+        symbolic_directional_segments.update(claim_segments & support_segments)
+    return not claim_segments.issubset(symbolic_directional_segments)
+
+
 def low_level_equality_claim_lacks_symbolic_support(
     step,
     support_relations,
@@ -5060,6 +5111,16 @@ def build_scripted_dossier_skeleton(
             support_refs=support_refs,
         ):
             continue
+        if high_level_step_lacks_symbolic_directional_coverage(
+            {
+                "relation": step.get("relation", ""),
+                "approved_route_relation": step.get("relation", ""),
+            },
+            resolved_support_relations,
+            known_points,
+            support_refs=support_refs,
+        ):
+            continue
         if low_level_equality_claim_lacks_symbolic_support(
             {
                 "relation": step.get("relation", ""),
@@ -6055,6 +6116,16 @@ def validate_dossier_plan_response(
                 return False, (
                     f"{field_name}[{idx}].claim relies only on equality or midpoint-style supports "
                     "and is missing a directional relay"
+                ), None
+            if high_level_step_lacks_symbolic_directional_coverage(
+                step_contract,
+                resolved_supports,
+                known_points,
+                support_refs=supports,
+            ):
+                return False, (
+                    f"{field_name}[{idx}].claim is missing symbolic directional coverage "
+                    "for the needed goal-side rays or segments"
                 ), None
             if low_level_equality_claim_lacks_symbolic_support(
                 step_contract,
