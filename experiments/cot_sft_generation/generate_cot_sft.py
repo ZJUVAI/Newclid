@@ -1351,6 +1351,10 @@ def build_hidden_proof_guidance(
     proof_match = re.search(r"<proof>(.*?)</proof>", sanitized_rest or "", re.DOTALL | re.IGNORECASE)
     aux_direct = build_aux_direct_consequences(aux_part)
     aux_scope = {point.lower() for point in extract_aux_point_scope(aux_part)}
+    goal_spec = parse_goal_expression(visible_goal)
+    effective_max_finish = max_finish
+    if (goal_spec.get("predicate") or "").lower() in {"contri", "contrir"}:
+        effective_max_finish = max(max_finish, 6)
     if not proof_match:
         return {
             "immediate_aux_consequences": aux_direct[:max_aux],
@@ -1359,7 +1363,6 @@ def build_hidden_proof_guidance(
             "goal_finish_relations": [],
         }
 
-    goal_spec = parse_goal_expression(visible_goal)
     goal_points = set(goal_spec["points"])
     new_points = {point.lower() for point in extract_aux_new_points(aux_part)}
     raw_clauses = [part.strip() for part in proof_match.group(1).split(";") if part.strip()]
@@ -1443,16 +1446,16 @@ def build_hidden_proof_guidance(
             continue
         if goal_spec["predicate"] and goal_spec["predicate"] in text.lower():
             finish.append(text)
-            if len(finish) >= max_finish:
+            if len(finish) >= effective_max_finish:
                 break
-    if len(finish) < max_finish:
+    if len(finish) < effective_max_finish:
         for item in reversed(summaries):
             text = item["summary"]
             if text in finish:
                 continue
             if item["has_goal_point"]:
                 finish.append(text)
-                if len(finish) >= max_finish:
+                if len(finish) >= effective_max_finish:
                     break
     finish.reverse()
 
