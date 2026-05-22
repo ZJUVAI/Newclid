@@ -335,7 +335,10 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         )
 
         self.assertFalse(ok)
-        self.assertIn("unsupported angle/ratio/similar segments", message)
+        self.assertTrue(
+            "unsupported angle/ratio/similar segments" in message
+            or "bridge_chain must not be empty" in message
+        )
 
     def test_validate_dossier_plan_response_rejects_angle_bridge_without_directional_relay(self):
         dossier = {
@@ -554,7 +557,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertFalse(writer_ok)
         self.assertIn("Internal planning reference detected", writer_message)
 
-    def test_build_scripted_dossier_skeleton_accepts_real_simtri_benchmark_sample(self):
+    def test_build_scripted_dossier_skeleton_rejects_real_simtri_benchmark_sample_with_ungrounded_similarity_closure(self):
         record = self._load_quality_review_record(3)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
 
@@ -566,9 +569,9 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             "simtri a c g f a g",
         )
 
-        self.assertTrue(ok, message)
-        self.assertGreaterEqual(len(dossier["bridge_chain"]), 3)
-        self.assertEqual(dossier["goal_closure"][-1]["claim"], "triangles acg and fag are similar")
+        self.assertFalse(ok)
+        self.assertIn("missing local correspondence support", message)
+        self.assertIsNone(dossier)
 
     def test_build_scripted_dossier_skeleton_rejects_real_eqratio_benchmark_sample_with_ungrounded_ratio_closure(self):
         record = self._load_quality_review_record(0)
@@ -599,7 +602,10 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         )
 
         self.assertFalse(ok)
-        self.assertIn("unsupported angle/ratio/similar segments", message)
+        self.assertTrue(
+            "unsupported angle/ratio/similar segments" in message
+            or "bridge_chain must not be empty" in message
+        )
 
     def test_build_scripted_dossier_skeleton_rejects_real_contri_benchmark_sample_with_coordinate_only_closure(self):
         record = self._load_quality_review_record(4)
@@ -657,7 +663,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("bridge_chain must not be empty", message)
 
-    def test_build_scripted_dossier_skeleton_accepts_real_late_fact_simtrir_benchmark_sample(self):
+    def test_build_scripted_dossier_skeleton_rejects_real_late_fact_simtrir_benchmark_sample_with_ungrounded_similarity_closure(self):
         record = self._load_quality_review_record(9)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
 
@@ -669,10 +675,9 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             "simtrir a g i i g h",
         )
 
-        self.assertTrue(ok, message)
-        self.assertIn("line dh is parallel to line eg", dossier["visible_facts"])
-        self.assertIn("b, d, h, i are concyclic", dossier["visible_facts"])
-        self.assertEqual(dossier["goal_closure"][-1]["claim"], "triangles agi and igh are similar")
+        self.assertFalse(ok)
+        self.assertIn("missing local correspondence support", message)
+        self.assertIsNone(dossier)
 
     def test_build_scripted_dossier_skeleton_rejects_real_contrir_benchmark_sample_with_ungrounded_equality_transfer(self):
         record = self._load_quality_review_record(11)
@@ -702,9 +707,12 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         )
 
         self.assertFalse(ok)
-        self.assertIn("missing symbolic directional coverage", message)
+        self.assertTrue(
+            "missing symbolic directional coverage" in message
+            or "bridge_chain must not be empty" in message
+        )
 
-    def test_build_scripted_dossier_skeleton_prefers_tail_only_route_for_real_simtri_sample(self):
+    def test_build_scripted_dossier_skeleton_rejects_real_simtri_tail_route_without_local_similarity_support(self):
         record = self._load_quality_review_record(3)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
 
@@ -716,19 +724,12 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             "simtri a c g f a g",
         )
 
-        self.assertTrue(ok, message)
-        self.assertEqual(
-            [step["claim"] for step in dossier["bridge_chain"]],
-            [
-                "triangles afh and ehg are similar",
-                "ratio af to ah equals ratio eh to eg",
-                "ratio ac to af equals ratio cg to ag",
-            ],
-        )
-        self.assertEqual(dossier["goal_closure"][-1]["claim"], "triangles acg and fag are similar")
+        self.assertFalse(ok)
+        self.assertIn("missing local correspondence support", message)
+        self.assertIsNone(dossier)
 
     def test_generate_dossier_thinking_plan_only_falls_back_to_scripted_skeleton(self):
-        record = self._load_quality_review_record(3)
+        record = self._load_quality_review_record(6)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -753,19 +754,17 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertTrue(result["success"])
         self.assertEqual(result["generation_style"], "dossier_v1")
         self.assertIsNotNone(result["plan_parsed"])
-        self.assertEqual(result["plan_parsed"]["goal_closure"][-1]["claim"], "triangles acg and fag are similar")
+        self.assertEqual(result["plan_parsed"]["goal_closure"][-1]["claim"], "ratio be to ce equals ratio de to be")
 
     def test_generate_dossier_thinking_scripted_fallback_skips_critic_in_full_generation(self):
-        record = self._load_quality_review_record(3)
+        record = self._load_quality_review_record(6)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
         writer_output = (
-            "The obstacle is to reconnect the helper circles to the target triangle comparison. "
-            "Construct point h so that a, b, e, h are concyclic and a, c, g, h are concyclic. "
-            "This immediately gives a, b, e, h are concyclic and a, c, g, h are concyclic. "
-            "Then angle ac/ag equals angle ch/gh, so one goal-side direction is now available. "
-            "Next angle ac/ah equals angle cg/gh, which keeps the route tied to triangles around a, c, g, and h. "
-            "After that ratio ac to af equals ratio cg to ag, so the side comparison needed for the target is in place. "
-            "Therefore triangles acg and fag are similar."
+            "The target ratio around b, e, c, e, d, e, and b, e still lacks a concrete bridge between the needed segment comparisons. "
+            "Construct point f such that ac equals bf and af equals bf, then construct point g such that line cf is parallel to line dg and a, d, f, g are concyclic. "
+            "This immediately gives ac equals bf and af equals bf. "
+            "Because c, d, e are collinear and ac equals bd, triangles bce and dbe are similar. "
+            "Therefore ratio be to ce equals ratio de to be."
         )
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -804,7 +803,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertEqual(call_model_mock.call_count, 1)
         critic_mock.assert_not_called()
         writer_mock.assert_called_once()
-        self.assertIn("triangles acg and fag are similar", result["thinking"])
+        self.assertIn("ratio be to ce equals ratio de to be", result["thinking"])
 
     def test_generate_dossier_thinking_fails_closed_when_scripted_eqratio_fallback_is_invalid_after_writer_failure(self):
         record = self._load_quality_review_record(0)
@@ -881,14 +880,14 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertIn("missing local pairwise support", result["error"])
 
     def test_generate_dossier_thinking_falls_back_to_scripted_skeleton_after_critic_rejection(self):
-        record = self._load_quality_review_record(3)
+        record = self._load_quality_review_record(6)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
         ok, message, dossier = build_scripted_dossier_skeleton(
             record,
             aux_part,
             sanitized_rest,
             record["point_coords_grid"],
-            "simtri a c g f a g",
+            "eqratio b e c e d e b e",
         )
         self.assertTrue(ok, message)
 
@@ -926,17 +925,17 @@ class CotSftFixturePipelineTest(unittest.TestCase):
                 )
 
         self.assertTrue(result["success"])
-        self.assertIn("triangles acg and fag are similar", result["thinking"])
+        self.assertIn("ratio be to ce equals ratio de to be", result["thinking"])
 
     def test_generate_dossier_thinking_falls_back_to_scripted_plan_after_live_plan_rejection(self):
-        record = self._load_quality_review_record(3)
+        record = self._load_quality_review_record(6)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
         ok, message, scripted_dossier = build_scripted_dossier_skeleton(
             record,
             aux_part,
             sanitized_rest,
             record["point_coords_grid"],
-            "simtri a c g f a g",
+            "eqratio b e c e d e b e",
         )
         self.assertTrue(ok, message)
 
@@ -986,7 +985,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             [step["claim"] for step in result["plan_parsed"]["bridge_chain"]],
             expected_bridge_chain,
         )
-        self.assertIn("triangles afh and ehg are similar", result["thinking"])
+        self.assertIn("triangles bce and dbe are similar", result["thinking"])
         self.assertNotIn("angle af/df equals angle df/cd", result["thinking"])
 
     def test_generate_dossier_thinking_eqratio_fails_closed_when_scripted_fallback_is_invalid_and_live_writer_is_weaker(self):
@@ -1038,14 +1037,12 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertIn("missing local pairwise support", result["error"])
 
     def test_generate_dossier_thinking_scripted_fallback_prefers_scripted_writer_when_plan_grounding_is_stronger(self):
-        record = self._load_quality_review_record(3)
+        record = self._load_quality_review_record(6)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
         live_writer_body = (
-            "The target triangle comparison around A, C, G, F, A, and G lacks one grounded bridge between the visible correspondences. "
-            "To connect the missing relation, construct point H such that A, B, E, and H are concyclic and A, C, G, and H are concyclic. "
-            "This creates a circle helper and one angle cue. "
-            "Since triangles AFH and EHG are similar, the route can keep moving toward the target. "
-            "The construction of H facilitates this similarity proof by bridging the necessary correspondences."
+            "The target ratio around BE, CE, DE, and BE still lacks a clear bridge. "
+            "Construct points F and G to help with the comparison. "
+            "This creates a helper frame and should facilitate the ratio proof by bridging the necessary correspondences."
         )
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1079,9 +1076,9 @@ class CotSftFixturePipelineTest(unittest.TestCase):
                 )
 
         self.assertTrue(result["success"])
-        self.assertIn("This immediately gives a, b, e, h are concyclic and a, c, g, h are concyclic", result["thinking"])
-        self.assertIn("triangles afh and ehg are similar", result["thinking"])
-        self.assertNotIn("facilitates this similarity proof", result["thinking"])
+        self.assertIn("This immediately gives ac equals bf and af equals bf", result["thinking"])
+        self.assertIn("triangles bce and dbe are similar", result["thinking"])
+        self.assertNotIn("facilitate the ratio proof", result["thinking"])
 
     def test_build_scripted_dossier_writer_body_rejects_real_eqratio_sample_with_ungrounded_ratio_closure(self):
         record = self._load_quality_review_record(0)
@@ -1108,7 +1105,10 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             "eqangle a b a c a d a e",
         )
         self.assertFalse(ok)
-        self.assertIn("missing symbolic directional coverage", message)
+        self.assertTrue(
+            "missing symbolic directional coverage" in message
+            or "bridge_chain must not be empty" in message
+        )
 
     def test_build_scripted_dossier_writer_body_rejects_real_simtrir_sample_with_ungrounded_goal_closure(self):
         record = self._load_quality_review_record(2)
@@ -1121,7 +1121,10 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             "simtrir b d e c e g",
         )
         self.assertFalse(ok)
-        self.assertIn("unsupported angle/ratio/similar segments", message)
+        self.assertTrue(
+            "unsupported angle/ratio/similar segments" in message
+            or "bridge_chain must not be empty" in message
+        )
 
     def test_build_scripted_dossier_writer_body_rejects_real_contrir_transfer_sample_with_ungrounded_equality_chain(self):
         record = self._load_quality_review_record(5)
@@ -1152,7 +1155,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             or "missing symbolic directional coverage" in message
         )
 
-    def test_build_scripted_dossier_writer_body_grounds_real_late_fact_simtrir_goal_closure(self):
+    def test_build_scripted_dossier_writer_body_rejects_real_late_fact_simtrir_goal_closure_without_local_similarity_support(self):
         record = self._load_quality_review_record(9)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
         ok, message, dossier = build_scripted_dossier_skeleton(
@@ -1162,19 +1165,9 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             record["point_coords_grid"],
             "simtrir a g i i g h",
         )
-        self.assertTrue(ok, message)
-
-        body = build_scripted_dossier_writer_body(dossier)
-        writer_ok, writer_message = validate_dossier_writer_body(
-            body,
-            visible_goal="simtrir a g i i g h",
-            plan=dossier,
-        )
-
-        self.assertTrue(writer_ok, writer_message)
-        self.assertIn("b, d, h, i are concyclic", body)
-        self.assertIn("ratio ab to bi equals ratio dh to di", body)
-        self.assertIn("triangles agi and igh are similar", body)
+        self.assertFalse(ok)
+        self.assertIn("missing local correspondence support", message)
+        self.assertIsNone(dossier)
 
     def test_build_scripted_dossier_writer_body_rejects_real_contrir_sample_with_ungrounded_equality_transfer(self):
         record = self._load_quality_review_record(11)
@@ -1189,37 +1182,29 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("unsupported angle/ratio/similar segments", message)
 
-    def test_build_scripted_dossier_writer_body_prefers_non_coordinate_supports_for_real_simtri_sample(self):
-        record = self._load_quality_review_record(3)
+    def test_build_scripted_dossier_writer_body_prefers_non_coordinate_supports_for_real_eqratio_sample(self):
+        record = self._load_quality_review_record(6)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
         ok, message, dossier = build_scripted_dossier_skeleton(
             record,
             aux_part,
             sanitized_rest,
             record["point_coords_grid"],
-            "simtri a c g f a g",
+            "eqratio b e c e d e b e",
         )
         self.assertTrue(ok, message)
 
         body = build_scripted_dossier_writer_body(dossier)
         writer_ok, writer_message = validate_dossier_writer_body(
             body,
-            visible_goal="simtri a c g f a g",
+            visible_goal="eqratio b e c e d e b e",
             plan=dossier,
         )
 
         self.assertTrue(writer_ok, writer_message)
-        self.assertIn("triangles afh and ehg are similar", body)
-        self.assertIn("a, c, g, h are concyclic", body)
-        coordinate_mentions = [
-            relation
-            for relation in [
-                "line af is perpendicular to line ag",
-                "line ac is perpendicular to line cg",
-            ]
-            if relation in body
-        ]
-        self.assertEqual(len(coordinate_mentions), 0)
+        self.assertIn("segments ac and bd look equal in length", body)
+        self.assertIn("triangles bce and dbe are similar", body)
+        self.assertNotIn("c=(12,190)", body)
 
     def test_process_and_generate_sft_runs_offline_dossier_pipeline(self):
         record = {

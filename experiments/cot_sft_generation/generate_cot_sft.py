@@ -1944,6 +1944,66 @@ def high_level_step_lacks_symbolic_directional_coverage(
     return not claim_segments.issubset(symbolic_directional_segments)
 
 
+def similar_step_with_aux_lacks_local_correspondence_support(
+    step,
+    support_relations,
+    point_names,
+    aux_points,
+    support_refs=None,
+    require_aux_point=True,
+):
+    if not isinstance(step, dict):
+        return False
+    relation_text = normalize_relation_surface(
+        step.get("approved_route_relation") or step.get("relation", "")
+    ).strip()
+    if triangle_relation_family(relation_text) != "similar":
+        return False
+
+    claim_points = extract_point_mentions(relation_text, point_names)
+    aux_point_set = {
+        str(point).lower()
+        for point in (aux_points or [])
+        if isinstance(point, str) and point.strip()
+    }
+    if require_aux_point and not (claim_points & aux_point_set):
+        return False
+
+    claim_segments = extract_relation_segment_tokens(relation_text)
+    if len(claim_segments) < 4:
+        return False
+
+    support_refs = list(support_refs or [])
+    local_support_signatures = set()
+    for idx, support in enumerate(support_relations or []):
+        if not isinstance(support, str) or not support.strip():
+            continue
+        support_ref = str(support_refs[idx]).lower() if idx < len(support_refs) else ""
+        if (
+            support_ref.startswith("image_scan[")
+            or support_ref.startswith("coordinate_checks[")
+        ):
+            continue
+        support_keywords = relation_text_keywords(support)
+        support_triangle_family = triangle_relation_family(support)
+        if support_triangle_family not in {"similar", "congruent"} and not (
+            support_keywords & {"angle", "ratio", "equal", "parallel", "perpendicular"}
+        ):
+            continue
+        support_segments = extract_relation_segment_tokens(support)
+        overlap_segments = claim_segments & support_segments
+        if len(overlap_segments) < 3:
+            continue
+        support_points = extract_point_mentions(support, point_names)
+        if len(claim_points & support_points) < 3:
+            continue
+        local_support_signatures.add(tuple(sorted(overlap_segments)))
+        if len(local_support_signatures) >= 2:
+            return False
+
+    return True
+
+
 def ratio_step_lacks_pairwise_support(step, support_relations):
     if not isinstance(step, dict):
         return False
@@ -5152,6 +5212,18 @@ def build_scripted_dossier_skeleton(
             support_refs=support_refs,
         ):
             continue
+        if similar_step_with_aux_lacks_local_correspondence_support(
+            {
+                "relation": step.get("relation", ""),
+                "approved_route_relation": step.get("relation", ""),
+            },
+            resolved_support_relations,
+            known_points,
+            aux_points,
+            support_refs=support_refs,
+            require_aux_point=True,
+        ):
+            continue
         if ratio_step_lacks_pairwise_support(
             {
                 "relation": step.get("relation", ""),
@@ -6165,6 +6237,18 @@ def validate_dossier_plan_response(
                 return False, (
                     f"{field_name}[{idx}].claim is missing symbolic directional coverage "
                     "for the needed goal-side rays or segments"
+                ), None
+            if similar_step_with_aux_lacks_local_correspondence_support(
+                step_contract,
+                resolved_supports,
+                known_points,
+                aux_points,
+                support_refs=supports,
+                require_aux_point=(field_name != "goal_closure"),
+            ):
+                return False, (
+                    f"{field_name}[{idx}].claim is missing local correspondence support "
+                    "for the similarity closure"
                 ), None
             if ratio_step_lacks_pairwise_support(
                 step_contract,
