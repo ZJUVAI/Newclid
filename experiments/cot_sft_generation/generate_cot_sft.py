@@ -6490,6 +6490,7 @@ def run_writer_stage(
     fallback_model_names=None,
     validator_fn=None,
     retry_feedback_builder=None,
+    failure_recovery_fn=None,
 ):
     del injected_prefix
     validator_fn = validator_fn or validate_writer_body
@@ -6518,6 +6519,18 @@ def run_writer_stage(
                 }
             last_error = message
             logger.warning(f"[{stage_name}] Validation failed: {message}")
+            if failure_recovery_fn is not None:
+                recovered_result = failure_recovery_fn(
+                    {
+                        "success": False,
+                        "output": output.strip() if isinstance(output, str) else output,
+                        "attempts_used": attempt,
+                        "elapsed_seconds": elapsed,
+                        "error": message,
+                    }
+                )
+                if recovered_result is not None and recovered_result.get("success"):
+                    return recovered_result
             if attempt < max_retries:
                 feedback = retry_feedback_builder(message, plan)
                 messages = messages + [{"role": "user", "content": feedback}]
@@ -6778,6 +6791,14 @@ def generate_dossier_thinking(
         max_retries=max_retries,
         validator_fn=validate_dossier_writer_body,
         retry_feedback_builder=build_dossier_writer_retry_feedback,
+        failure_recovery_fn=lambda failed_write_result: maybe_choose_scripted_dossier_writer_body(
+            record=record,
+            aux_part=aux_part,
+            visible_goal=visible_goal,
+            plan=plan_result["parsed"],
+            write_result=failed_write_result,
+            logger=logger,
+        ),
     )
     if plan_source in {"scripted_fallback", "scripted_preferred"}:
         write_result = maybe_choose_scripted_dossier_writer_body(

@@ -610,6 +610,40 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertTrue(result["success"])
         self.assertIn("ratio ae to bd equals ratio eg to bf", result["thinking"])
 
+    def test_generate_dossier_thinking_scripted_fallback_short_circuits_writer_retries(self):
+        record = self._load_quality_review_record(0)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            image_path = Path(temp_dir) / "fixture.png"
+            image_path.write_bytes(b"fixture-image")
+
+            with patch(
+                "experiments.cot_sft_generation.generate_cot_sft.call_model",
+                side_effect=[
+                    "not a json plan",
+                    "still not a json plan",
+                    "final invalid plan output",
+                    "This target still needs the desired ratio before the helper can finish.",
+                ],
+            ) as call_model_mock, patch(
+                "experiments.cot_sft_generation.generate_cot_sft.validate_thinking_response",
+                return_value=(True, "Valid thinking"),
+            ):
+                result = generate_dossier_thinking(
+                    record=record,
+                    image_path=image_path,
+                    aux_part=aux_part,
+                    sanitized_rest=sanitized_rest,
+                    model_name="fixture-model",
+                    max_retries=3,
+                    verbose=True,
+                )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(call_model_mock.call_count, 4)
+        self.assertIn("ratio ae to bd equals ratio eg to bf", result["thinking"])
+
     def test_generate_dossier_thinking_falls_back_to_scripted_skeleton_after_critic_rejection(self):
         record = self._load_quality_review_record(1)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
