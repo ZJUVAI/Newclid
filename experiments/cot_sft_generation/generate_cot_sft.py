@@ -3904,6 +3904,55 @@ def prune_unreferenced_dossier_coordinate_checks(coordinate_checks, bridge_chain
     return pruned_coordinate_checks, pruned_bridge_chain, pruned_goal_support_refs
 
 
+def build_aux_goal_bridge_tail_relations(
+    proof_guidance,
+    goal_finish,
+    aux_points,
+    known_points,
+    max_items=3,
+):
+    normalized_goal_finish = normalize_relation_surface(goal_finish or "").strip()
+    aux_point_set = {
+        point.lower()
+        for point in (aux_points or [])
+        if isinstance(point, str) and point.strip()
+    }
+    if not normalized_goal_finish or not aux_point_set:
+        return []
+
+    ordered_route_relations = [
+        normalize_relation_surface(relation).strip()
+        for relation in (proof_guidance or {}).get("ordered_route_relations", [])
+        if isinstance(relation, str) and relation.strip()
+    ]
+    if not ordered_route_relations:
+        return []
+
+    target_segments = set(extract_relation_segment_tokens(normalized_goal_finish))
+    target_points = extract_point_mentions(normalized_goal_finish, known_points)
+    selected = []
+    seen_relations = {normalized_goal_finish.lower()}
+
+    for relation in reversed(ordered_route_relations):
+        lowered_relation = relation.lower()
+        if lowered_relation in seen_relations:
+            continue
+        relation_points = extract_point_mentions(relation, known_points)
+        relation_segments = extract_relation_segment_tokens(relation)
+        if not (relation_points & aux_point_set):
+            continue
+        if not ((relation_segments & target_segments) or (relation_points & target_points)):
+            continue
+        selected.append(relation)
+        seen_relations.add(lowered_relation)
+        target_segments.update(relation_segments)
+        target_points.update(relation_points)
+        if len(selected) >= max_items:
+            break
+
+    return list(reversed(selected))
+
+
 def build_scripted_dossier_skeleton(
     record,
     aux_part,
@@ -3955,11 +4004,11 @@ def build_scripted_dossier_skeleton(
         for relation in scripted_plan.get("aux_direct_relations", [])
         if isinstance(relation, str) and relation.strip()
     ]
-    known_points = extract_visible_point_names(point_coords) + [
+    aux_points = [
         point.lower()
         for point in extract_aux_new_points(aux_part or "")
     ]
-
+    known_points = extract_visible_point_names(point_coords) + aux_points
     normalized_goal_finish = normalize_relation_surface(scripted_plan.get("goal_finish", ""))
     goal_tail_relations = []
     for relation in proof_guidance.get("goal_finish_relations", []) or []:
@@ -3970,6 +4019,21 @@ def build_scripted_dossier_skeleton(
             continue
         if normalized_relation.lower() not in {item.lower() for item in goal_tail_relations}:
             goal_tail_relations.append(normalized_relation)
+    goal_tail_mentions_aux = any(
+        any(point in relation.lower() for point in aux_points)
+        for relation in goal_tail_relations
+    )
+    tail_relations_for_chain = goal_tail_relations
+    if aux_points and goal_tail_relations and not goal_tail_mentions_aux:
+        aux_goal_bridge_tail_relations = build_aux_goal_bridge_tail_relations(
+            proof_guidance,
+            normalized_goal_finish,
+            aux_points,
+            known_points,
+            max_items=3,
+        )
+        if aux_goal_bridge_tail_relations:
+            tail_relations_for_chain = aux_goal_bridge_tail_relations
 
     base_bridge_steps = [
         step
@@ -3977,7 +4041,7 @@ def build_scripted_dossier_skeleton(
         if isinstance(step, dict) and step.get("relation")
     ]
     max_bridge_steps = 6
-    keep_prefix_count = max_bridge_steps - len(goal_tail_relations)
+    keep_prefix_count = max_bridge_steps - len(tail_relations_for_chain)
     min_prefix_count = 1 if base_bridge_steps and extract_aux_new_points(aux_part or "") else 0
     keep_prefix_count = max(min_prefix_count, keep_prefix_count)
     keep_prefix_count = min(len(base_bridge_steps), keep_prefix_count)
@@ -3991,7 +4055,7 @@ def build_scripted_dossier_skeleton(
         for step in base_bridge_steps[:keep_prefix_count]
     ]
     remaining_slots = max(0, max_bridge_steps - len(selected_bridge_specs))
-    tail_relations_to_add = goal_tail_relations[-remaining_slots:] if remaining_slots else []
+    tail_relations_to_add = tail_relations_for_chain[-remaining_slots:] if remaining_slots else []
     for idx, relation in enumerate(tail_relations_to_add):
         next_relation = (
             tail_relations_to_add[idx + 1]
@@ -4011,8 +4075,8 @@ def build_scripted_dossier_skeleton(
         )
 
     coordinate_check_targets = [normalized_goal_finish]
-    if goal_tail_relations:
-        coordinate_check_targets.insert(0, goal_tail_relations[-1])
+    if tail_relations_for_chain:
+        coordinate_check_targets.insert(0, tail_relations_for_chain[-1])
     elif selected_bridge_specs:
         coordinate_check_targets.insert(0, selected_bridge_specs[-1].get("relation", ""))
 

@@ -344,6 +344,10 @@ class CotSftFixturePipelineTest(unittest.TestCase):
 
         self.assertTrue(ok, message)
         self.assertGreaterEqual(len(dossier["coordinate_checks"]), 1)
+        bridge_claims = [step["claim"] for step in dossier["bridge_chain"]]
+        self.assertIn("ratio ah to dh equals ratio eg to bg", bridge_claims)
+        self.assertIn("ratio ad to ah equals ratio be to eg", bridge_claims)
+        self.assertNotIn("a, f, g are collinear", bridge_claims)
         self.assertEqual(dossier["goal_closure"][-1]["claim"], "ratio ae to bd equals ratio eg to bf")
 
     def test_build_scripted_dossier_skeleton_accepts_real_simtrir_benchmark_sample(self):
