@@ -344,6 +344,62 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("unsupported angle/ratio/similar segments", message)
 
+    def test_validate_dossier_plan_response_rejects_angle_bridge_without_directional_relay(self):
+        dossier = {
+            "visible_facts": [
+                "ac equals bd",
+                "g is the midpoint of be",
+                "line ad is parallel to line bc",
+            ],
+            "image_scan": [
+                "segments ae and bg look perpendicular",
+            ],
+            "coordinate_checks": [],
+            "goal_obstacle": "the target ratio still lacks one grounded bridge between the helper halves and the visible side.",
+            "aux_motivation": "a midpoint helper should create one local balance before any angle or ratio transfer is attempted.",
+            "construction": "construct point h as the midpoint of ad.",
+            "aux_immediate_effects": ["h is the midpoint of ad"],
+            "bridge_chain": [
+                {
+                    "claim": "angle ab/ah equals angle bg/ac",
+                    "supports": [
+                        "aux_immediate_effects[1]",
+                        "visible_facts[1]",
+                        "visible_facts[2]",
+                    ],
+                    "why_next": "this would start the ratio transfer.",
+                }
+            ],
+            "goal_closure": [
+                {
+                    "claim": "ratio ae to bd equals ratio eg to bf",
+                    "supports": [
+                        "bridge_chain[1]",
+                        "visible_facts[3]",
+                    ],
+                    "why_next": "this is the target ratio relation.",
+                }
+            ],
+        }
+
+        ok, message, _ = validate_dossier_plan_response(
+            dossier,
+            point_coords={
+                "a": [134, 196],
+                "b": [226, 184],
+                "c": [217, 115],
+                "d": [124, 128],
+                "e": [187, 144],
+                "f": [247, 146],
+                "g": [206, 164],
+            },
+            visible_goal="eqratio a e b d e g b f",
+            aux_part="<aux> x00 h : midp h a d [008] ; </aux>",
+        )
+
+        self.assertFalse(ok)
+        self.assertIn("missing a directional relay", message)
+
     def test_validate_dossier_writer_body_rejects_internal_planning_refs(self):
         ok, message, cleaned = validate_dossier_plan_response(
             DOSSIER_PLAN_OUTPUT,
@@ -408,11 +464,18 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertEqual(
             bridge_claims,
             [
-                "angle ab/ah equals angle bg/ac",
+                "a, d, h are collinear",
                 "ratio ah to dh equals ratio eg to bg",
                 "ratio ad to ah equals ratio be to eg",
                 "line cf is parallel to line eg",
                 "ratio ac to ae equals ratio cf to eg",
+            ],
+        )
+        self.assertCountEqual(
+            dossier["bridge_chain"][0]["resolved_supports"],
+            [
+                "h is the midpoint of ad",
+                "line ad is parallel to line bc",
             ],
         )
         self.assertCountEqual(
@@ -424,7 +487,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         )
         self.assertEqual(dossier["goal_closure"][-1]["claim"], "ratio ae to bd equals ratio eg to bf")
 
-    def test_build_scripted_dossier_skeleton_accepts_real_simtrir_benchmark_sample(self):
+    def test_build_scripted_dossier_skeleton_rejects_real_simtrir_benchmark_sample_with_ungrounded_goal_closure(self):
         record = self._load_quality_review_record(2)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
 
@@ -436,18 +499,30 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             "simtrir b d e c e g",
         )
 
-        self.assertTrue(ok, message)
-        self.assertGreaterEqual(len(dossier["coordinate_checks"]), 1)
-        bridge_claims = [step["claim"] for step in dossier["bridge_chain"]]
-        self.assertEqual(
-            bridge_claims,
-            [
-                "triangles bch and cfh are similar",
-                "ratio bh to ch equals ratio ch to fh",
-                "ratio bd to be equals ratio ce to cg",
-            ],
+        self.assertFalse(ok)
+        self.assertIn("unsupported angle/ratio/similar segments", message)
+
+    def test_build_scripted_dossier_skeleton_grounds_real_contri_angle_bridge_with_cyclic_support(self):
+        record = self._load_quality_review_record(4)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+
+        ok, message, dossier = build_scripted_dossier_skeleton(
+            record,
+            aux_part,
+            sanitized_rest,
+            record["point_coords_grid"],
+            "contri b c f f e b",
         )
-        self.assertEqual(dossier["goal_closure"][-1]["claim"], "triangles bde and ceg are similar")
+
+        self.assertTrue(ok, message)
+        self.assertEqual(
+            [step["claim"] for step in dossier["bridge_chain"]],
+            ["angle be/bf equals angle cf/bf"],
+        )
+        self.assertIn(
+            "b, c, d, e are concyclic",
+            dossier["bridge_chain"][0]["resolved_supports"],
+        )
 
     def test_build_dossier_goal_tail_relations_prefers_transfer_checkpoint_for_real_contrir_sample(self):
         record = self._load_quality_review_record(5)
@@ -540,6 +615,10 @@ class CotSftFixturePipelineTest(unittest.TestCase):
                 "bh equals ch",
                 "angle bi/bh equals angle ch/ci",
             ],
+        )
+        self.assertIn(
+            "a, c, i are collinear",
+            dossier["bridge_chain"][2]["resolved_supports"],
         )
         self.assertEqual(dossier["goal_closure"][-1]["claim"], "triangles ach and dbh are congruent")
 
@@ -897,17 +976,14 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertNotIn("AE appears perpendicular to BG", result["thinking"])
 
     def test_generate_dossier_thinking_scripted_fallback_prefers_scripted_writer_when_plan_grounding_is_stronger(self):
-        record = self._load_quality_review_record(2)
+        record = self._load_quality_review_record(5)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
         live_writer_body = (
-            "The target triangle comparison around B, D, E, C, E, and G lacks enough direct side or angle correspondences. "
-            "To connect the missing angle relation, construct point H such that line BD is parallel to line FH and line BD is perpendicular to line BH. "
-            "This creates a perpendicular link and a parallel link. "
-            "Since AB is parallel to EF and AF is parallel to BE, angle AB/AF equals angle BH/FH, moving us closer to the goal. "
-            "Given BC equals BE and CE equals CF, along with CF being parallel to CG, the ratio BD to BE equals the ratio CE to CG. "
-            "Line DE is perpendicular to line EG, and angle AB/BC equals angle BC/BD. "
-            "Therefore, triangles BDE and CEG are similar by these angle and side ratios. "
-            "The construction of H facilitates this similarity proof by bridging the necessary angle relations."
+            "The target triangle comparison around B, D, I, I, F, and B lacks enough direct side or angle correspondences. "
+            "To connect the missing relation, construct point J such that line CF is perpendicular to line CJ and angle BF/CF equals angle FJ/BF. "
+            "This creates a perpendicular helper and one angle cue. "
+            "Since CF equals CJ and DF equals DJ, the route can keep moving toward the target. "
+            "The construction of J facilitates this congruence proof by bridging the necessary angle relations."
         )
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -941,8 +1017,9 @@ class CotSftFixturePipelineTest(unittest.TestCase):
                 )
 
         self.assertTrue(result["success"])
-        self.assertIn("This immediately gives line bd is parallel to line fh and line bd is perpendicular to line bh", result["thinking"])
-        self.assertNotIn("facilitates this similarity proof", result["thinking"])
+        self.assertIn("This immediately gives line cf is perpendicular to line cj and angle bf/cf equals angle fj/bf", result["thinking"])
+        self.assertIn("triangles bdj and jfb are congruent", result["thinking"])
+        self.assertNotIn("facilitates this congruence proof", result["thinking"])
 
     def test_build_scripted_dossier_writer_body_validates_for_real_eqratio_sample(self):
         record = self._load_quality_review_record(0)
@@ -990,12 +1067,12 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         )
 
         self.assertTrue(writer_ok, writer_message)
-        self.assertIn("ad equals ae", body)
-        self.assertIn("angle ab/bc equals angle bc/ac", body)
+        self.assertIn("a, c, d, f are concyclic", body)
         self.assertIn("angle ab/bc equals angle bc/be", body)
+        self.assertIn("angle ab/bc equals angle bc/bd", body)
         self.assertNotIn("Because ad equals ae, ad equals ae.", body)
 
-    def test_build_scripted_dossier_writer_body_grounds_real_simtrir_goal_closure(self):
+    def test_build_scripted_dossier_writer_body_rejects_real_simtrir_sample_with_ungrounded_goal_closure(self):
         record = self._load_quality_review_record(2)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
         ok, message, dossier = build_scripted_dossier_skeleton(
@@ -1005,19 +1082,8 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             record["point_coords_grid"],
             "simtrir b d e c e g",
         )
-        self.assertTrue(ok, message)
-
-        body = build_scripted_dossier_writer_body(dossier)
-        writer_ok, writer_message = validate_dossier_writer_body(
-            body,
-            visible_goal="simtrir b d e c e g",
-            plan=dossier,
-        )
-
-        self.assertTrue(writer_ok, writer_message)
-        self.assertIn("ratio bd to be equals ratio ce to cg", body)
-        self.assertIn("line de is perpendicular to line eg", body)
-        self.assertIn("angle ab/bc equals angle bc/bd", body)
+        self.assertFalse(ok)
+        self.assertIn("unsupported angle/ratio/similar segments", message)
 
     def test_build_scripted_dossier_writer_body_grounds_real_contrir_transfer_goal_closure(self):
         record = self._load_quality_review_record(5)
@@ -1043,6 +1109,30 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertIn("triangles bdj and jfb are congruent", body)
         self.assertIn("j equals i", body)
         self.assertIn("triangles bdi and ifb are congruent", body)
+
+    def test_build_scripted_dossier_writer_body_mentions_cyclic_support_for_real_contri_sample(self):
+        record = self._load_quality_review_record(4)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+        ok, message, dossier = build_scripted_dossier_skeleton(
+            record,
+            aux_part,
+            sanitized_rest,
+            record["point_coords_grid"],
+            "contri b c f f e b",
+        )
+        self.assertTrue(ok, message)
+
+        body = build_scripted_dossier_writer_body(dossier)
+        writer_ok, writer_message = validate_dossier_writer_body(
+            body,
+            visible_goal="contri b c f f e b",
+            plan=dossier,
+        )
+
+        self.assertTrue(writer_ok, writer_message)
+        self.assertIn("b, c, d, e are concyclic", body)
+        self.assertIn("angle be/bf equals angle cf/bf", body)
+        self.assertIn("triangles bcf and feb are congruent", body)
 
     def test_build_scripted_dossier_writer_body_grounds_real_late_fact_simtrir_goal_closure(self):
         record = self._load_quality_review_record(9)
@@ -1122,7 +1212,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             ]
             if relation in body
         ]
-        self.assertEqual(len(coordinate_mentions), 1)
+        self.assertEqual(len(coordinate_mentions), 0)
 
     def test_process_and_generate_sft_runs_offline_dossier_pipeline(self):
         record = {
