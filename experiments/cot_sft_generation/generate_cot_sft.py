@@ -4045,6 +4045,13 @@ def build_scripted_dossier_skeleton(
     min_prefix_count = 1 if base_bridge_steps and extract_aux_new_points(aux_part or "") else 0
     keep_prefix_count = max(min_prefix_count, keep_prefix_count)
     keep_prefix_count = min(len(base_bridge_steps), keep_prefix_count)
+    if (
+        goal_tail_mentions_aux
+        and tail_relations_for_chain == goal_tail_relations
+        and len(tail_relations_for_chain) >= 3
+        and "similar" in relation_text_keywords(tail_relations_for_chain[0])
+    ):
+        keep_prefix_count = 0
     selected_bridge_specs = [
         {
             "relation": step.get("relation", ""),

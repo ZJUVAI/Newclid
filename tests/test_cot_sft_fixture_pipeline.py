@@ -365,8 +365,14 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertTrue(ok, message)
         self.assertGreaterEqual(len(dossier["coordinate_checks"]), 1)
         bridge_claims = [step["claim"] for step in dossier["bridge_chain"]]
-        self.assertIn("triangles bch and cfh are similar", bridge_claims)
-        self.assertIn("ratio bh to ch equals ratio ch to fh", bridge_claims)
+        self.assertEqual(
+            bridge_claims,
+            [
+                "triangles bch and cfh are similar",
+                "ratio bh to ch equals ratio ch to fh",
+                "ratio bd to be equals ratio ce to cg",
+            ],
+        )
         self.assertEqual(dossier["goal_closure"][-1]["claim"], "triangles bde and ceg are similar")
 
     def test_build_scripted_dossier_skeleton_preserves_goal_side_tail_steps_for_real_eqangle_sample(self):
@@ -393,6 +399,29 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             ],
         )
         self.assertEqual(dossier["goal_closure"][-1]["claim"], "angle ab/ac equals angle ad/ae")
+
+    def test_build_scripted_dossier_skeleton_prefers_tail_only_route_for_real_simtri_sample(self):
+        record = self._load_quality_review_record(3)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+
+        ok, message, dossier = build_scripted_dossier_skeleton(
+            record,
+            aux_part,
+            sanitized_rest,
+            record["point_coords_grid"],
+            "simtri a c g f a g",
+        )
+
+        self.assertTrue(ok, message)
+        self.assertEqual(
+            [step["claim"] for step in dossier["bridge_chain"]],
+            [
+                "triangles afh and ehg are similar",
+                "ratio af to ah equals ratio eh to eg",
+                "ratio ac to af equals ratio cg to ag",
+            ],
+        )
+        self.assertEqual(dossier["goal_closure"][-1]["claim"], "triangles acg and fag are similar")
 
     def test_generate_dossier_thinking_plan_only_falls_back_to_scripted_skeleton(self):
         record = self._load_quality_review_record(3)
