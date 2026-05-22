@@ -4094,12 +4094,107 @@ def relation_has_tautological_ratio_side(relation):
     return left_num == left_den or right_num == right_den
 
 
+def triangle_relation_family(relation):
+    normalized_relation = normalize_relation_surface(relation or "").strip().lower()
+    if not normalized_relation:
+        return ""
+    for pattern in [
+        r"\btriangles?\s+[a-z]{3}\s+and\s+[a-z]{3}\s+are\s+(similar|congruent)\b",
+        r"\btriangle\s+[a-z]{3}\s+is\s+(similar|congruent)\s+to\s+triangle\s+[a-z]{3}\b",
+    ]:
+        match = re.search(pattern, normalized_relation)
+        if match:
+            return match.group(1)
+    return ""
+
+
+def relation_is_transfer_style_equality(relation):
+    normalized_relation = normalize_relation_surface(relation or "").strip()
+    if not normalized_relation:
+        return False
+    if triangle_relation_family(normalized_relation):
+        return False
+    keywords = relation_text_keywords(normalized_relation)
+    if "equal" not in keywords or keywords & {"angle", "similar", "circle", "parallel", "perpendicular"}:
+        return False
+    mentioned_points = {
+        token.lower()
+        for token in re.findall(r"\b([a-z])\b", normalized_relation.lower())
+    }
+    return len(mentioned_points) <= 3
+
+
+def find_triangle_transfer_checkpoint(
+    ordered_route_relations,
+    goal_finish,
+    transfer_relation,
+    known_points,
+):
+    normalized_goal_finish = normalize_relation_surface(goal_finish or "").strip()
+    normalized_transfer_relation = normalize_relation_surface(transfer_relation or "").strip()
+    goal_triangle_family = triangle_relation_family(normalized_goal_finish)
+    goal_segments = extract_relation_segment_tokens(normalized_goal_finish)
+    goal_points = extract_point_mentions(normalized_goal_finish, known_points)
+    transfer_points = extract_point_mentions(normalized_transfer_relation, known_points)
+    transfer_only_points = transfer_points - goal_points
+    if (
+        not normalized_goal_finish
+        or not normalized_transfer_relation
+        or not goal_triangle_family
+        or len(goal_segments) < 2
+    ):
+        return ""
+
+    transfer_index = None
+    for idx, route_relation in enumerate(ordered_route_relations or []):
+        if relations_semantically_match(route_relation, normalized_transfer_relation, known_points):
+            transfer_index = idx
+            break
+    if transfer_index is None:
+        transfer_index = len(ordered_route_relations or [])
+
+    best_relation = ""
+    best_key = None
+    for route_relation in reversed((ordered_route_relations or [])[:transfer_index]):
+        normalized_route_relation = normalize_relation_surface(route_relation).strip()
+        route_triangle_family = triangle_relation_family(normalized_route_relation)
+        if route_triangle_family != goal_triangle_family:
+            continue
+        route_segments = extract_relation_segment_tokens(normalized_route_relation)
+        route_points = extract_point_mentions(normalized_route_relation, known_points)
+        segment_overlap = len(route_segments & goal_segments)
+        point_overlap = len(route_points & goal_points)
+        if segment_overlap < 2 and point_overlap < max(3, len(goal_points) - 1):
+            continue
+        transfer_overlap = len(route_points & transfer_points)
+        transfer_only_overlap = len(route_points & transfer_only_points)
+        key = (
+            1 if transfer_only_overlap else 0,
+            transfer_overlap,
+            segment_overlap,
+            point_overlap,
+            -len(route_points - goal_points - transfer_points),
+            -len(normalized_route_relation),
+            normalized_route_relation.lower(),
+        )
+        if best_key is None or key > best_key:
+            best_key = key
+            best_relation = normalized_route_relation
+    return best_relation
+
+
 def build_dossier_goal_tail_relations(
     proof_guidance,
     goal_finish,
     known_points,
 ):
     normalized_goal_finish = normalize_relation_surface(goal_finish or "").strip()
+    goal_triangle_family = triangle_relation_family(normalized_goal_finish)
+    ordered_route_relations = [
+        normalize_relation_surface(relation).strip()
+        for relation in (proof_guidance or {}).get("ordered_route_relations", [])
+        if isinstance(relation, str) and relation.strip()
+    ]
     goal_tail_relations = []
     for relation in (proof_guidance or {}).get("goal_finish_relations", []) or []:
         if not isinstance(relation, str) or not relation.strip():
@@ -4117,11 +4212,6 @@ def build_dossier_goal_tail_relations(
         and "ratio" in relation_text_keywords(goal_tail_relations[0])
         and relation_has_tautological_ratio_side(goal_tail_relations[0])
     ):
-        ordered_route_relations = [
-            normalize_relation_surface(relation).strip()
-            for relation in (proof_guidance or {}).get("ordered_route_relations", [])
-            if isinstance(relation, str) and relation.strip()
-        ]
         for route_index, route_relation in enumerate(ordered_route_relations):
             if not relations_semantically_match(route_relation, goal_tail_relations[0], known_points):
                 continue
@@ -4134,6 +4224,30 @@ def build_dossier_goal_tail_relations(
                 goal_tail_relations = [prerequisite_relation] + goal_tail_relations[1:]
                 break
             break
+
+    if (
+        goal_triangle_family
+        and goal_tail_relations
+        and not any(
+            triangle_relation_family(relation)
+            for relation in goal_tail_relations
+        )
+    ):
+        transfer_relations = [
+            relation
+            for relation in goal_tail_relations
+            if relation_is_transfer_style_equality(relation)
+        ]
+        if transfer_relations:
+            transfer_relation = transfer_relations[-1]
+            checkpoint_relation = find_triangle_transfer_checkpoint(
+                ordered_route_relations,
+                normalized_goal_finish,
+                transfer_relation,
+                known_points,
+            )
+            if checkpoint_relation:
+                goal_tail_relations = [checkpoint_relation, transfer_relation]
     return goal_tail_relations
 
 

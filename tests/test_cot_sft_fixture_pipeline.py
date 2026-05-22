@@ -5,6 +5,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from experiments.cot_sft_generation.generate_cot_sft import (
+    build_dossier_goal_tail_relations,
+    build_hidden_proof_guidance,
     build_scripted_dossier_writer_body,
     build_scripted_dossier_skeleton,
     generate_dossier_thinking,
@@ -447,6 +449,29 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         )
         self.assertEqual(dossier["goal_closure"][-1]["claim"], "triangles bde and ceg are similar")
 
+    def test_build_dossier_goal_tail_relations_prefers_transfer_checkpoint_for_real_contrir_sample(self):
+        record = self._load_quality_review_record(5)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+        proof_guidance = build_hidden_proof_guidance(
+            sanitized_rest,
+            aux_part,
+            "contrir b d i i f b",
+        )
+
+        goal_tail_relations = build_dossier_goal_tail_relations(
+            proof_guidance,
+            "triangles bdi and ifb are congruent",
+            list(record["point_coords_grid"]) + ["j"],
+        )
+
+        self.assertEqual(
+            goal_tail_relations,
+            [
+                "triangles bdj and jfb are congruent",
+                "j equals i",
+            ],
+        )
+
     def test_build_scripted_dossier_skeleton_keeps_aux_reconnect_for_real_contrir_transfer_sample(self):
         record = self._load_quality_review_record(5)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
@@ -460,7 +485,21 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         )
 
         self.assertTrue(ok, message)
-        self.assertEqual(dossier["bridge_chain"][0]["claim"], "cf equals cj")
+        bridge_claims = [step["claim"] for step in dossier["bridge_chain"]]
+        self.assertEqual(bridge_claims[0], "cf equals cj")
+        self.assertEqual(
+            bridge_claims[-2:],
+            [
+                "triangles bdj and jfb are congruent",
+                "j equals i",
+            ],
+        )
+        self.assertIn("df equals dj", bridge_claims)
+        self.assertIn("bf equals dj", bridge_claims)
+        self.assertIn(
+            "triangles bdj and jfb are congruent",
+            dossier["goal_closure"][-1]["resolved_supports"],
+        )
         self.assertEqual(dossier["goal_closure"][-1]["claim"], "triangles bdi and ifb are congruent")
 
     def test_build_scripted_dossier_skeleton_accepts_real_late_fact_simtrir_benchmark_sample(self):
@@ -1001,6 +1040,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
 
         self.assertTrue(writer_ok, writer_message)
         self.assertIn("cf equals cj", body)
+        self.assertIn("triangles bdj and jfb are congruent", body)
         self.assertIn("j equals i", body)
         self.assertIn("triangles bdi and ifb are congruent", body)
 
