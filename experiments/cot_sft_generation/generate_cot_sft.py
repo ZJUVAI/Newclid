@@ -1944,13 +1944,11 @@ def high_level_step_lacks_symbolic_directional_coverage(
     return not claim_segments.issubset(symbolic_directional_segments)
 
 
-def similar_step_with_aux_lacks_local_correspondence_support(
+def similar_step_lacks_local_correspondence_support(
     step,
     support_relations,
     point_names,
-    aux_points,
     support_refs=None,
-    require_aux_point=True,
 ):
     if not isinstance(step, dict):
         return False
@@ -1961,14 +1959,6 @@ def similar_step_with_aux_lacks_local_correspondence_support(
         return False
 
     claim_points = extract_point_mentions(relation_text, point_names)
-    aux_point_set = {
-        str(point).lower()
-        for point in (aux_points or [])
-        if isinstance(point, str) and point.strip()
-    }
-    if require_aux_point and not (claim_points & aux_point_set):
-        return False
-
     claim_segments = extract_relation_segment_tokens(relation_text)
     if len(claim_segments) < 4:
         return False
@@ -5212,16 +5202,14 @@ def build_scripted_dossier_skeleton(
             support_refs=support_refs,
         ):
             continue
-        if similar_step_with_aux_lacks_local_correspondence_support(
+        if similar_step_lacks_local_correspondence_support(
             {
                 "relation": step.get("relation", ""),
                 "approved_route_relation": step.get("relation", ""),
             },
             resolved_support_relations,
             known_points,
-            aux_points,
             support_refs=support_refs,
-            require_aux_point=True,
         ):
             continue
         if ratio_step_lacks_pairwise_support(
@@ -6238,13 +6226,11 @@ def validate_dossier_plan_response(
                     f"{field_name}[{idx}].claim is missing symbolic directional coverage "
                     "for the needed goal-side rays or segments"
                 ), None
-            if similar_step_with_aux_lacks_local_correspondence_support(
+            if similar_step_lacks_local_correspondence_support(
                 step_contract,
                 resolved_supports,
                 known_points,
-                aux_points,
                 support_refs=supports,
-                require_aux_point=(field_name != "goal_closure"),
             ):
                 return False, (
                     f"{field_name}[{idx}].claim is missing local correspondence support "

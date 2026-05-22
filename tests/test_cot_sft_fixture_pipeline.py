@@ -11,6 +11,7 @@ from experiments.cot_sft_generation.generate_cot_sft import (
     build_scripted_dossier_skeleton,
     generate_dossier_thinking,
     process_and_generate_sft,
+    similar_step_lacks_local_correspondence_support,
     validate_dossier_plan_response,
     validate_dossier_writer_body,
 )
@@ -223,6 +224,68 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         ]
         return records[index]
 
+    def _build_clean_scripted_fallback_fixture(self):
+        record = {
+            "nl_problem": "Observe the diagram and justify the target relation.",
+            "llm_input_renamed": (
+                "<problem>g1: cong a d b c [001]; g2: midp g b e [002] ? cong a d b c</problem>"
+            ),
+            "llm_output_renamed": "<aux> x00 h : midp h a d [008] ; </aux>",
+            "point_coords_grid": {
+                "a": [134, 196],
+                "b": [226, 184],
+                "c": [217, 115],
+                "d": [124, 128],
+                "e": [187, 144],
+                "f": [247, 146],
+                "g": [206, 164],
+            },
+        }
+        aux_part = "<aux> x00 h : midp h a d [008] ; </aux>"
+        sanitized_rest = ""
+        dossier = {
+            "visible_facts": ["ad equals bc", "g is the midpoint of be"],
+            "image_scan": [
+                "points a, c, and e lie on a straight line",
+                "lines ae and cf intersect at right angles",
+            ],
+            "goal_obstacle": "the target ratio still needs one helper link back to the visible figure.",
+            "aux_motivation": "a midpoint helper can create one local balance first and then reconnect it to the old figure.",
+            "construction": "construct point h as the midpoint of ad.",
+            "aux_immediate_effects": [
+                "ah equals dh",
+                "h lies on the line segment ad",
+            ],
+            "bridge_chain": [
+                {
+                    "claim": "ah equals dh",
+                    "supports": ["aux_immediate_effects[0]"],
+                    "why_next": "this states the first local balance from the midpoint construction.",
+                },
+                {
+                    "claim": "dh equals ah",
+                    "supports": ["bridge_chain[0]"],
+                    "why_next": "this keeps the same helper equality available when we return to the visible target.",
+                },
+            ],
+            "goal_closure": [
+                {
+                    "claim": "ad equals bc",
+                    "supports": ["visible_facts[0]", "bridge_chain[0]"],
+                    "why_next": "this is the target equality relation.",
+                }
+            ],
+        }
+
+        ok, message, cleaned = validate_dossier_plan_response(
+            dossier,
+            point_coords=record["point_coords_grid"],
+            visible_goal="cong a d b c",
+            aux_part=aux_part,
+        )
+        self.assertTrue(ok, message)
+        return record, aux_part, sanitized_rest, cleaned
+
     def test_validate_dossier_plan_response_accepts_zero_based_supports_and_canonicalizes_aux(self):
         dossier = {
             "visible_facts": ["ad equals bc", "g is the midpoint of be"],
@@ -339,6 +402,26 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             "unsupported angle/ratio/similar segments" in message
             or "bridge_chain must not be empty" in message
         )
+
+    def test_similar_step_local_correspondence_gate_rejects_nonaux_similarity_bridge(self):
+        step = {
+            "relation": "triangles bce and dbe are similar",
+            "approved_route_relation": "triangles bce and dbe are similar",
+        }
+        support_relations = [
+            "c, d, e are collinear",
+            "ac equals bd",
+            "segments ac and be look parallel",
+            "angle ab/ad equals angle bd/ab",
+        ]
+
+        lacks_support = similar_step_lacks_local_correspondence_support(
+            step,
+            support_relations,
+            ["a", "b", "c", "d", "e", "f", "g"],
+        )
+
+        self.assertTrue(lacks_support)
 
     def test_validate_dossier_plan_response_rejects_angle_bridge_without_directional_relay(self):
         dossier = {
@@ -570,7 +653,10 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         )
 
         self.assertFalse(ok)
-        self.assertIn("missing local correspondence support", message)
+        self.assertTrue(
+            "missing local correspondence support" in message
+            or "missing local pairwise support" in message
+        )
         self.assertIsNone(dossier)
 
     def test_build_scripted_dossier_skeleton_rejects_real_eqratio_benchmark_sample_with_ungrounded_ratio_closure(self):
@@ -676,7 +762,10 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         )
 
         self.assertFalse(ok)
-        self.assertIn("missing local correspondence support", message)
+        self.assertTrue(
+            "missing local correspondence support" in message
+            or "missing local pairwise support" in message
+        )
         self.assertIsNone(dossier)
 
     def test_build_scripted_dossier_skeleton_rejects_real_contrir_benchmark_sample_with_ungrounded_equality_transfer(self):
@@ -725,12 +814,33 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         )
 
         self.assertFalse(ok)
-        self.assertIn("missing local correspondence support", message)
+        self.assertTrue(
+            "missing local correspondence support" in message
+            or "missing local pairwise support" in message
+        )
+        self.assertIsNone(dossier)
+
+    def test_build_scripted_dossier_skeleton_rejects_real_eqratio_benchmark_sample_with_ungrounded_similarity_bridge(self):
+        record = self._load_quality_review_record(6)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+
+        ok, message, dossier = build_scripted_dossier_skeleton(
+            record,
+            aux_part,
+            sanitized_rest,
+            record["point_coords_grid"],
+            "eqratio b e c e d e b e",
+        )
+
+        self.assertFalse(ok)
+        self.assertTrue(
+            "missing local correspondence support" in message
+            or "missing local pairwise support" in message
+        )
         self.assertIsNone(dossier)
 
     def test_generate_dossier_thinking_plan_only_falls_back_to_scripted_skeleton(self):
-        record = self._load_quality_review_record(6)
-        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+        record, aux_part, sanitized_rest, scripted_dossier = self._build_clean_scripted_fallback_fixture()
 
         with tempfile.TemporaryDirectory() as temp_dir:
             image_path = Path(temp_dir) / "fixture.png"
@@ -739,6 +849,9 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             with patch(
                 "experiments.cot_sft_generation.generate_cot_sft.call_model",
                 side_effect=["not a json plan"],
+            ), patch(
+                "experiments.cot_sft_generation.generate_cot_sft.build_scripted_dossier_skeleton",
+                return_value=(True, "Valid dossier", scripted_dossier),
             ):
                 result = generate_dossier_thinking(
                     record=record,
@@ -754,18 +867,11 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertTrue(result["success"])
         self.assertEqual(result["generation_style"], "dossier_v1")
         self.assertIsNotNone(result["plan_parsed"])
-        self.assertEqual(result["plan_parsed"]["goal_closure"][-1]["claim"], "ratio be to ce equals ratio de to be")
+        self.assertEqual(result["plan_parsed"]["goal_closure"][-1]["claim"], "ad equals bc")
 
     def test_generate_dossier_thinking_scripted_fallback_skips_critic_in_full_generation(self):
-        record = self._load_quality_review_record(6)
-        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
-        writer_output = (
-            "The target ratio around b, e, c, e, d, e, and b, e still lacks a concrete bridge between the needed segment comparisons. "
-            "Construct point f such that ac equals bf and af equals bf, then construct point g such that line cf is parallel to line dg and a, d, f, g are concyclic. "
-            "This immediately gives ac equals bf and af equals bf. "
-            "Because c, d, e are collinear and ac equals bd, triangles bce and dbe are similar. "
-            "Therefore ratio be to ce equals ratio de to be."
-        )
+        record, aux_part, sanitized_rest, scripted_dossier = self._build_clean_scripted_fallback_fixture()
+        writer_output = build_scripted_dossier_writer_body(scripted_dossier)
 
         with tempfile.TemporaryDirectory() as temp_dir:
             image_path = Path(temp_dir) / "fixture.png"
@@ -775,6 +881,9 @@ class CotSftFixturePipelineTest(unittest.TestCase):
                 "experiments.cot_sft_generation.generate_cot_sft.call_model",
                 side_effect=["not a json plan"],
             ) as call_model_mock, patch(
+                "experiments.cot_sft_generation.generate_cot_sft.build_scripted_dossier_skeleton",
+                return_value=(True, "Valid dossier", scripted_dossier),
+            ), patch(
                 "experiments.cot_sft_generation.generate_cot_sft.run_plan_critic_stage",
             ) as critic_mock, patch(
                 "experiments.cot_sft_generation.generate_cot_sft.run_writer_stage",
@@ -803,7 +912,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertEqual(call_model_mock.call_count, 1)
         critic_mock.assert_not_called()
         writer_mock.assert_called_once()
-        self.assertIn("ratio be to ce equals ratio de to be", result["thinking"])
+        self.assertIn("Finally, because ah equals dh, ad equals bc.", result["thinking"])
 
     def test_generate_dossier_thinking_fails_closed_when_scripted_eqratio_fallback_is_invalid_after_writer_failure(self):
         record = self._load_quality_review_record(0)
@@ -880,16 +989,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertIn("missing local pairwise support", result["error"])
 
     def test_generate_dossier_thinking_falls_back_to_scripted_skeleton_after_critic_rejection(self):
-        record = self._load_quality_review_record(6)
-        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
-        ok, message, dossier = build_scripted_dossier_skeleton(
-            record,
-            aux_part,
-            sanitized_rest,
-            record["point_coords_grid"],
-            "eqratio b e c e d e b e",
-        )
-        self.assertTrue(ok, message)
+        record, aux_part, sanitized_rest, scripted_dossier = self._build_clean_scripted_fallback_fixture()
 
         with tempfile.TemporaryDirectory() as temp_dir:
             image_path = Path(temp_dir) / "fixture.png"
@@ -898,9 +998,12 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             with patch(
                 "experiments.cot_sft_generation.generate_cot_sft.call_model",
                 side_effect=[
-                    json.dumps(dossier),
+                    json.dumps(scripted_dossier),
                     json.dumps(DOSSIER_CRITIC_REJECTION_OUTPUT),
                 ],
+            ), patch(
+                "experiments.cot_sft_generation.generate_cot_sft.build_scripted_dossier_skeleton",
+                return_value=(True, "Valid dossier", scripted_dossier),
             ), patch(
                 "experiments.cot_sft_generation.generate_cot_sft.run_writer_stage",
                 return_value={
@@ -925,19 +1028,10 @@ class CotSftFixturePipelineTest(unittest.TestCase):
                 )
 
         self.assertTrue(result["success"])
-        self.assertIn("ratio be to ce equals ratio de to be", result["thinking"])
+        self.assertIn("Finally, because ah equals dh, ad equals bc.", result["thinking"])
 
     def test_generate_dossier_thinking_falls_back_to_scripted_plan_after_live_plan_rejection(self):
-        record = self._load_quality_review_record(6)
-        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
-        ok, message, scripted_dossier = build_scripted_dossier_skeleton(
-            record,
-            aux_part,
-            sanitized_rest,
-            record["point_coords_grid"],
-            "eqratio b e c e d e b e",
-        )
-        self.assertTrue(ok, message)
+        record, aux_part, sanitized_rest, scripted_dossier = self._build_clean_scripted_fallback_fixture()
 
         captured_bridge_chain = []
 
@@ -962,6 +1056,9 @@ class CotSftFixturePipelineTest(unittest.TestCase):
                     json.dumps(DOSSIER_CRITIC_REJECTION_OUTPUT),
                 ],
             ), patch(
+                "experiments.cot_sft_generation.generate_cot_sft.build_scripted_dossier_skeleton",
+                return_value=(True, "Valid dossier", scripted_dossier),
+            ), patch(
                 "experiments.cot_sft_generation.generate_cot_sft.run_writer_stage",
                 side_effect=fake_run_writer_stage,
             ), patch(
@@ -985,7 +1082,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             [step["claim"] for step in result["plan_parsed"]["bridge_chain"]],
             expected_bridge_chain,
         )
-        self.assertIn("triangles bce and dbe are similar", result["thinking"])
+        self.assertIn("Because ah equals dh, dh equals ah.", result["thinking"])
         self.assertNotIn("angle af/df equals angle df/cd", result["thinking"])
 
     def test_generate_dossier_thinking_eqratio_fails_closed_when_scripted_fallback_is_invalid_and_live_writer_is_weaker(self):
@@ -1037,12 +1134,11 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertIn("missing local pairwise support", result["error"])
 
     def test_generate_dossier_thinking_scripted_fallback_prefers_scripted_writer_when_plan_grounding_is_stronger(self):
-        record = self._load_quality_review_record(6)
-        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+        record, aux_part, sanitized_rest, scripted_dossier = self._build_clean_scripted_fallback_fixture()
         live_writer_body = (
-            "The target ratio around BE, CE, DE, and BE still lacks a clear bridge. "
-            "Construct points F and G to help with the comparison. "
-            "This creates a helper frame and should facilitate the ratio proof by bridging the necessary correspondences."
+            "The target equality around AD and BC still lacks a clear bridge. "
+            "Construct point H to help with the comparison. "
+            "This creates a helper frame and should facilitate the final congruence without spelling out the actual route."
         )
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1052,6 +1148,9 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             with patch(
                 "experiments.cot_sft_generation.generate_cot_sft.call_model",
                 side_effect=["not a json plan"],
+            ), patch(
+                "experiments.cot_sft_generation.generate_cot_sft.build_scripted_dossier_skeleton",
+                return_value=(True, "Valid dossier", scripted_dossier),
             ), patch(
                 "experiments.cot_sft_generation.generate_cot_sft.run_writer_stage",
                 return_value={
@@ -1076,9 +1175,9 @@ class CotSftFixturePipelineTest(unittest.TestCase):
                 )
 
         self.assertTrue(result["success"])
-        self.assertIn("This immediately gives ac equals bf and af equals bf", result["thinking"])
-        self.assertIn("triangles bce and dbe are similar", result["thinking"])
-        self.assertNotIn("facilitate the ratio proof", result["thinking"])
+        self.assertIn("This immediately gives ah equals dh and a, d, h are collinear.", result["thinking"])
+        self.assertIn("Finally, because ah equals dh, ad equals bc.", result["thinking"])
+        self.assertNotIn("facilitate the final congruence", result["thinking"])
 
     def test_build_scripted_dossier_writer_body_rejects_real_eqratio_sample_with_ungrounded_ratio_closure(self):
         record = self._load_quality_review_record(0)
@@ -1182,7 +1281,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("unsupported angle/ratio/similar segments", message)
 
-    def test_build_scripted_dossier_writer_body_prefers_non_coordinate_supports_for_real_eqratio_sample(self):
+    def test_build_scripted_dossier_writer_body_rejects_real_eqratio_sample_with_ungrounded_similarity_bridge(self):
         record = self._load_quality_review_record(6)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
         ok, message, dossier = build_scripted_dossier_skeleton(
@@ -1192,19 +1291,12 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             record["point_coords_grid"],
             "eqratio b e c e d e b e",
         )
-        self.assertTrue(ok, message)
-
-        body = build_scripted_dossier_writer_body(dossier)
-        writer_ok, writer_message = validate_dossier_writer_body(
-            body,
-            visible_goal="eqratio b e c e d e b e",
-            plan=dossier,
+        self.assertFalse(ok)
+        self.assertTrue(
+            "missing local correspondence support" in message
+            or "missing local pairwise support" in message
         )
-
-        self.assertTrue(writer_ok, writer_message)
-        self.assertIn("segments ac and bd look equal in length", body)
-        self.assertIn("triangles bce and dbe are similar", body)
-        self.assertNotIn("c=(12,190)", body)
+        self.assertIsNone(dossier)
 
     def test_process_and_generate_sft_runs_offline_dossier_pipeline(self):
         record = {
