@@ -403,9 +403,23 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertTrue(ok, message)
         self.assertGreaterEqual(len(dossier["coordinate_checks"]), 1)
         bridge_claims = [step["claim"] for step in dossier["bridge_chain"]]
-        self.assertIn("ratio ah to dh equals ratio eg to bg", bridge_claims)
-        self.assertIn("ratio ad to ah equals ratio be to eg", bridge_claims)
-        self.assertNotIn("a, f, g are collinear", bridge_claims)
+        self.assertEqual(
+            bridge_claims,
+            [
+                "angle ab/ah equals angle bg/ac",
+                "ratio ah to dh equals ratio eg to bg",
+                "ratio ad to ah equals ratio be to eg",
+                "line cf is parallel to line eg",
+                "ratio ac to ae equals ratio cf to eg",
+            ],
+        )
+        self.assertCountEqual(
+            dossier["bridge_chain"][3]["resolved_supports"],
+            [
+                "segments be and cf look parallel",
+                "line be is parallel to line eg",
+            ],
+        )
         self.assertEqual(dossier["goal_closure"][-1]["claim"], "ratio ae to bd equals ratio eg to bf")
 
     def test_build_scripted_dossier_skeleton_accepts_real_simtrir_benchmark_sample(self):
@@ -820,6 +834,10 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         )
 
         self.assertTrue(writer_ok, writer_message)
+        self.assertIn("line cf is parallel to line eg", body)
+        self.assertIn("segments be and cf look parallel", body)
+        self.assertIn("line be is parallel to line eg", body)
+        self.assertNotIn("Because line cf is parallel to line eg, line cf is parallel to line eg.", body)
         self.assertIn("ratio ae to bd equals ratio eg to bf", body)
 
     def test_build_scripted_dossier_writer_body_prefers_non_coordinate_supports_for_real_simtri_sample(self):

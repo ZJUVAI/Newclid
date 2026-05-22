@@ -3543,6 +3543,99 @@ def map_support_relations_to_dossier_refs(
     return refs
 
 
+def select_low_level_relay_support_refs(
+    relation_text,
+    support_catalog,
+    point_names,
+    max_supports=2,
+):
+    relation_keywords = relation_text_keywords(relation_text)
+    if max_supports < 2 or not (relation_keywords & {"parallel", "perpendicular"}):
+        return []
+
+    relation_segments = extract_relation_segment_tokens(relation_text)
+    relation_points = extract_point_mentions(relation_text, point_names)
+    if len(relation_segments) < 2:
+        return []
+
+    def ref_source_priority(ref):
+        lowered = str(ref or "").lower()
+        if lowered.startswith("image_scan["):
+            return 3
+        if lowered.startswith("coordinate_checks["):
+            return 2
+        if lowered.startswith("visible_facts["):
+            return 1
+        return 0
+
+    candidates = []
+    for item in support_catalog or []:
+        relation = item.get("relation", "")
+        ref = item.get("ref", "")
+        if not relation or not ref:
+            continue
+        lowered_ref = ref.lower()
+        if lowered_ref.startswith("bridge_chain[") or lowered_ref.startswith("aux_immediate_effects["):
+            continue
+        support_keywords = relation_text_keywords(relation)
+        if not support_keywords & {"parallel", "perpendicular", "collinear"}:
+            continue
+        support_segments = extract_relation_segment_tokens(relation)
+        if not support_segments:
+            continue
+        candidates.append(
+            {
+                "ref": ref,
+                "relation": relation,
+                "keywords": support_keywords,
+                "segments": support_segments,
+                "points": extract_point_mentions(relation, point_names),
+                "source_priority": ref_source_priority(ref),
+            }
+        )
+
+    best_pair = []
+    best_key = None
+    for left_idx, left in enumerate(candidates):
+        for right in candidates[left_idx + 1:]:
+            combined_segments = left["segments"] | right["segments"]
+            covered_claim_segments = len(combined_segments & relation_segments)
+            if covered_claim_segments < len(relation_segments):
+                continue
+            shared_relay_segments = (left["segments"] & right["segments"]) - relation_segments
+            shared_relay_points = (left["points"] & right["points"]) - relation_points
+            if not shared_relay_segments and not shared_relay_points:
+                continue
+            pair = [left, right]
+            pair.sort(
+                key=lambda candidate: (
+                    len(candidate["segments"] & relation_segments),
+                    candidate["source_priority"],
+                    score_support_relation(candidate["relation"], relation_text, point_names),
+                    -len(candidate["relation"]),
+                    candidate["relation"].lower(),
+                ),
+                reverse=True,
+            )
+            key = (
+                covered_claim_segments,
+                len(shared_relay_segments),
+                len(shared_relay_points),
+                sum(candidate["source_priority"] for candidate in pair),
+                sum(
+                    score_support_relation(candidate["relation"], relation_text, point_names)
+                    for candidate in pair
+                ),
+                -sum(len(candidate["relation"]) for candidate in pair),
+                tuple(candidate["relation"].lower() for candidate in pair),
+            )
+            if best_key is None or key > best_key:
+                best_key = key
+                best_pair = pair
+
+    return [candidate["ref"] for candidate in best_pair[:max_supports]]
+
+
 def select_dossier_support_refs_for_relation(
     relation_text,
     support_catalog,
@@ -3561,6 +3654,12 @@ def select_dossier_support_refs_for_relation(
     if len(preferred_refs) >= max_supports:
         return preferred_refs[:max_supports]
 
+    relay_refs = select_low_level_relay_support_refs(
+        relation_text,
+        support_catalog,
+        point_names,
+        max_supports=max_supports,
+    )
     ranked_supports = select_support_relations_for_step(
         relation_text,
         [item.get("relation", "") for item in support_catalog],
@@ -3575,7 +3674,7 @@ def select_dossier_support_refs_for_relation(
         max_supports=max_supports,
     )
     combined = []
-    for ref in preferred_refs + ranked_refs:
+    for ref in preferred_refs + relay_refs + ranked_refs:
         if ref not in combined:
             combined.append(ref)
         if len(combined) >= max_supports:
@@ -4096,6 +4195,40 @@ def score_dossier_plan_goal_tail_route(plan, proof_guidance, visible_goal, known
     )
 
 
+def compose_aux_goal_tail_relations(aux_tail_relations, goal_tail_relations, visible_goal):
+    aux_tail_relations = [
+        relation
+        for relation in (aux_tail_relations or [])
+        if isinstance(relation, str) and relation.strip()
+    ]
+    goal_tail_relations = [
+        relation
+        for relation in (goal_tail_relations or [])
+        if isinstance(relation, str) and relation.strip()
+    ]
+    if not aux_tail_relations:
+        return goal_tail_relations, goal_tail_relations
+    if not goal_tail_relations:
+        return aux_tail_relations, []
+
+    appended_goal_tail_relations = list(goal_tail_relations)
+    goal_predicate = parse_goal_expression(visible_goal or "").get("predicate")
+    if (
+        goal_predicate == "eqratio"
+        and len(appended_goal_tail_relations) >= 2
+        and "collinear" in relation_text_keywords(appended_goal_tail_relations[0])
+    ):
+        appended_goal_tail_relations = appended_goal_tail_relations[-2:]
+
+    combined_tail_relations = list(aux_tail_relations)
+    combined_lower = {relation.lower() for relation in combined_tail_relations}
+    for relation in appended_goal_tail_relations:
+        if relation.lower() not in combined_lower:
+            combined_tail_relations.append(relation)
+            combined_lower.add(relation.lower())
+    return combined_tail_relations, appended_goal_tail_relations
+
+
 def maybe_choose_scripted_dossier_plan(
     record,
     aux_part,
@@ -4233,6 +4366,8 @@ def build_scripted_dossier_skeleton(
         for relation in goal_tail_relations
     )
     tail_relations_for_chain = goal_tail_relations
+    aux_goal_bridge_tail_relations = []
+    appended_goal_tail_relations = goal_tail_relations
     if aux_points and goal_tail_relations and not goal_tail_mentions_aux:
         aux_goal_bridge_tail_relations = build_aux_goal_bridge_tail_relations(
             proof_guidance,
@@ -4242,7 +4377,11 @@ def build_scripted_dossier_skeleton(
             max_items=3,
         )
         if aux_goal_bridge_tail_relations:
-            tail_relations_for_chain = aux_goal_bridge_tail_relations
+            tail_relations_for_chain, appended_goal_tail_relations = compose_aux_goal_tail_relations(
+                aux_goal_bridge_tail_relations,
+                goal_tail_relations,
+                visible_goal,
+            )
 
     base_bridge_steps = [
         step
@@ -4254,6 +4393,25 @@ def build_scripted_dossier_skeleton(
     min_prefix_count = 1 if base_bridge_steps and extract_aux_new_points(aux_part or "") else 0
     keep_prefix_count = max(min_prefix_count, keep_prefix_count)
     keep_prefix_count = min(len(base_bridge_steps), keep_prefix_count)
+    merged_aux_goal_tail = bool(
+        aux_goal_bridge_tail_relations
+        and len(tail_relations_for_chain) > len(aux_goal_bridge_tail_relations)
+    )
+    tail_chain_starts_from_aux = bool(
+        tail_relations_for_chain
+        and any(point in tail_relations_for_chain[0].lower() for point in aux_points)
+    )
+    if (
+        merged_aux_goal_tail
+        and tail_chain_starts_from_aux
+        and appended_goal_tail_relations
+        and count_ordered_relation_matches(
+            tail_relations_for_chain,
+            appended_goal_tail_relations,
+            known_points,
+        ) == len(appended_goal_tail_relations)
+    ):
+        keep_prefix_count = 0
     if (
         goal_tail_mentions_aux
         and tail_relations_for_chain == goal_tail_relations
@@ -4291,7 +4449,9 @@ def build_scripted_dossier_skeleton(
         )
 
     coordinate_check_targets = [normalized_goal_finish]
-    if tail_relations_for_chain:
+    if merged_aux_goal_tail and aux_goal_bridge_tail_relations:
+        coordinate_check_targets.insert(0, aux_goal_bridge_tail_relations[-1])
+    elif tail_relations_for_chain:
         coordinate_check_targets.insert(0, tail_relations_for_chain[-1])
     elif selected_bridge_specs:
         coordinate_check_targets.insert(0, selected_bridge_specs[-1].get("relation", ""))
@@ -4510,12 +4670,15 @@ def build_scripted_dossier_writer_body(plan):
             )
         )
         claim_segments = extract_relation_segment_tokens(claim)
-        complex_claim = bool(relation_text_keywords(claim) & {"angle", "ratio", "similar"})
+        claim_keywords = relation_text_keywords(claim)
+        complex_claim = bool(claim_keywords & {"angle", "ratio", "similar"})
         min_mentions = int(step.get("min_support_mentions") or 1)
         base_target = max(
             min_mentions,
             2 if complex_claim and len(candidates) >= 2 else 1,
         )
+        if claim_keywords & {"parallel", "perpendicular"} and len(candidates) >= 2:
+            base_target = max(base_target, 2)
         target_cap = min(len(candidates), max_items)
 
         def select_next_candidate(remaining, covered_segments):
@@ -4591,6 +4754,9 @@ def build_scripted_dossier_writer_body(plan):
                 candidate
                 for candidate in candidates
                 if relation_matches_coordinate(candidate.get("relation", ""), point_names)
+                and (
+                    extract_relation_segment_tokens(candidate.get("relation", "")) & claim_segments
+                )
                 and candidate.get("relation", "") not in selected_relations
             ]
             if coordinate_candidates:
@@ -4659,10 +4825,13 @@ def build_scripted_dossier_writer_body(plan):
         claim = clean_text(step.get("claim"))
         if not claim:
             continue
+        step_has_coordinate_support = any(
+            str(ref).strip().lower().startswith("coordinate_checks[")
+            for ref in (step.get("supports") or [])
+        )
         force_coordinate = (
             bool(coordinate_relations)
-            and not coordinate_reused
-            and step_idx == len(bridge_steps) - 1
+            and step_has_coordinate_support
         )
         selected_supports = choose_support_texts(
             step,
@@ -4687,10 +4856,13 @@ def build_scripted_dossier_writer_body(plan):
         claim = clean_text(step.get("claim"))
         if not claim:
             continue
+        step_has_coordinate_support = any(
+            str(ref).strip().lower().startswith("coordinate_checks[")
+            for ref in (step.get("supports") or [])
+        )
         force_coordinate = (
             bool(coordinate_relations)
-            and not coordinate_reused
-            and idx == len(goal_steps) - 1
+            and step_has_coordinate_support
         )
         selected_supports = choose_support_texts(
             step,
