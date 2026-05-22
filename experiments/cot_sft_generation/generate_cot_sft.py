@@ -1893,6 +1893,57 @@ def high_level_step_lacks_directional_support(step, support_relations, point_nam
     return not saw_symbolic_directional_support
 
 
+def congruent_step_lacks_noncoordinate_correspondence_support(
+    step,
+    support_relations,
+    point_names,
+    support_refs=None,
+):
+    if not isinstance(step, dict):
+        return False
+    relation_text = step.get("approved_route_relation") or step.get("relation", "")
+    if triangle_relation_family(relation_text) != "congruent":
+        return False
+
+    claim_points = extract_point_mentions(relation_text, point_names)
+    if len(claim_points) < 4:
+        return False
+
+    support_refs = list(support_refs or [])
+    saw_symbolic_correspondence = False
+    saw_noncoordinate_side_or_triangle_support = False
+    for idx, support in enumerate(support_relations or []):
+        if not isinstance(support, str) or not support.strip():
+            continue
+        support_points = extract_point_mentions(support, point_names)
+        if len(claim_points & support_points) < 2:
+            continue
+        support_ref = str(support_refs[idx]).lower() if idx < len(support_refs) else ""
+        if (
+            support_ref.startswith("image_scan[")
+            or support_ref.startswith("coordinate_checks[")
+        ):
+            continue
+        support_keywords = relation_text_keywords(support)
+        support_triangle_family = triangle_relation_family(support)
+        if support_triangle_family in {"similar", "congruent"}:
+            saw_symbolic_correspondence = True
+            saw_noncoordinate_side_or_triangle_support = True
+            continue
+        if "angle" in support_keywords:
+            saw_symbolic_correspondence = True
+            continue
+        if "equal" in support_keywords and not (
+            support_keywords
+            & {"angle", "ratio", "similar", "parallel", "perpendicular", "circle"}
+        ):
+            saw_noncoordinate_side_or_triangle_support = True
+
+    if not saw_symbolic_correspondence:
+        return False
+    return not saw_noncoordinate_side_or_triangle_support
+
+
 def find_skipped_prerequisite_route_checkpoint(
     step,
     previous_route_position,
@@ -4873,6 +4924,16 @@ def build_scripted_dossier_skeleton(
             support_refs=support_refs,
         ):
             continue
+        if congruent_step_lacks_noncoordinate_correspondence_support(
+            {
+                "relation": step.get("relation", ""),
+                "approved_route_relation": step.get("relation", ""),
+            },
+            resolved_support_relations,
+            known_points,
+            support_refs=support_refs,
+        ):
+            continue
         raw_bridge_chain.append(
             {
                 "claim": step.get("relation", ""),
@@ -5848,6 +5909,16 @@ def validate_dossier_plan_response(
                 return False, (
                     f"{field_name}[{idx}].claim relies only on equality or midpoint-style supports "
                     "and is missing a directional relay"
+                ), None
+            if congruent_step_lacks_noncoordinate_correspondence_support(
+                step_contract,
+                resolved_supports,
+                known_points,
+                support_refs=supports,
+            ):
+                return False, (
+                    f"{field_name}[{idx}].claim uses a directional relay but is missing a non-coordinate "
+                    "side or triangle correspondence support"
                 ), None
             min_support_mentions = compute_bridge_step_min_support_mentions(
                 {

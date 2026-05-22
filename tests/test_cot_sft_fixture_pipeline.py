@@ -400,6 +400,79 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("missing a directional relay", message)
 
+    def test_validate_dossier_plan_response_rejects_congruent_closure_with_only_coordinate_side_supports(self):
+        dossier = {
+            "visible_facts": [
+                "b, c, d, e are concyclic",
+                "ab equals cd",
+                "cd equals cf",
+                "ab equals be",
+            ],
+            "image_scan": [
+                "segments bc and ef look parallel",
+            ],
+            "coordinate_checks": [
+                {
+                    "relation": "bc equals ef",
+                    "points": ["b", "c", "e", "f"],
+                    "calc_type": "equal_length",
+                    "why_it_matters": "this would supply one side comparison near the target triangles.",
+                },
+                {
+                    "relation": "be equals cf",
+                    "points": ["b", "e", "c", "f"],
+                    "calc_type": "equal_length",
+                    "why_it_matters": "this would supply another side comparison near the target triangles.",
+                },
+            ],
+            "goal_obstacle": "the target triangle comparison still lacks one grounded correspondence at the goal side.",
+            "aux_motivation": "the helper should create one local direction cue before the final triangle comparison is attempted.",
+            "construction": "construct point g such that ab equals cg and line bc is perpendicular to line cg",
+            "aux_immediate_effects": [
+                "ab equals cg",
+                "line bc is perpendicular to line cg",
+            ],
+            "bridge_chain": [
+                {
+                    "claim": "angle be/bf equals angle cf/bf",
+                    "supports": [
+                        "visible_facts[1]",
+                        "coordinate_checks[2]",
+                        "coordinate_checks[1]",
+                    ],
+                    "why_next": "this would supply one directional relay near the target triangles.",
+                }
+            ],
+            "goal_closure": [
+                {
+                    "claim": "triangles bcf and feb are congruent",
+                    "supports": [
+                        "bridge_chain[1]",
+                        "coordinate_checks[1]",
+                        "coordinate_checks[2]",
+                    ],
+                    "why_next": "this is the target relation.",
+                }
+            ],
+        }
+
+        ok, message, _ = validate_dossier_plan_response(
+            dossier,
+            point_coords={
+                "a": [84, 82],
+                "b": [135, 119],
+                "c": [69, 206],
+                "d": [119, 244],
+                "e": [77, 144],
+                "f": [12, 230],
+            },
+            visible_goal="contri b c f f e b",
+            aux_part="<aux> x00 g : cong a b c g [006] perp b c c g [007] ; </aux>",
+        )
+
+        self.assertFalse(ok)
+        self.assertIn("missing a non-coordinate side or triangle correspondence support", message)
+
     def test_validate_dossier_writer_body_rejects_internal_planning_refs(self):
         ok, message, cleaned = validate_dossier_plan_response(
             DOSSIER_PLAN_OUTPUT,
@@ -502,7 +575,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("unsupported angle/ratio/similar segments", message)
 
-    def test_build_scripted_dossier_skeleton_grounds_real_contri_angle_bridge_with_cyclic_support(self):
+    def test_build_scripted_dossier_skeleton_rejects_real_contri_benchmark_sample_with_coordinate_only_closure(self):
         record = self._load_quality_review_record(4)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
 
@@ -514,15 +587,8 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             "contri b c f f e b",
         )
 
-        self.assertTrue(ok, message)
-        self.assertEqual(
-            [step["claim"] for step in dossier["bridge_chain"]],
-            ["angle be/bf equals angle cf/bf"],
-        )
-        self.assertIn(
-            "b, c, d, e are concyclic",
-            dossier["bridge_chain"][0]["resolved_supports"],
-        )
+        self.assertFalse(ok)
+        self.assertIn("missing a non-coordinate side or triangle correspondence support", message)
 
     def test_build_dossier_goal_tail_relations_prefers_transfer_checkpoint_for_real_contrir_sample(self):
         record = self._load_quality_review_record(5)
@@ -1110,7 +1176,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertIn("j equals i", body)
         self.assertIn("triangles bdi and ifb are congruent", body)
 
-    def test_build_scripted_dossier_writer_body_mentions_cyclic_support_for_real_contri_sample(self):
+    def test_build_scripted_dossier_writer_body_rejects_real_contri_sample_with_coordinate_only_closure(self):
         record = self._load_quality_review_record(4)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
         ok, message, dossier = build_scripted_dossier_skeleton(
@@ -1120,19 +1186,8 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             record["point_coords_grid"],
             "contri b c f f e b",
         )
-        self.assertTrue(ok, message)
-
-        body = build_scripted_dossier_writer_body(dossier)
-        writer_ok, writer_message = validate_dossier_writer_body(
-            body,
-            visible_goal="contri b c f f e b",
-            plan=dossier,
-        )
-
-        self.assertTrue(writer_ok, writer_message)
-        self.assertIn("b, c, d, e are concyclic", body)
-        self.assertIn("angle be/bf equals angle cf/bf", body)
-        self.assertIn("triangles bcf and feb are congruent", body)
+        self.assertFalse(ok)
+        self.assertIn("missing a non-coordinate side or triangle correspondence support", message)
 
     def test_build_scripted_dossier_writer_body_grounds_real_late_fact_simtrir_goal_closure(self):
         record = self._load_quality_review_record(9)
