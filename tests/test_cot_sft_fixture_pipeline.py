@@ -840,6 +840,55 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertNotIn("Because line cf is parallel to line eg, line cf is parallel to line eg.", body)
         self.assertIn("ratio ae to bd equals ratio eg to bf", body)
 
+    def test_build_scripted_dossier_writer_body_grounds_real_eqangle_goal_closure(self):
+        record = self._load_quality_review_record(1)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+        ok, message, dossier = build_scripted_dossier_skeleton(
+            record,
+            aux_part,
+            sanitized_rest,
+            record["point_coords_grid"],
+            "eqangle a b a c a d a e",
+        )
+        self.assertTrue(ok, message)
+
+        body = build_scripted_dossier_writer_body(dossier)
+        writer_ok, writer_message = validate_dossier_writer_body(
+            body,
+            visible_goal="eqangle a b a c a d a e",
+            plan=dossier,
+        )
+
+        self.assertTrue(writer_ok, writer_message)
+        self.assertIn("ad equals ae", body)
+        self.assertIn("angle ab/bc equals angle bc/ac", body)
+        self.assertIn("angle ab/bc equals angle bc/be", body)
+        self.assertNotIn("Because ad equals ae, ad equals ae.", body)
+
+    def test_build_scripted_dossier_writer_body_grounds_real_simtrir_goal_closure(self):
+        record = self._load_quality_review_record(2)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+        ok, message, dossier = build_scripted_dossier_skeleton(
+            record,
+            aux_part,
+            sanitized_rest,
+            record["point_coords_grid"],
+            "simtrir b d e c e g",
+        )
+        self.assertTrue(ok, message)
+
+        body = build_scripted_dossier_writer_body(dossier)
+        writer_ok, writer_message = validate_dossier_writer_body(
+            body,
+            visible_goal="simtrir b d e c e g",
+            plan=dossier,
+        )
+
+        self.assertTrue(writer_ok, writer_message)
+        self.assertIn("ratio bd to be equals ratio ce to cg", body)
+        self.assertIn("line de is perpendicular to line eg", body)
+        self.assertIn("angle ab/bc equals angle bc/bd", body)
+
     def test_build_scripted_dossier_writer_body_prefers_non_coordinate_supports_for_real_simtri_sample(self):
         record = self._load_quality_review_record(3)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)

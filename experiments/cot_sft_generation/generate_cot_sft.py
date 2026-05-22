@@ -4431,6 +4431,15 @@ def build_scripted_dossier_skeleton(
     remaining_slots = max(0, max_bridge_steps - len(selected_bridge_specs))
     tail_relations_to_add = tail_relations_for_chain[-remaining_slots:] if remaining_slots else []
     for idx, relation in enumerate(tail_relations_to_add):
+        if any(
+            relations_semantically_match(
+                relation,
+                candidate.get("relation", ""),
+                known_points,
+            )
+            for candidate in selected_bridge_specs
+        ):
+            continue
         next_relation = (
             tail_relations_to_add[idx + 1]
             if idx + 1 < len(tail_relations_to_add)
@@ -4601,7 +4610,7 @@ def build_scripted_dossier_writer_body(plan):
                 return True
         return False
 
-    def choose_support_texts(step, max_items=3, force_coordinate=False):
+    def choose_support_texts(step, max_items=3, force_coordinate=False, goal_step=False):
         claim = clean_text(step.get("claim"))
         required = [
             clean_text(relation)
@@ -4669,6 +4678,17 @@ def build_scripted_dossier_writer_body(plan):
                 + [candidate.get("relation", "") for candidate in candidates]
             )
         )
+        non_tautological_candidates = [
+            candidate
+            for candidate in candidates
+            if not relations_semantically_match(
+                candidate.get("relation", ""),
+                claim,
+                point_names,
+            )
+        ]
+        fallback_candidates = candidates
+        candidates = non_tautological_candidates or candidates
         claim_segments = extract_relation_segment_tokens(claim)
         claim_keywords = relation_text_keywords(claim)
         complex_claim = bool(claim_keywords & {"angle", "ratio", "similar"})
@@ -4677,6 +4697,8 @@ def build_scripted_dossier_writer_body(plan):
             min_mentions,
             2 if complex_claim and len(candidates) >= 2 else 1,
         )
+        if goal_step and claim_keywords & {"angle", "similar"} and len(candidates) >= 3:
+            base_target = max(base_target, 3)
         if claim_keywords & {"parallel", "perpendicular"} and len(candidates) >= 2:
             base_target = max(base_target, 2)
         target_cap = min(len(candidates), max_items)
@@ -4781,6 +4803,9 @@ def build_scripted_dossier_writer_body(plan):
                     if replace_idx is not None:
                         selected_relations[replace_idx] = coordinate_candidates[0].get("relation", "")
 
+        if not selected_relations and fallback_candidates:
+            selected_relations.append(fallback_candidates[0].get("relation", ""))
+
         return selected_relations
 
     def make_support_clause(relations):
@@ -4866,7 +4891,9 @@ def build_scripted_dossier_writer_body(plan):
         )
         selected_supports = choose_support_texts(
             step,
+            max_items=4,
             force_coordinate=force_coordinate,
+            goal_step=True,
         )
         if any(
             relation_matches_coordinate(
