@@ -1893,6 +1893,72 @@ def high_level_step_lacks_directional_support(step, support_relations, point_nam
     return not saw_symbolic_directional_support
 
 
+def low_level_equality_claim_lacks_symbolic_support(
+    step,
+    support_relations,
+    point_names,
+    support_refs=None,
+):
+    if not isinstance(step, dict):
+        return False
+    relation_text = step.get("approved_route_relation") or step.get("relation", "")
+    relation_keywords = relation_text_keywords(relation_text)
+    if triangle_relation_family(relation_text):
+        return False
+    if "equal" not in relation_keywords or relation_keywords & {
+        "angle",
+        "ratio",
+        "similar",
+        "parallel",
+        "perpendicular",
+        "circle",
+        "collinear",
+    }:
+        return False
+
+    claim_segments = extract_relation_segment_tokens(relation_text)
+    claim_points = extract_point_mentions(relation_text, point_names)
+    support_refs = list(support_refs or [])
+
+    symbolic_segment_coverage = set()
+    symbolic_point_support_count = 0
+    exact_symbolic_match = False
+    for idx, support in enumerate(support_relations or []):
+        if not isinstance(support, str) or not support.strip():
+            continue
+        support_ref = str(support_refs[idx]).lower() if idx < len(support_refs) else ""
+        if (
+            support_ref.startswith("image_scan[")
+            or support_ref.startswith("coordinate_checks[")
+        ):
+            continue
+        support_keywords = relation_text_keywords(support)
+        support_triangle_family = triangle_relation_family(support)
+        if support_triangle_family not in {"similar", "congruent"} and not (
+            support_keywords & {"equal", "midpoint"}
+        ):
+            continue
+
+        support_points = extract_point_mentions(support, point_names)
+        support_segments = extract_relation_segment_tokens(support)
+        if relations_semantically_match(support, relation_text, point_names):
+            exact_symbolic_match = True
+        if claim_segments:
+            symbolic_segment_coverage.update(claim_segments & support_segments)
+        if len(claim_points & support_points) >= min(2, len(claim_points)):
+            symbolic_point_support_count += 1
+        if support_triangle_family in {"similar", "congruent"} and len(claim_points & support_points) >= 3:
+            symbolic_segment_coverage.update(claim_segments)
+
+    if exact_symbolic_match:
+        return False
+    if claim_segments:
+        return not claim_segments.issubset(symbolic_segment_coverage)
+    if len(claim_points) >= 2:
+        return symbolic_point_support_count < 2
+    return False
+
+
 def congruent_step_lacks_noncoordinate_correspondence_support(
     step,
     support_relations,
@@ -3786,6 +3852,70 @@ def select_symbolic_directional_support_refs(
     return [item[-1] for item in candidates[:max_supports]]
 
 
+def select_symbolic_equality_support_refs(
+    relation_text,
+    support_catalog,
+    point_names,
+    max_supports=2,
+):
+    relation_keywords = relation_text_keywords(relation_text)
+    if triangle_relation_family(relation_text):
+        return []
+    if "equal" not in relation_keywords or relation_keywords & {
+        "angle",
+        "ratio",
+        "similar",
+        "parallel",
+        "perpendicular",
+        "circle",
+        "collinear",
+    }:
+        return []
+
+    relation_segments = extract_relation_segment_tokens(relation_text)
+    relation_points = extract_point_mentions(relation_text, point_names)
+    candidates = []
+    for item in support_catalog or []:
+        relation = item.get("relation", "")
+        ref = str(item.get("ref", ""))
+        if not relation or not ref:
+            continue
+        lowered_ref = ref.lower()
+        if lowered_ref.startswith("image_scan[") or lowered_ref.startswith("coordinate_checks["):
+            continue
+        support_keywords = relation_text_keywords(relation)
+        support_triangle_family = triangle_relation_family(relation)
+        if support_triangle_family not in {"similar", "congruent"} and not (
+            support_keywords & {"equal", "midpoint"}
+        ):
+            continue
+        support_segments = extract_relation_segment_tokens(relation)
+        support_points = extract_point_mentions(relation, point_names)
+        segment_overlap = len(support_segments & relation_segments) if relation_segments else 0
+        point_overlap = len(support_points & relation_points)
+        if relation_segments:
+            if segment_overlap <= 0:
+                continue
+        elif point_overlap < min(2, len(relation_points)):
+            continue
+        candidates.append(
+            (
+                1 if relations_semantically_match(relation, relation_text, point_names) else 0,
+                segment_overlap,
+                point_overlap,
+                1 if lowered_ref.startswith("bridge_chain[") else 0,
+                1 if lowered_ref.startswith("visible_facts[") else 0,
+                1 if lowered_ref.startswith("aux_immediate_effects[") else 0,
+                score_support_relation(relation, relation_text, point_names),
+                -len(relation),
+                ref.lower(),
+                ref,
+            )
+        )
+    candidates.sort(reverse=True)
+    return [item[-1] for item in candidates[:max_supports]]
+
+
 def select_dossier_support_refs_for_relation(
     relation_text,
     support_catalog,
@@ -3805,6 +3935,12 @@ def select_dossier_support_refs_for_relation(
         return preferred_refs[:max_supports]
 
     symbolic_refs = select_symbolic_directional_support_refs(
+        relation_text,
+        support_catalog,
+        point_names,
+        max_supports=max_supports,
+    )
+    symbolic_equality_refs = select_symbolic_equality_support_refs(
         relation_text,
         support_catalog,
         point_names,
@@ -3830,7 +3966,7 @@ def select_dossier_support_refs_for_relation(
         max_supports=max_supports,
     )
     combined = []
-    for ref in preferred_refs + symbolic_refs + relay_refs + ranked_refs:
+    for ref in preferred_refs + symbolic_equality_refs + symbolic_refs + relay_refs + ranked_refs:
         if ref not in combined:
             combined.append(ref)
         if len(combined) >= max_supports:
@@ -4924,6 +5060,16 @@ def build_scripted_dossier_skeleton(
             support_refs=support_refs,
         ):
             continue
+        if low_level_equality_claim_lacks_symbolic_support(
+            {
+                "relation": step.get("relation", ""),
+                "approved_route_relation": step.get("relation", ""),
+            },
+            resolved_support_relations,
+            known_points,
+            support_refs=support_refs,
+        ):
+            continue
         if congruent_step_lacks_noncoordinate_correspondence_support(
             {
                 "relation": step.get("relation", ""),
@@ -5909,6 +6055,15 @@ def validate_dossier_plan_response(
                 return False, (
                     f"{field_name}[{idx}].claim relies only on equality or midpoint-style supports "
                     "and is missing a directional relay"
+                ), None
+            if low_level_equality_claim_lacks_symbolic_support(
+                step_contract,
+                resolved_supports,
+                known_points,
+                support_refs=supports,
+            ):
+                return False, (
+                    f"{field_name}[{idx}].claim is missing a local non-coordinate equality support chain"
                 ), None
             if congruent_step_lacks_noncoordinate_correspondence_support(
                 step_contract,
