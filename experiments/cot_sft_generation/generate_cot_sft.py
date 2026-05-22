@@ -3955,6 +3955,217 @@ def build_aux_goal_bridge_tail_relations(
     return list(reversed(selected))
 
 
+def relation_has_tautological_ratio_side(relation):
+    match = re.search(
+        r"\bratio\s+([a-z0-9]+)\s+to\s+([a-z0-9]+)\s+equals\s+ratio\s+([a-z0-9]+)\s+to\s+([a-z0-9]+)\b",
+        normalize_relation_surface(relation or ""),
+        re.IGNORECASE,
+    )
+    if not match:
+        return False
+    left_num, left_den, right_num, right_den = [
+        item.lower()
+        for item in match.groups()
+    ]
+    return left_num == left_den or right_num == right_den
+
+
+def build_dossier_goal_tail_relations(
+    proof_guidance,
+    goal_finish,
+    known_points,
+):
+    normalized_goal_finish = normalize_relation_surface(goal_finish or "").strip()
+    goal_tail_relations = []
+    for relation in (proof_guidance or {}).get("goal_finish_relations", []) or []:
+        if not isinstance(relation, str) or not relation.strip():
+            continue
+        normalized_relation = normalize_relation_surface(relation)
+        if relations_semantically_match(normalized_relation, normalized_goal_finish, known_points):
+            continue
+        if normalized_relation.lower() not in {item.lower() for item in goal_tail_relations}:
+            goal_tail_relations.append(normalized_relation)
+
+    if (
+        goal_tail_relations
+        and "ratio" in relation_text_keywords(goal_tail_relations[0])
+        and relation_has_tautological_ratio_side(goal_tail_relations[0])
+    ):
+        ordered_route_relations = [
+            normalize_relation_surface(relation).strip()
+            for relation in (proof_guidance or {}).get("ordered_route_relations", [])
+            if isinstance(relation, str) and relation.strip()
+        ]
+        for route_index, route_relation in enumerate(ordered_route_relations):
+            if not relations_semantically_match(route_relation, goal_tail_relations[0], known_points):
+                continue
+            target_segments = extract_relation_segment_tokens(goal_tail_relations[0])
+            for prerequisite_relation in reversed(ordered_route_relations[:route_index]):
+                if "similar" not in relation_text_keywords(prerequisite_relation):
+                    continue
+                if len(extract_relation_segment_tokens(prerequisite_relation) & target_segments) < 2:
+                    continue
+                goal_tail_relations = [prerequisite_relation] + goal_tail_relations[1:]
+                break
+            break
+    return goal_tail_relations
+
+
+def count_ordered_relation_matches(candidate_relations, target_relations, point_names):
+    search_start = 0
+    matches = 0
+    for target_relation in target_relations or []:
+        for idx in range(search_start, len(candidate_relations or [])):
+            candidate_relation = candidate_relations[idx]
+            if relations_semantically_match(target_relation, candidate_relation, point_names):
+                matches += 1
+                search_start = idx + 1
+                break
+    return matches
+
+
+def count_tail_suffix_relation_matches(candidate_relations, target_relations, point_names):
+    suffix_matches = 0
+    candidate_tail = list(candidate_relations or [])
+    target_tail = list(target_relations or [])
+    while candidate_tail and target_tail:
+        if not relations_semantically_match(candidate_tail[-1], target_tail[-1], point_names):
+            break
+        suffix_matches += 1
+        candidate_tail.pop()
+        target_tail.pop()
+    return suffix_matches
+
+
+def score_dossier_plan_goal_tail_route(plan, proof_guidance, visible_goal, known_points):
+    if not isinstance(plan, dict):
+        return (-1, -1, -1, -1, -1)
+
+    goal_finish = normalize_relation_surface(
+        plan.get("goal_finish")
+        or summarize_aux_clause(visible_goal)
+        or ""
+    ).strip()
+    route_relations = [
+        normalize_relation_surface(step.get("claim", "")).strip()
+        for step in (plan.get("bridge_chain") or [])
+        if isinstance(step, dict) and step.get("claim")
+    ]
+    route_relations.extend(
+        normalize_relation_surface(step.get("claim", "")).strip()
+        for step in (plan.get("goal_closure") or [])
+        if (
+            isinstance(step, dict)
+            and step.get("claim")
+            and not relations_semantically_match(step.get("claim", ""), goal_finish, known_points)
+        )
+    )
+    goal_tail_relations = build_dossier_goal_tail_relations(
+        proof_guidance,
+        goal_finish,
+        known_points,
+    )
+    if not goal_tail_relations:
+        return (0, 0, 0, 0, -len(route_relations))
+
+    ordered_matches = count_ordered_relation_matches(
+        route_relations,
+        goal_tail_relations,
+        known_points,
+    )
+    suffix_matches = count_tail_suffix_relation_matches(
+        route_relations,
+        goal_tail_relations,
+        known_points,
+    )
+    exact_matches = sum(
+        1
+        for target_relation in goal_tail_relations
+        if any(
+            relations_semantically_match(target_relation, candidate_relation, known_points)
+            for candidate_relation in route_relations
+        )
+    )
+    extra_route_steps = max(0, len(route_relations) - len(goal_tail_relations))
+    return (
+        ordered_matches,
+        suffix_matches,
+        exact_matches,
+        -extra_route_steps,
+        -len(route_relations),
+    )
+
+
+def maybe_choose_scripted_dossier_plan(
+    record,
+    aux_part,
+    sanitized_rest,
+    point_coords,
+    visible_goal,
+    visible_text_facts,
+    visible_premise_summaries,
+    live_plan,
+    logger,
+):
+    if not isinstance(live_plan, dict):
+        return live_plan, None
+
+    skeleton_ok, skeleton_message, scripted_dossier = build_scripted_dossier_skeleton(
+        record,
+        aux_part,
+        sanitized_rest,
+        point_coords,
+        visible_goal,
+        visible_text_facts=visible_text_facts,
+        visible_premise_summaries=visible_premise_summaries,
+    )
+    if not skeleton_ok:
+        logger.warning(
+            "[plan] Scripted dossier candidate unavailable for live-plan comparison: %s",
+            skeleton_message,
+        )
+        return live_plan, None
+
+    known_points = extract_visible_point_names(point_coords) + [
+        point.lower()
+        for point in extract_aux_new_points(aux_part or "")
+    ]
+    proof_guidance = build_hidden_proof_guidance(
+        sanitized_rest,
+        aux_part,
+        visible_goal,
+    )
+    goal_tail_relations = build_dossier_goal_tail_relations(
+        proof_guidance,
+        scripted_dossier.get("goal_finish", ""),
+        known_points,
+    )
+    if not goal_tail_relations:
+        return live_plan, None
+
+    live_score = score_dossier_plan_goal_tail_route(
+        live_plan,
+        proof_guidance,
+        visible_goal,
+        known_points,
+    )
+    scripted_score = score_dossier_plan_goal_tail_route(
+        scripted_dossier,
+        proof_guidance,
+        visible_goal,
+        known_points,
+    )
+    if scripted_score > live_score and scripted_score[0] == len(goal_tail_relations):
+        logger.warning(
+            "[plan] Replacing live validated dossier with scripted skeleton based on stronger goal-tail route (%s -> %s)",
+            live_score,
+            scripted_score,
+        )
+        return scripted_dossier, "scripted_preferred"
+
+    return live_plan, None
+
+
 def build_scripted_dossier_skeleton(
     record,
     aux_part,
@@ -4012,15 +4223,11 @@ def build_scripted_dossier_skeleton(
     ]
     known_points = extract_visible_point_names(point_coords) + aux_points
     normalized_goal_finish = normalize_relation_surface(scripted_plan.get("goal_finish", ""))
-    goal_tail_relations = []
-    for relation in proof_guidance.get("goal_finish_relations", []) or []:
-        if not isinstance(relation, str) or not relation.strip():
-            continue
-        normalized_relation = normalize_relation_surface(relation)
-        if relations_semantically_match(normalized_relation, normalized_goal_finish, known_points):
-            continue
-        if normalized_relation.lower() not in {item.lower() for item in goal_tail_relations}:
-            goal_tail_relations.append(normalized_relation)
+    goal_tail_relations = build_dossier_goal_tail_relations(
+        proof_guidance,
+        normalized_goal_finish,
+        known_points,
+    )
     goal_tail_mentions_aux = any(
         any(point in relation.lower() for point in aux_points)
         for relation in goal_tail_relations
@@ -6330,6 +6537,22 @@ def generate_dossier_thinking(
             else:
                 plan_result["parsed"] = cleaned_plan
 
+    if plan_source != "scripted_fallback":
+        preferred_plan, replacement_source = maybe_choose_scripted_dossier_plan(
+            record=record,
+            aux_part=aux_part,
+            sanitized_rest=sanitized_rest,
+            point_coords=point_coords,
+            visible_goal=visible_goal,
+            visible_text_facts=visible_text_facts,
+            visible_premise_summaries=[fact["relation"] for fact in visible_text_facts],
+            live_plan=plan_result["parsed"],
+            logger=logger,
+        )
+        if replacement_source:
+            plan_result["parsed"] = preferred_plan
+            plan_source = replacement_source
+
     write_prompt = build_dossier_write_prompt_text(
         record,
         plan_result["parsed"],
@@ -6357,7 +6580,7 @@ def generate_dossier_thinking(
         validator_fn=validate_dossier_writer_body,
         retry_feedback_builder=build_dossier_writer_retry_feedback,
     )
-    if plan_source == "scripted_fallback":
+    if plan_source in {"scripted_fallback", "scripted_preferred"}:
         write_result = maybe_choose_scripted_dossier_writer_body(
             record=record,
             aux_part=aux_part,

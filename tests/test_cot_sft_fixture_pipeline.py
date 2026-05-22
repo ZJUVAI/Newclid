@@ -94,6 +94,64 @@ DOSSIER_CRITIC_REJECTION_OUTPUT = {
     "summary": "reject and request a cleaner route.",
 }
 
+DOSSIER_WEAK_EQANGLE_PLAN_OUTPUT = {
+    "visible_facts": [
+        "angle ab/bc equals angle bc/ac",
+        "ab equals ac",
+        "ad equals bc",
+        "angle ab/bc equals angle bc/bd",
+        "ae equals bc",
+        "angle ab/bc equals angle bc/be",
+    ],
+    "image_scan": [
+        "points a, c, d appear to lie on a circle",
+        "points b, d seem collinear",
+        "angles at b and c suggest symmetry around bc",
+    ],
+    "coordinate_checks": [],
+    "goal_obstacle": "the visible figure does not directly show how angles at a relate across ab, ac, ad, and ae.",
+    "aux_motivation": "adding a helper point f can create cyclic properties and collinearities that link the angles at a.",
+    "construction": "construct point f such that a, c, d, f are concyclic and b, d, f are collinear",
+    "aux_immediate_effects": [
+        "a, c, d, f are concyclic",
+        "b, d, f are collinear",
+    ],
+    "bridge_chain": [
+        {
+            "claim": "angle ac/ad equals angle cf/df",
+            "supports": ["aux_immediate_effects[0]", "image_scan[0]"],
+            "why_next": "this uses the cyclic property to relate angles at a and f.",
+        },
+        {
+            "claim": "angle ac/af equals angle cd/df",
+            "supports": ["aux_immediate_effects[0]", "bridge_chain[0]"],
+            "why_next": "this extends the cyclic angle relation further along the circle.",
+        },
+        {
+            "claim": "angle ad/af equals angle cd/cf",
+            "supports": ["aux_immediate_effects[0]", "bridge_chain[1]"],
+            "why_next": "this completes the angle relations within the cyclic quadrilateral.",
+        },
+        {
+            "claim": "angle af/df equals angle df/cd",
+            "supports": ["aux_immediate_effects[0]", "bridge_chain[2]"],
+            "why_next": "this ties the angles at f back to the original points.",
+        },
+    ],
+    "goal_closure": [
+        {
+            "claim": "angle ab/ac equals angle ad/ae",
+            "supports": [
+                "visible_facts[0]",
+                "visible_facts[3]",
+                "visible_facts[5]",
+                "bridge_chain[3]",
+            ],
+            "why_next": "this combines the given angle equalities with the constructed angle relations to reach the target.",
+        }
+    ],
+}
+
 WRITER_BODY = (
     "The obstacle is to transfer the d-side and c-side into one local helper frame before the final equality closes. "
     "Using a=(0,0), b=(4,0), and c=(0,2), the midpoint of bc is (2.0, 1.0), which differs from a by residual 2.2361 and the collinearity residual is 1.7889, so point a looks like the midpoint of bc. "
@@ -392,8 +450,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertEqual(
             bridge_claims,
             [
-                "angle ac/ad equals angle cf/df",
-                "ratio ad to cf equals ratio df to df",
+                "triangles adf and cfd are similar",
                 "ad equals cf",
                 "bc equals cf",
             ],
@@ -586,6 +643,67 @@ class CotSftFixturePipelineTest(unittest.TestCase):
 
         self.assertTrue(result["success"])
         self.assertIn("angle ab/ac equals angle ad/ae", result["thinking"])
+
+    def test_generate_dossier_thinking_prefers_scripted_plan_when_goal_tail_route_is_stronger(self):
+        record = self._load_quality_review_record(1)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+        ok, message, scripted_dossier = build_scripted_dossier_skeleton(
+            record,
+            aux_part,
+            sanitized_rest,
+            record["point_coords_grid"],
+            "eqangle a b a c a d a e",
+        )
+        self.assertTrue(ok, message)
+
+        captured_bridge_chain = []
+
+        def fake_run_writer_stage(*args, **kwargs):
+            captured_bridge_chain[:] = [step["claim"] for step in kwargs["plan"]["bridge_chain"]]
+            return {
+                "success": True,
+                "output": build_scripted_dossier_writer_body(kwargs["plan"]),
+                "attempts_used": 1,
+                "elapsed_seconds": 0.01,
+                "error": None,
+            }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            image_path = Path(temp_dir) / "fixture.png"
+            image_path.write_bytes(b"fixture-image")
+
+            with patch(
+                "experiments.cot_sft_generation.generate_cot_sft.call_model",
+                side_effect=[
+                    json.dumps(DOSSIER_WEAK_EQANGLE_PLAN_OUTPUT),
+                    json.dumps(PLAN_CRITIC_OUTPUT),
+                ],
+            ), patch(
+                "experiments.cot_sft_generation.generate_cot_sft.run_writer_stage",
+                side_effect=fake_run_writer_stage,
+            ), patch(
+                "experiments.cot_sft_generation.generate_cot_sft.validate_thinking_response",
+                return_value=(True, "Valid thinking"),
+            ):
+                result = generate_dossier_thinking(
+                    record=record,
+                    image_path=image_path,
+                    aux_part=aux_part,
+                    sanitized_rest=sanitized_rest,
+                    model_name="fixture-model",
+                    max_retries=1,
+                    verbose=True,
+                )
+
+        expected_bridge_chain = [step["claim"] for step in scripted_dossier["bridge_chain"]]
+        self.assertTrue(result["success"])
+        self.assertEqual(captured_bridge_chain, expected_bridge_chain)
+        self.assertEqual(
+            [step["claim"] for step in result["plan_parsed"]["bridge_chain"]],
+            expected_bridge_chain,
+        )
+        self.assertIn("triangles adf and cfd are similar", result["thinking"])
+        self.assertNotIn("angle af/df equals angle df/cd", result["thinking"])
 
     def test_generate_dossier_thinking_scripted_fallback_prefers_scripted_writer_when_audit_is_better(self):
         record = self._load_quality_review_record(0)
