@@ -30,7 +30,7 @@ try:
         audit_source_record,
         bridge_step_relation_realized,
         build_visible_premise_summaries,
-        extract_visible_formal_facts,
+        select_visible_formal_facts,
         count_support_relation_mentions,
         coordinate_relation_matches_candidate,
         count_relation_mentions,
@@ -119,7 +119,7 @@ except ImportError:  # pragma: no cover - script execution path
         audit_source_record,
         bridge_step_relation_realized,
         build_visible_premise_summaries,
-        extract_visible_formal_facts,
+        select_visible_formal_facts,
         count_support_relation_mentions,
         coordinate_relation_matches_candidate,
         count_relation_mentions,
@@ -570,15 +570,10 @@ def build_visible_text_facts(record, max_items=12):
     point_coords = get_point_coords(record)
     visible_points = extract_visible_point_names(point_coords)
     facts = []
-    seen = set()
-    for fact in extract_visible_formal_facts(record):
+    for fact in select_visible_formal_facts(record, max_items=max_items):
         relation = normalize_relation_surface((fact.get("summary") or "").strip())
         if not relation:
             continue
-        lowered = relation.lower()
-        if lowered in seen:
-            continue
-        seen.add(lowered)
         facts.append(
             {
                 "id": f"T{len(facts) + 1}",
@@ -588,8 +583,6 @@ def build_visible_text_facts(record, max_items=12):
                 "source": "public_problem_text",
             }
         )
-        if len(facts) >= max_items:
-            break
     return facts
 
 
@@ -1035,6 +1028,13 @@ def build_canonical_bridge_unlock(next_target_relation, final_step=False):
     if any(token in lowered for token in [" equals ", "equal"]):
         return "this creates one intermediate equality that the next step can reuse."
     return "this prepares one smaller bridge that the next step can reuse."
+
+
+def relation_contains_forbidden_thinking_pattern(text):
+    normalized_text = normalize_relation_surface(text or "").strip()
+    if not normalized_text:
+        return True
+    return any(pattern.search(normalized_text) for pattern in FORBIDDEN_THINKING_PATTERNS)
 
 
 def validate_descriptive_text(value, field_name, min_chars=12, point_names=None, ignored_forbidden_patterns=None):
@@ -4038,6 +4038,8 @@ def build_aux_goal_bridge_tail_relations(
         lowered_relation = relation.lower()
         if lowered_relation in seen_relations:
             continue
+        if relation_contains_forbidden_thinking_pattern(relation):
+            continue
         relation_points = extract_point_mentions(relation, known_points)
         relation_segments = extract_relation_segment_tokens(relation)
         if not (relation_points & aux_point_set):
@@ -4080,6 +4082,8 @@ def build_dossier_goal_tail_relations(
         if not isinstance(relation, str) or not relation.strip():
             continue
         normalized_relation = normalize_relation_surface(relation)
+        if relation_contains_forbidden_thinking_pattern(normalized_relation):
+            continue
         if relations_semantically_match(normalized_relation, normalized_goal_finish, known_points):
             continue
         if normalized_relation.lower() not in {item.lower() for item in goal_tail_relations}:
@@ -4229,6 +4233,95 @@ def compose_aux_goal_tail_relations(aux_tail_relations, goal_tail_relations, vis
     return combined_tail_relations, appended_goal_tail_relations
 
 
+def merge_dossier_visible_relations(primary_relations, fallback_relations, max_items=12):
+    merged_relations = []
+    seen = set()
+    for relation in list(primary_relations or []) + list(fallback_relations or []):
+        if not isinstance(relation, str) or not relation.strip():
+            continue
+        normalized_relation = normalize_relation_surface(relation).strip()
+        lowered_relation = normalized_relation.lower()
+        if not normalized_relation or lowered_relation in seen:
+            continue
+        seen.add(lowered_relation)
+        merged_relations.append(normalized_relation)
+        if len(merged_relations) >= max_items:
+            break
+    return merged_relations
+
+
+def tail_route_can_start_without_prefix(
+    tail_relations,
+    goal_finish,
+    visible_facts,
+    image_scan,
+    coordinate_candidates,
+    point_coords,
+    aux_immediate_effects,
+    known_points,
+):
+    candidate_tail_relations = [
+        normalize_relation_surface(relation).strip()
+        for relation in (tail_relations or [])
+        if isinstance(relation, str) and relation.strip()
+    ]
+    if not candidate_tail_relations:
+        return False
+
+    coordinate_check_targets = [normalize_relation_surface(goal_finish or "").strip()]
+    if candidate_tail_relations[-1]:
+        coordinate_check_targets.insert(0, candidate_tail_relations[-1])
+    provisional_coordinate_checks = build_scripted_dossier_coordinate_checks(
+        coordinate_candidates,
+        point_coords,
+        visible_facts,
+        image_scan,
+        coordinate_check_targets,
+        max_items=4,
+    )
+    support_catalog = build_dossier_relation_ref_catalog(
+        visible_facts,
+        image_scan,
+        provisional_coordinate_checks,
+        aux_immediate_effects,
+        [],
+    )
+    if not support_catalog:
+        return False
+
+    first_relation = candidate_tail_relations[0]
+    next_relation = (
+        candidate_tail_relations[1]
+        if len(candidate_tail_relations) > 1
+        else normalize_relation_surface(goal_finish or "").strip()
+    )
+    max_supports = min(
+        compute_bridge_step_required_support_cap({"relation": first_relation}),
+        max(1, len(support_catalog)),
+    )
+    support_refs = select_dossier_support_refs_for_relation(
+        first_relation,
+        support_catalog,
+        known_points,
+        preferred_supports=[],
+        next_target_relation=next_relation,
+        max_supports=max_supports,
+    )
+    resolved_support_relations = [
+        item.get("relation", "")
+        for item in support_catalog
+        if item.get("ref") in set(support_refs)
+    ]
+    unsupported_segments = find_unsupported_bridge_relation_segments(
+        {
+            "relation": first_relation,
+            "approved_route_relation": first_relation,
+        },
+        resolved_support_relations,
+    )
+    return len(unsupported_segments) <= 1
+
+
 def maybe_choose_scripted_dossier_plan(
     record,
     aux_part,
@@ -4329,11 +4422,11 @@ def build_scripted_dossier_skeleton(
         visible_goal,
     )
     proof_guidance = build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal)
-    visible_facts = [
-        relation
-        for relation in scripted_plan.get("visible_relations", []) or visible_premise_summaries
-        if isinstance(relation, str) and relation.strip()
-    ]
+    visible_facts = merge_dossier_visible_relations(
+        scripted_plan.get("visible_relations", []),
+        visible_premise_summaries,
+        max_items=12,
+    )
     image_scan = [
         observation.get("relation", "")
         for observation in scripted_plan.get("observation_relations", [])
@@ -4382,6 +4475,16 @@ def build_scripted_dossier_skeleton(
                 goal_tail_relations,
                 visible_goal,
             )
+    tail_only_viable = tail_route_can_start_without_prefix(
+        tail_relations_for_chain,
+        normalized_goal_finish,
+        visible_facts,
+        image_scan,
+        coordinate_candidates,
+        point_coords,
+        aux_immediate_effects,
+        known_points,
+    )
 
     base_bridge_steps = [
         step
@@ -4405,6 +4508,7 @@ def build_scripted_dossier_skeleton(
         merged_aux_goal_tail
         and tail_chain_starts_from_aux
         and appended_goal_tail_relations
+        and tail_only_viable
         and count_ordered_relation_matches(
             tail_relations_for_chain,
             appended_goal_tail_relations,
@@ -4416,6 +4520,7 @@ def build_scripted_dossier_skeleton(
         goal_tail_mentions_aux
         and tail_relations_for_chain == goal_tail_relations
         and len(tail_relations_for_chain) >= 3
+        and tail_only_viable
         and "similar" in relation_text_keywords(tail_relations_for_chain[0])
     ):
         keep_prefix_count = 0

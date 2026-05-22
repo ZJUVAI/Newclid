@@ -447,6 +447,23 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         )
         self.assertEqual(dossier["goal_closure"][-1]["claim"], "triangles bde and ceg are similar")
 
+    def test_build_scripted_dossier_skeleton_accepts_real_late_fact_simtrir_benchmark_sample(self):
+        record = self._load_quality_review_record(9)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+
+        ok, message, dossier = build_scripted_dossier_skeleton(
+            record,
+            aux_part,
+            sanitized_rest,
+            record["point_coords_grid"],
+            "simtrir a g i i g h",
+        )
+
+        self.assertTrue(ok, message)
+        self.assertIn("line dh is parallel to line eg", dossier["visible_facts"])
+        self.assertIn("b, d, h, i are concyclic", dossier["visible_facts"])
+        self.assertEqual(dossier["goal_closure"][-1]["claim"], "triangles agi and igh are similar")
+
     def test_build_scripted_dossier_skeleton_preserves_goal_side_tail_steps_for_real_eqangle_sample(self):
         record = self._load_quality_review_record(1)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
@@ -922,6 +939,30 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertIn("ratio bd to be equals ratio ce to cg", body)
         self.assertIn("line de is perpendicular to line eg", body)
         self.assertIn("angle ab/bc equals angle bc/bd", body)
+
+    def test_build_scripted_dossier_writer_body_grounds_real_late_fact_simtrir_goal_closure(self):
+        record = self._load_quality_review_record(9)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+        ok, message, dossier = build_scripted_dossier_skeleton(
+            record,
+            aux_part,
+            sanitized_rest,
+            record["point_coords_grid"],
+            "simtrir a g i i g h",
+        )
+        self.assertTrue(ok, message)
+
+        body = build_scripted_dossier_writer_body(dossier)
+        writer_ok, writer_message = validate_dossier_writer_body(
+            body,
+            visible_goal="simtrir a g i i g h",
+            plan=dossier,
+        )
+
+        self.assertTrue(writer_ok, writer_message)
+        self.assertIn("b, d, h, i are concyclic", body)
+        self.assertIn("ratio ab to bi equals ratio dh to di", body)
+        self.assertIn("triangles agi and igh are similar", body)
 
     def test_build_scripted_dossier_writer_body_prefers_non_coordinate_supports_for_real_simtri_sample(self):
         record = self._load_quality_review_record(3)

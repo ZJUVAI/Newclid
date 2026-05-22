@@ -1,3 +1,4 @@
+import json
 import unittest
 from pathlib import Path
 
@@ -15,6 +16,16 @@ from experiments.cot_sft_generation.audits import (
 
 
 class CotSftAuditsTest(unittest.TestCase):
+    @staticmethod
+    def _load_quality_review_record(index):
+        benchmark_path = Path("experiments/cot_sft_generation/benchmarks/quality_review_v1/quality_review_v1_input.jsonl")
+        records = [
+            json.loads(line)
+            for line in benchmark_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        return records[index]
+
     def test_get_point_coords_normalizes_grid_coord(self):
         coords = get_point_coords({"grid_coord": {"A": [1, 2], "b": (3, 4)}})
 
@@ -48,6 +59,25 @@ class CotSftAuditsTest(unittest.TestCase):
             summaries,
             ["line ab is parallel to line cd", "ab equals ac"],
         )
+
+    def test_build_visible_premise_summaries_retains_late_goal_grounding_facts_for_real_simtrir_sample(self):
+        record = self._load_quality_review_record(9)
+
+        summaries = build_visible_premise_summaries(record)
+
+        self.assertEqual(len(summaries), 12)
+        self.assertIn("line dh is parallel to line eg", summaries)
+        self.assertIn("b, d, h, i are concyclic", summaries)
+        self.assertIn("af equals ag", summaries)
+
+    def test_build_visible_premise_summaries_retains_late_h_facts_for_real_contrir_sample(self):
+        record = self._load_quality_review_record(11)
+
+        summaries = build_visible_premise_summaries(record)
+
+        self.assertEqual(len(summaries), 12)
+        self.assertIn("d, g, h are collinear", summaries)
+        self.assertIn("dg equals dh", summaries)
 
     def test_audit_source_record_flags_missing_goal_finish_guidance(self):
         record = {

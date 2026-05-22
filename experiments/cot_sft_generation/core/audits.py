@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, Iterable
 
@@ -21,6 +22,7 @@ try:
         extract_relation_signatures,
         extract_aux_new_points,
         extract_aux_point_scope,
+        extract_problem_goal,
         extract_point_mentions,
         extract_visible_point_names,
         infer_relation_type_from_text,
@@ -38,6 +40,7 @@ except ImportError:  # pragma: no cover - script execution path
         extract_relation_signatures,
         extract_aux_new_points,
         extract_aux_point_scope,
+        extract_problem_goal,
         extract_point_mentions,
         extract_visible_point_names,
         infer_relation_type_from_text,
@@ -91,21 +94,152 @@ def extract_visible_formal_facts(record: Dict[str, Any]) -> list[Dict[str, Any]]
     return facts
 
 
-def build_visible_premise_summaries(record: Dict[str, Any], max_items: int = 12) -> list[str]:
-    summaries = []
+def _extract_fact_points(fact: Dict[str, Any]) -> tuple[str, ...]:
+    if not isinstance(fact, dict):
+        return ()
+    points = []
+    for token in fact.get("args", []) or []:
+        normalized = str(token or "").strip().lower()
+        if re.fullmatch(r"[a-z]\w*", normalized):
+            points.append(normalized)
+    return tuple(dict.fromkeys(points))
+
+
+def select_visible_formal_facts(
+    record: Dict[str, Any],
+    max_items: int = 12,
+    stable_prefix: int | None = None,
+) -> list[Dict[str, Any]]:
+    if max_items <= 0:
+        return []
+
+    deduped_facts = []
     seen = set()
-    for fact in extract_visible_formal_facts(record):
-        summary = fact.get("summary")
+    for source_index, fact in enumerate(extract_visible_formal_facts(record)):
+        summary = str(fact.get("summary") or "").strip()
         if not summary:
             continue
         normalized = summary.lower()
         if normalized in seen:
             continue
         seen.add(normalized)
-        summaries.append(summary)
-        if len(summaries) >= max_items:
+        deduped_facts.append(
+            {
+                **fact,
+                "summary": summary,
+                "_source_index": source_index,
+                "_points": _extract_fact_points(fact),
+            }
+        )
+
+    if len(deduped_facts) <= max_items:
+        return [
+            {key: value for key, value in fact.items() if not key.startswith("_")}
+            for fact in deduped_facts
+        ]
+
+    if stable_prefix is None:
+        stable_prefix = min(max_items, max(2, min(6, max_items // 2)))
+    stable_prefix = max(0, min(stable_prefix, max_items, len(deduped_facts)))
+
+    point_counts = Counter(
+        point
+        for fact in deduped_facts
+        for point in fact.get("_points", ())
+    )
+    first_point_indices: dict[str, int] = {}
+    for index, fact in enumerate(deduped_facts):
+        for point in fact.get("_points", ()):
+            first_point_indices.setdefault(point, index)
+
+    goal_points = {
+        point
+        for point in parse_goal_expression(extract_problem_goal(record)).get("points", [])
+        if isinstance(point, str) and point.strip()
+    }
+    late_intro_points = {
+        point
+        for point, first_index in first_point_indices.items()
+        if first_index >= stable_prefix
+    }
+
+    selected_indices = set(range(stable_prefix))
+    covered_points = {
+        point
+        for index in selected_indices
+        for point in deduped_facts[index].get("_points", ())
+    }
+
+    while len(selected_indices) < max_items:
+        best_index = None
+        best_key = None
+
+        for index, fact in enumerate(deduped_facts):
+            if index in selected_indices:
+                continue
+
+            fact_points = set(fact.get("_points", ()))
+            uncovered_goal_points = fact_points & (goal_points - covered_points)
+            uncovered_late_points = fact_points & (late_intro_points - covered_points)
+            new_points = fact_points - covered_points
+            rare_points = {
+                point
+                for point in fact_points
+                if point_counts.get(point, 0) <= 2
+            }
+            goal_overlap_points = fact_points & goal_points
+
+            score = (
+                100 * len(uncovered_goal_points)
+                + 30 * len(uncovered_late_points)
+                + 16 * len(new_points)
+                + 8 * len(goal_overlap_points)
+                + 4 * len(rare_points)
+            )
+            ranking_key = (
+                score,
+                len(uncovered_goal_points),
+                len(uncovered_late_points),
+                len(new_points),
+                len(goal_overlap_points),
+                -index,
+            )
+            if best_key is None or ranking_key > best_key:
+                best_key = ranking_key
+                best_index = index
+
+        if best_index is None:
             break
-    return summaries
+        selected_indices.add(best_index)
+        covered_points.update(deduped_facts[best_index].get("_points", ()))
+        if best_key and best_key[0] <= 0:
+            break
+
+    if len(selected_indices) < max_items:
+        for index in range(len(deduped_facts)):
+            if index in selected_indices:
+                continue
+            selected_indices.add(index)
+            if len(selected_indices) >= max_items:
+                break
+
+    return [
+        {
+            key: value
+            for key, value in deduped_facts[index].items()
+            if not key.startswith("_")
+        }
+        for index in range(len(deduped_facts))
+        if index in selected_indices
+    ]
+
+
+def build_visible_premise_summaries(record: Dict[str, Any], max_items: int = 12) -> list[str]:
+    return [
+        fact.get("summary", "")
+        for fact in select_visible_formal_facts(record, max_items=max_items)
+        if fact.get("summary")
+    ]
 
 
 def _canonical_line_key(p1: str, p2: str) -> tuple[str, str]:
