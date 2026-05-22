@@ -1944,6 +1944,37 @@ def high_level_step_lacks_symbolic_directional_coverage(
     return not claim_segments.issubset(symbolic_directional_segments)
 
 
+def ratio_step_lacks_pairwise_support(step, support_relations):
+    if not isinstance(step, dict):
+        return False
+    relation_text = normalize_relation_surface(
+        step.get("approved_route_relation") or step.get("relation", "")
+    ).strip()
+    match = re.search(
+        r"\bratio\s+([a-z0-9]+)\s+to\s+([a-z0-9]+)\s+equals\s+ratio\s+([a-z0-9]+)\s+to\s+([a-z0-9]+)\b",
+        relation_text,
+        re.IGNORECASE,
+    )
+    if not match:
+        return False
+
+    left_num, left_den, right_num, right_den = [
+        item.lower()
+        for item in match.groups()
+    ]
+    claim_pairs = [{left_num, left_den}, {right_num, right_den}]
+    grounded_pairs = set()
+    for pair_idx, pair in enumerate(claim_pairs):
+        for support in support_relations or []:
+            if not isinstance(support, str) or not support.strip():
+                continue
+            support_segments = extract_relation_segment_tokens(support)
+            if pair.issubset(support_segments):
+                grounded_pairs.add(pair_idx)
+                break
+    return len(grounded_pairs) < len(claim_pairs)
+
+
 def low_level_equality_claim_lacks_symbolic_support(
     step,
     support_relations,
@@ -5121,6 +5152,14 @@ def build_scripted_dossier_skeleton(
             support_refs=support_refs,
         ):
             continue
+        if ratio_step_lacks_pairwise_support(
+            {
+                "relation": step.get("relation", ""),
+                "approved_route_relation": step.get("relation", ""),
+            },
+            resolved_support_relations,
+        ):
+            continue
         if low_level_equality_claim_lacks_symbolic_support(
             {
                 "relation": step.get("relation", ""),
@@ -6126,6 +6165,14 @@ def validate_dossier_plan_response(
                 return False, (
                     f"{field_name}[{idx}].claim is missing symbolic directional coverage "
                     "for the needed goal-side rays or segments"
+                ), None
+            if ratio_step_lacks_pairwise_support(
+                step_contract,
+                resolved_supports,
+            ):
+                return False, (
+                    f"{field_name}[{idx}].claim is missing local pairwise support "
+                    "for one side of the ratio"
                 ), None
             if low_level_equality_claim_lacks_symbolic_support(
                 step_contract,
