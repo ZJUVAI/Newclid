@@ -3913,6 +3913,26 @@ def prune_unreferenced_dossier_bridge_chain(bridge_chain, goal_support_refs, aux
                     keep_indices.add(dependency_index)
                     changed = True
 
+    if aux_points and keep_indices:
+        earliest_kept_index = min(keep_indices)
+        if not step_reconnects_aux(bridge_chain[earliest_kept_index]):
+            for idx, step in enumerate(bridge_chain):
+                if not step_reconnects_aux(step):
+                    continue
+                keep_indices.add(idx)
+                changed = True
+                break
+            while changed:
+                changed = False
+                for step_index in list(keep_indices):
+                    step = bridge_chain[step_index]
+                    for ref in step.get("supports", []) or []:
+                        dependency_index = _extract_bridge_chain_ref_index(ref, bridge_chain_len)
+                        if dependency_index is None or dependency_index in keep_indices:
+                            continue
+                        keep_indices.add(dependency_index)
+                        changed = True
+
     sorted_keep_indices = sorted(keep_indices)
     old_to_new_index = {
         old_index: new_index

@@ -447,6 +447,22 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         )
         self.assertEqual(dossier["goal_closure"][-1]["claim"], "triangles bde and ceg are similar")
 
+    def test_build_scripted_dossier_skeleton_keeps_aux_reconnect_for_real_contrir_transfer_sample(self):
+        record = self._load_quality_review_record(5)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+
+        ok, message, dossier = build_scripted_dossier_skeleton(
+            record,
+            aux_part,
+            sanitized_rest,
+            record["point_coords_grid"],
+            "contrir b d i i f b",
+        )
+
+        self.assertTrue(ok, message)
+        self.assertEqual(dossier["bridge_chain"][0]["claim"], "cf equals cj")
+        self.assertEqual(dossier["goal_closure"][-1]["claim"], "triangles bdi and ifb are congruent")
+
     def test_build_scripted_dossier_skeleton_accepts_real_late_fact_simtrir_benchmark_sample(self):
         record = self._load_quality_review_record(9)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
@@ -963,6 +979,30 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertIn("ratio bd to be equals ratio ce to cg", body)
         self.assertIn("line de is perpendicular to line eg", body)
         self.assertIn("angle ab/bc equals angle bc/bd", body)
+
+    def test_build_scripted_dossier_writer_body_grounds_real_contrir_transfer_goal_closure(self):
+        record = self._load_quality_review_record(5)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+        ok, message, dossier = build_scripted_dossier_skeleton(
+            record,
+            aux_part,
+            sanitized_rest,
+            record["point_coords_grid"],
+            "contrir b d i i f b",
+        )
+        self.assertTrue(ok, message)
+
+        body = build_scripted_dossier_writer_body(dossier)
+        writer_ok, writer_message = validate_dossier_writer_body(
+            body,
+            visible_goal="contrir b d i i f b",
+            plan=dossier,
+        )
+
+        self.assertTrue(writer_ok, writer_message)
+        self.assertIn("cf equals cj", body)
+        self.assertIn("j equals i", body)
+        self.assertIn("triangles bdi and ifb are congruent", body)
 
     def test_build_scripted_dossier_writer_body_grounds_real_late_fact_simtrir_goal_closure(self):
         record = self._load_quality_review_record(9)
