@@ -10,6 +10,7 @@ from experiments.cot_sft_generation.generate_cot_sft import (
     build_hidden_proof_guidance,
     build_scripted_dossier_writer_body,
     build_scripted_dossier_skeleton,
+    congruent_step_lacks_noncoordinate_correspondence_support,
     extract_aux_and_rest,
     generate_dossier_thinking,
     high_level_step_lacks_symbolic_directional_coverage,
@@ -474,6 +475,79 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         )
 
         self.assertFalse(lacks_support)
+
+    def test_similar_step_local_correspondence_gate_accepts_congruent_plus_midpoint_pair(self):
+        step = {
+            "relation": "triangles abe and dca are similar",
+            "approved_route_relation": "triangles abe and dca are similar",
+        }
+        support_relations = [
+            "triangles abf and acf are congruent",
+            "e is the midpoint of ad",
+            "line ab is parallel to line cd",
+            "segments ac and be look parallel",
+        ]
+        support_refs = [
+            "bridge_chain[1]",
+            "visible_facts[5]",
+            "visible_facts[2]",
+            "image_scan[2]",
+        ]
+
+        lacks_support = similar_step_lacks_local_correspondence_support(
+            step,
+            support_relations,
+            ["a", "b", "c", "d", "e", "f"],
+            support_refs=support_refs,
+        )
+
+        self.assertFalse(lacks_support)
+
+    def test_congruent_step_noncoordinate_gate_accepts_equal_angle_pair(self):
+        step = {
+            "relation": "triangles abf and acf are congruent",
+            "approved_route_relation": "triangles abf and acf are congruent",
+        }
+        support_relations = [
+            "bf equals cf",
+            "angle ab/bc equals angle bc/ac",
+        ]
+        support_refs = [
+            "aux_immediate_effects[1]",
+            "visible_facts[1]",
+        ]
+
+        lacks_support = congruent_step_lacks_noncoordinate_correspondence_support(
+            step,
+            support_relations,
+            ["a", "b", "c", "f"],
+            support_refs=support_refs,
+        )
+
+        self.assertFalse(lacks_support)
+
+    def test_congruent_step_noncoordinate_gate_rejects_angle_only_transfer_with_unrelated_equality(self):
+        step = {
+            "relation": "triangles bdj and jfb are congruent",
+            "approved_route_relation": "triangles bdj and jfb are congruent",
+        }
+        support_relations = [
+            "angle bf/cf equals angle fj/bf",
+            "bd equals dg",
+        ]
+        support_refs = [
+            "aux_immediate_effects[2]",
+            "visible_facts[5]",
+        ]
+
+        lacks_support = congruent_step_lacks_noncoordinate_correspondence_support(
+            step,
+            support_relations,
+            ["b", "c", "d", "f", "g", "j"],
+            support_refs=support_refs,
+        )
+
+        self.assertTrue(lacks_support)
 
     def test_angle_bridge_symbolic_directional_coverage_accepts_coordinate_backed_tail_segments(self):
         step = {
@@ -1168,6 +1242,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertTrue(
             "unsupported angle/ratio/similar segments" in message
             or "missing symbolic directional coverage" in message
+            or "missing a non-coordinate side or triangle correspondence support" in message
         )
 
     def test_build_scripted_dossier_skeleton_accepts_real_eqangle_sample_with_symbolic_goal_side_equality_bridge(self):
@@ -1282,6 +1357,25 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertNotIn(
             "ratio ab to ac equals ratio ag to ag",
             bridge_claims + goal_claims,
+        )
+
+    def test_build_scripted_dossier_skeleton_accepts_real_simtri_sample_with_congruent_midpoint_goal_support(self):
+        record = self._load_quality_review_record(8)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+
+        ok, message, dossier = build_scripted_dossier_skeleton(
+            record,
+            aux_part,
+            sanitized_rest,
+            record["point_coords_grid"],
+            "simtri a b e d c a",
+        )
+
+        self.assertTrue(ok, message)
+        self.assertIsNotNone(dossier)
+        self.assertIn(
+            "triangles abg and acg are similar",
+            [step.get("claim", "") for step in dossier.get("bridge_chain", [])],
         )
 
     def test_build_scripted_dossier_skeleton_rejects_real_eqratio_benchmark_sample_with_ungrounded_similarity_bridge(self):
@@ -1718,6 +1812,21 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             or "missing symbolic directional coverage" in message
         )
 
+    def test_build_scripted_dossier_writer_body_accepts_real_simtri_sample_with_congruent_midpoint_goal_support(self):
+        record = self._load_quality_review_record(8)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+        ok, message, dossier = build_scripted_dossier_skeleton(
+            record,
+            aux_part,
+            sanitized_rest,
+            record["point_coords_grid"],
+            "simtri a b e d c a",
+        )
+        self.assertTrue(ok, message)
+        writer_output = build_scripted_dossier_writer_body(dossier)
+        self.assertIn("triangles abf and acf are congruent", writer_output)
+        self.assertIn("triangles abe and dca are similar", writer_output)
+
     def test_build_scripted_dossier_writer_body_accepts_real_late_fact_simtrir_goal_closure_with_local_similarity_support(self):
         record = self._load_quality_review_record(9)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
@@ -1747,6 +1856,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertTrue(
             "unsupported angle/ratio/similar segments" in message
             or "missing symbolic directional coverage" in message
+            or "missing a non-coordinate side or triangle correspondence support" in message
         )
 
     def test_build_scripted_dossier_writer_body_rejects_real_eqratio_sample_with_ungrounded_similarity_bridge(self):

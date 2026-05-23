@@ -325,7 +325,10 @@ def relation_text_keywords(text):
         "isosceles": ["isosceles"],
     }
     for label, variants in keyword_groups.items():
-        if any(variant in lowered for variant in variants):
+        if any(
+            re.search(rf"\b{re.escape(variant)}\b", lowered)
+            for variant in variants
+        ):
             keywords.add(label)
     if re.search(r"\b[a-z]{2}\s*:\s*[a-z]{2}\s*=\s*[a-z]{2}\s*:\s*[a-z]{2}\b", lowered):
         keywords.add("ratio")

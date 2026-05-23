@@ -2047,12 +2047,17 @@ def similar_step_lacks_local_correspondence_support(
         support_keywords = relation_text_keywords(support)
         support_triangle_family = triangle_relation_family(support)
         if support_triangle_family not in {"similar", "congruent"} and not (
-            support_keywords & {"angle", "ratio", "equal", "parallel", "perpendicular", "circle", "collinear"}
+            support_keywords & {"angle", "ratio", "equal", "midpoint", "parallel", "perpendicular", "circle", "collinear"}
         ):
             continue
         support_segments = extract_relation_segment_tokens(support)
         overlap_segments = claim_segments & support_segments
-        if len(overlap_segments) < 3:
+        min_overlap_segments = 3
+        if support_triangle_family in {"similar", "congruent"} or (
+            support_keywords & {"equal", "midpoint"}
+        ):
+            min_overlap_segments = 2
+        if len(overlap_segments) < min_overlap_segments:
             continue
         support_points = extract_point_mentions(support, point_names)
         if len(claim_points & support_points) < 3:
@@ -2208,42 +2213,59 @@ def congruent_step_lacks_noncoordinate_correspondence_support(
         return False
 
     claim_points = extract_point_mentions(relation_text, point_names)
+    claim_segments = extract_relation_segment_tokens(relation_text)
     if len(claim_points) < 4:
         return False
 
     support_refs = list(support_refs or [])
-    saw_symbolic_correspondence = False
-    saw_noncoordinate_side_or_triangle_support = False
+    local_support_signatures = set()
+    local_support_kinds = {}
     for idx, support in enumerate(support_relations or []):
         if not isinstance(support, str) or not support.strip():
             continue
         support_points = extract_point_mentions(support, point_names)
-        if len(claim_points & support_points) < 2:
-            continue
         support_ref = str(support_refs[idx]).lower() if idx < len(support_refs) else ""
         if (
             support_ref.startswith("image_scan[")
             or support_ref.startswith("coordinate_checks[")
         ):
             continue
+        if relations_semantically_match(support, relation_text, point_names):
+            return False
+        if len(claim_points & support_points) < 3:
+            continue
         support_keywords = relation_text_keywords(support)
         support_triangle_family = triangle_relation_family(support)
-        if support_triangle_family in {"similar", "congruent"}:
-            saw_symbolic_correspondence = True
-            saw_noncoordinate_side_or_triangle_support = True
-            continue
-        if "angle" in support_keywords:
-            saw_symbolic_correspondence = True
-            continue
-        if "equal" in support_keywords and not (
-            support_keywords
-            & {"angle", "ratio", "similar", "parallel", "perpendicular", "circle"}
+        if support_triangle_family not in {"similar", "congruent"} and not (
+            support_keywords & {"angle", "equal", "midpoint", "parallel", "perpendicular", "circle", "collinear"}
         ):
-            saw_noncoordinate_side_or_triangle_support = True
+            continue
+        support_segments = extract_relation_segment_tokens(support)
+        overlap_segments = claim_segments & support_segments
+        if len(overlap_segments) < 2:
+            continue
+        signature = tuple(sorted(overlap_segments))
+        local_support_signatures.add(signature)
+        kinds = local_support_kinds.setdefault(signature, set())
+        if support_triangle_family in {"similar", "congruent"}:
+            kinds.add("triangle")
+        if support_keywords & {"angle", "parallel", "perpendicular", "circle", "collinear"}:
+            kinds.add("angle")
+        if support_keywords & {"equal", "midpoint"} and not (
+            support_keywords & {"angle", "ratio", "similar"}
+        ):
+            kinds.add("equal")
+        if ("triangle" in kinds and ("angle" in kinds or "equal" in kinds)) or (
+            "angle" in kinds and "equal" in kinds
+        ):
+            return False
 
-    if not saw_symbolic_correspondence:
+    if len(local_support_signatures) >= 2 and any(
+        ("triangle" in kinds or "equal" in kinds)
+        for kinds in local_support_kinds.values()
+    ):
         return False
-    return not saw_noncoordinate_side_or_triangle_support
+    return True
 
 
 def find_skipped_prerequisite_route_checkpoint(

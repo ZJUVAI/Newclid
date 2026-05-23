@@ -10,6 +10,7 @@ from experiments.cot_sft_generation.geometry_text import (
     extract_relation_segment_tokens,
     extract_problem_goal,
     normalize_relation_surface,
+    relation_text_keywords,
     relations_semantically_match,
     select_support_relations_for_step,
 )
@@ -61,6 +62,20 @@ class CotSftGeometryTextTest(unittest.TestCase):
                 "b, d, f are collinear",
                 ["b", "d", "f"],
             )
+        )
+
+    def test_relation_text_keywords_does_not_treat_triangles_as_angle_relations(self):
+        self.assertEqual(
+            relation_text_keywords("triangles abf and acf are congruent"),
+            {"equal"},
+        )
+        self.assertEqual(
+            relation_text_keywords("triangles agi and igh are similar"),
+            {"similar"},
+        )
+        self.assertEqual(
+            relation_text_keywords("angle ab/ac equals angle ad/ae"),
+            {"angle", "equal"},
         )
 
     def test_extract_relation_segment_tokens_and_support_ranking_handle_natural_collinear_cues(self):
