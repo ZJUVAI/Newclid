@@ -1370,8 +1370,11 @@ def build_hidden_proof_guidance(
     aux_scope = {point.lower() for point in extract_aux_point_scope(aux_part)}
     goal_spec = parse_goal_expression(visible_goal)
     effective_max_finish = max_finish
+    effective_max_route_extra = 4
     if (goal_spec.get("predicate") or "").lower() in {"contri", "contrir"}:
         effective_max_finish = max(max_finish, 6)
+    if (goal_spec.get("predicate") or "").lower() in {"simtri", "simtrir"}:
+        effective_max_route_extra = max(effective_max_route_extra, 6)
     if not proof_match:
         return {
             "immediate_aux_consequences": aux_direct[:max_aux],
@@ -1480,6 +1483,7 @@ def build_hidden_proof_guidance(
         summaries,
         immediate_relations=immediate,
         route_relations=aux_bridge + bridge + finish,
+        max_extra=effective_max_route_extra,
     )
 
     return {
@@ -4816,14 +4820,56 @@ def select_dossier_support_refs_for_relation(
             combined.append(ref)
         if len(combined) >= max_supports:
             break
+    support_catalog_by_ref = {
+        str(item.get("ref", "")): item
+        for item in support_catalog
+        if isinstance(item, dict) and item.get("ref")
+    }
     relation_segments = extract_relation_segment_tokens(relation_text)
-    if relation_segments and len(combined) < max_supports:
+
+    def grounded_claim_segments(refs):
         grounded_segments = set()
-        for item in support_catalog:
-            if item.get("ref") in combined:
-                grounded_segments.update(extract_relation_segment_tokens(item.get("relation", "")))
-        missing_segments = relation_segments - grounded_segments
-        while missing_segments and len(combined) < max_supports:
+        for ref in refs:
+            item = support_catalog_by_ref.get(str(ref), {})
+            grounded_segments.update(
+                extract_relation_segment_tokens(item.get("relation", ""))
+                & relation_segments
+            )
+        return grounded_segments
+
+    def candidate_fill_key(item, missing_segments):
+        ref = str(item.get("ref", ""))
+        relation = item.get("relation", "")
+        candidate_segments = extract_relation_segment_tokens(relation)
+        candidate_keywords = relation_text_keywords(relation)
+        return (
+            len(candidate_segments & missing_segments),
+            len(candidate_segments & relation_segments),
+            1 if ref.lower().startswith("coordinate_checks[") else 0,
+            1 if candidate_keywords & {"collinear", "equal", "parallel", "perpendicular", "angle", "circle"} else 0,
+            -len(str(relation)),
+            ref.lower(),
+        )
+
+    def is_symbolic_directional_ref(ref):
+        item = support_catalog_by_ref.get(str(ref), {})
+        relation = item.get("relation", "")
+        lowered_ref = str(ref).lower()
+        if lowered_ref.startswith("image_scan[") or lowered_ref.startswith("coordinate_checks["):
+            return False
+        support_keywords = relation_text_keywords(relation)
+        support_triangle_family = triangle_relation_family(relation)
+        support_segments = extract_relation_segment_tokens(relation)
+        if not (support_segments & relation_segments):
+            return False
+        return bool(
+            support_triangle_family in {"similar", "congruent"}
+            or support_keywords & {"angle", "ratio", "similar", "parallel", "perpendicular", "circle", "collinear"}
+        )
+
+    if relation_segments:
+        missing_segments = relation_segments - grounded_claim_segments(combined)
+        while missing_segments:
             best_item = None
             best_key = None
             for item in support_catalog:
@@ -4837,22 +4883,49 @@ def select_dossier_support_refs_for_relation(
                 candidate_keywords = relation_text_keywords(relation)
                 if candidate_keywords & {"ratio", "similar"}:
                     continue
-                key = (
-                    len(candidate_segments & missing_segments),
-                    len(candidate_segments & relation_segments),
-                    1 if ref.lower().startswith("coordinate_checks[") else 0,
-                    1 if candidate_keywords & {"collinear", "equal", "parallel", "perpendicular", "angle", "circle"} else 0,
-                    -len(str(relation)),
-                    ref.lower(),
-                )
+                key = candidate_fill_key(item, missing_segments)
                 if best_key is None or key > best_key:
                     best_key = key
                     best_item = item
             if best_item is None:
                 break
-            combined.append(best_item.get("ref", ""))
-            grounded_segments.update(extract_relation_segment_tokens(best_item.get("relation", "")))
-            missing_segments = relation_segments - grounded_segments
+            best_ref = best_item.get("ref", "")
+            if len(combined) < max_supports:
+                combined.append(best_ref)
+                missing_segments = relation_segments - grounded_claim_segments(combined)
+                continue
+
+            removable_candidates = []
+            symbolic_count = sum(1 for ref in combined if is_symbolic_directional_ref(ref))
+            for idx, ref in enumerate(combined):
+                if ref in preferred_refs:
+                    continue
+                item = support_catalog_by_ref.get(str(ref), {})
+                item_segments = extract_relation_segment_tokens(item.get("relation", "")) & relation_segments
+                other_refs = combined[:idx] + combined[idx + 1:]
+                other_segments = grounded_claim_segments(other_refs)
+                unique_segments = item_segments - other_segments
+                if unique_segments:
+                    continue
+                if is_symbolic_directional_ref(ref) and symbolic_count <= 1:
+                    continue
+                removable_candidates.append(
+                    (
+                        1 if str(ref).lower().startswith("bridge_chain[") else 0,
+                        1 if str(ref).lower().startswith("visible_facts[") else 0,
+                        1 if str(ref).lower().startswith("aux_immediate_effects[") else 0,
+                        1 if str(ref).lower().startswith("coordinate_checks[") else 0,
+                        score_support_relation(item.get("relation", ""), relation_text, point_names),
+                        len(item_segments),
+                        len(item.get("relation", "")),
+                        idx,
+                    )
+                )
+            if not removable_candidates:
+                break
+            replace_index = min(removable_candidates)[-1]
+            combined[replace_index] = best_ref
+            missing_segments = relation_segments - grounded_claim_segments(combined)
     return combined
 
 
@@ -5728,6 +5801,71 @@ def find_angle_goal_tail_precheckpoint(
     return best_relation
 
 
+def prune_similarity_goal_tail_relations(
+    goal_tail_relations,
+    goal_finish,
+    known_points,
+):
+    normalized_goal_finish = normalize_relation_surface(goal_finish or "").strip()
+    if triangle_relation_family(normalized_goal_finish) != "similar":
+        return goal_tail_relations
+
+    normalized_relations = [
+        normalize_relation_surface(relation).strip()
+        for relation in (goal_tail_relations or [])
+        if isinstance(relation, str) and relation.strip()
+    ]
+    local_support_relations = [
+        relation
+        for relation in normalized_relations
+        if similarity_local_support_relation(
+            relation,
+            normalized_goal_finish,
+            known_points,
+        )
+    ]
+    if len(local_support_relations) < 2:
+        return normalized_relations
+
+    first_local_index = next(
+        (
+            idx
+            for idx, relation in enumerate(normalized_relations)
+            if relation in local_support_relations
+        ),
+        len(normalized_relations),
+    )
+    leading_angle_relations = [
+        relation
+        for relation in normalized_relations[:first_local_index]
+        if "angle" in relation_text_keywords(relation)
+    ]
+    angle_relations = [
+        relation
+        for relation in local_support_relations
+        if "angle" in relation_text_keywords(relation)
+    ]
+    non_angle_relations = [
+        relation
+        for relation in local_support_relations
+        if relation not in angle_relations
+    ]
+
+    selected_relations = []
+    if leading_angle_relations:
+        selected_relations.append(leading_angle_relations[-1])
+    if angle_relations:
+        selected_relations.append(angle_relations[0])
+        if non_angle_relations:
+            selected_relations.append(non_angle_relations[-1])
+    for relation in local_support_relations:
+        if relation not in selected_relations:
+            selected_relations.append(relation)
+        if len(selected_relations) >= 3:
+            break
+    return selected_relations if len(selected_relations) >= 2 else normalized_relations
+
+
 def build_dossier_goal_tail_relations(
     proof_guidance,
     goal_finish,
@@ -5824,6 +5962,11 @@ def build_dossier_goal_tail_relations(
     )
     if angle_precheckpoint_relation:
         goal_tail_relations = [angle_precheckpoint_relation] + goal_tail_relations
+    goal_tail_relations = prune_similarity_goal_tail_relations(
+        goal_tail_relations,
+        normalized_goal_finish,
+        known_points,
+    )
     return goal_tail_relations
 
 
