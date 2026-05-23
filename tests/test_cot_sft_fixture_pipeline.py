@@ -842,7 +842,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             goal_step.get("resolved_supports", []),
         )
 
-    def test_build_scripted_dossier_skeleton_rejects_real_eqratio_benchmark_sample_with_ungrounded_ratio_closure(self):
+    def test_build_scripted_dossier_skeleton_accepts_real_eqratio_benchmark_sample_with_symbolic_carrier_ratio_closure(self):
         record = self._load_quality_review_record(0)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
 
@@ -854,9 +854,22 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             "eqratio a e b d e g b f",
         )
 
-        self.assertFalse(ok)
-        self.assertIn("missing local pairwise support", message)
-        self.assertIsNone(dossier)
+        self.assertTrue(ok, message)
+        self.assertIsNotNone(dossier)
+        goal_step = dossier["goal_closure"][0]
+        self.assertEqual(goal_step["claim"], "ratio ae to bd equals ratio eg to bf")
+        self.assertIn(
+            "ratio ac to ae equals ratio cf to eg",
+            goal_step.get("resolved_supports", []),
+        )
+        self.assertIn(
+            "ac equals bd",
+            goal_step.get("resolved_supports", []),
+        )
+        self.assertIn(
+            "bf equals cf",
+            goal_step.get("resolved_supports", []),
+        )
 
     def test_build_scripted_dossier_skeleton_rejects_real_simtrir_benchmark_sample_with_ungrounded_goal_closure(self):
         record = self._load_quality_review_record(2)
@@ -1163,6 +1176,25 @@ class CotSftFixturePipelineTest(unittest.TestCase):
 
         self.assertIn("aux_immediate_effects[1]", refs)
         self.assertIn("visible_facts[1]", refs)
+
+    def test_select_dossier_support_refs_for_ratio_prefers_symbolic_carrier_chain(self):
+        support_catalog = [
+            {"ref": "bridge_chain[1]", "relation": "ratio ac to ae equals ratio cf to eg"},
+            {"ref": "coordinate_checks[1]", "relation": "ac equals bd"},
+            {"ref": "coordinate_checks[2]", "relation": "bf equals cf"},
+            {"ref": "visible_facts[1]", "relation": "line bd is perpendicular to line bf"},
+        ]
+
+        refs = select_dossier_support_refs_for_relation(
+            "ratio ae to bd equals ratio eg to bf",
+            support_catalog,
+            ["a", "b", "c", "d", "e", "f", "g"],
+            max_supports=4,
+        )
+
+        self.assertIn("bridge_chain[1]", refs)
+        self.assertIn("coordinate_checks[1]", refs)
+        self.assertIn("coordinate_checks[2]", refs)
 
     def test_select_dossier_support_refs_for_local_angle_prefers_segment_coverage(self):
         support_catalog = [
@@ -1472,7 +1504,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         writer_mock.assert_called_once()
         self.assertIn("Finally, because ah equals dh, ad equals bc.", result["thinking"])
 
-    def test_generate_dossier_thinking_fails_closed_when_scripted_eqratio_fallback_is_invalid_after_writer_failure(self):
+    def test_generate_dossier_thinking_falls_back_to_scripted_eqratio_writer_after_writer_failure(self):
         record = self._load_quality_review_record(0)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
 
@@ -1506,12 +1538,13 @@ class CotSftFixturePipelineTest(unittest.TestCase):
                     verbose=True,
                 )
 
-        self.assertFalse(result["success"])
-        writer_mock.assert_not_called()
-        self.assertEqual(result["thinking"], "not a json plan")
-        self.assertIn("missing local pairwise support", result["error"])
+        self.assertTrue(result["success"])
+        writer_mock.assert_called_once()
+        self.assertIn("ratio ac to ae equals ratio cf to eg", result["thinking"])
+        self.assertIn("ac equals bd", result["thinking"])
+        self.assertIn("bf equals cf", result["thinking"])
 
-    def test_generate_dossier_thinking_eqratio_planner_failure_stops_before_writer_retries_when_no_valid_scripted_fallback_exists(self):
+    def test_generate_dossier_thinking_eqratio_planner_failure_uses_scripted_fallback_after_writer_failure(self):
         record = self._load_quality_review_record(0)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
 
@@ -1525,9 +1558,17 @@ class CotSftFixturePipelineTest(unittest.TestCase):
                     "not a json plan",
                     "still not a json plan",
                     "final invalid plan output",
-                    "This target still needs the desired ratio before the helper can finish.",
                 ],
             ) as call_model_mock, patch(
+                "experiments.cot_sft_generation.generate_cot_sft.run_writer_stage",
+                return_value={
+                    "success": False,
+                    "output": None,
+                    "attempts_used": 1,
+                    "elapsed_seconds": 0.01,
+                    "error": "Unknown error",
+                },
+            ) as writer_mock, patch(
                 "experiments.cot_sft_generation.generate_cot_sft.validate_thinking_response",
                 return_value=(True, "Valid thinking"),
             ):
@@ -1541,10 +1582,11 @@ class CotSftFixturePipelineTest(unittest.TestCase):
                     verbose=True,
                 )
 
-        self.assertFalse(result["success"])
+        self.assertTrue(result["success"])
         self.assertEqual(call_model_mock.call_count, 3)
-        self.assertEqual(result["thinking"], "final invalid plan output")
-        self.assertIn("missing local pairwise support", result["error"])
+        writer_mock.assert_called_once()
+        self.assertIn("ratio ac to ae equals ratio cf to eg", result["thinking"])
+        self.assertIn("bf equals cf", result["thinking"])
 
     def test_generate_dossier_thinking_falls_back_to_scripted_skeleton_after_critic_rejection(self):
         record, aux_part, sanitized_rest, scripted_dossier = self._build_clean_scripted_fallback_fixture()
@@ -1643,7 +1685,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertIn("Because ah equals dh, dh equals ah.", result["thinking"])
         self.assertNotIn("angle af/df equals angle df/cd", result["thinking"])
 
-    def test_generate_dossier_thinking_eqratio_fails_closed_when_scripted_fallback_is_invalid_and_live_writer_is_weaker(self):
+    def test_generate_dossier_thinking_eqratio_replaces_live_writer_when_scripted_fallback_is_stronger(self):
         record = self._load_quality_review_record(0)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
         live_writer_body = (
@@ -1686,10 +1728,10 @@ class CotSftFixturePipelineTest(unittest.TestCase):
                     verbose=True,
                 )
 
-        self.assertFalse(result["success"])
-        writer_mock.assert_not_called()
-        self.assertEqual(result["thinking"], "not a json plan")
-        self.assertIn("missing local pairwise support", result["error"])
+        self.assertTrue(result["success"])
+        writer_mock.assert_called_once()
+        self.assertIn("ratio ac to ae equals ratio cf to eg", result["thinking"])
+        self.assertIn("bf equals cf", result["thinking"])
 
     def test_generate_dossier_thinking_scripted_fallback_prefers_scripted_writer_when_plan_grounding_is_stronger(self):
         record, aux_part, sanitized_rest, scripted_dossier = self._build_clean_scripted_fallback_fixture()
@@ -1737,7 +1779,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertIn("Finally, because ah equals dh, ad equals bc.", result["thinking"])
         self.assertNotIn("facilitate the final congruence", result["thinking"])
 
-    def test_build_scripted_dossier_writer_body_rejects_real_eqratio_sample_with_ungrounded_ratio_closure(self):
+    def test_build_scripted_dossier_writer_body_accepts_real_eqratio_sample_with_symbolic_carrier_ratio_closure(self):
         record = self._load_quality_review_record(0)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
         ok, message, dossier = build_scripted_dossier_skeleton(
@@ -1747,9 +1789,11 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             record["point_coords_grid"],
             "eqratio a e b d e g b f",
         )
-        self.assertFalse(ok)
-        self.assertIn("missing local pairwise support", message)
-        self.assertIsNone(dossier)
+        self.assertTrue(ok, message)
+        writer_output = build_scripted_dossier_writer_body(dossier)
+        self.assertIn("ac equals bd", writer_output)
+        self.assertIn("bf equals cf", writer_output)
+        self.assertIn("ratio ae to bd equals ratio eg to bf", writer_output)
 
     def test_build_scripted_dossier_writer_body_accepts_real_eqangle_sample_with_symbolic_goal_side_equality_bridge(self):
         record = self._load_quality_review_record(1)

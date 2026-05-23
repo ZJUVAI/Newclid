@@ -2100,19 +2100,38 @@ def ratio_step_lacks_pairwise_support(step, support_relations):
         return False
 
     left_num, left_den, right_num, right_den = [
-        item.lower()
+        _canonical_support_segment_token(item.lower())
         for item in match.groups()
     ]
     claim_pairs = [{left_num, left_den}, {right_num, right_den}]
-    grounded_pairs = set()
-    for pair_idx, pair in enumerate(claim_pairs):
-        for support in support_relations or []:
-            if not isinstance(support, str) or not support.strip():
-                continue
-            support_segments = extract_relation_segment_tokens(support)
-            if pair.issubset(support_segments):
-                grounded_pairs.add(pair_idx)
-                break
+    support_items = []
+    for idx, support in enumerate(support_relations or []):
+        if not isinstance(support, str) or not support.strip():
+            continue
+        support_items.append(
+            {
+                "ref": f"support[{idx}]",
+                "relation": support,
+                "segments": extract_relation_segment_tokens(support),
+                "keywords": relation_text_keywords(support),
+                "triangle_family": triangle_relation_family(support),
+            }
+        )
+    support_pairs = [
+        (item["ref"], item["relation"])
+        for item in support_items
+        if extract_symbolic_equality_edges(item["relation"])
+    ]
+    grounded_pairs = {
+        pair_idx
+        for pair_idx, pair in enumerate(claim_pairs)
+        if _find_ratio_pair_grounding_bundle(
+            pair,
+            support_items,
+            support_pairs,
+            max_supports=max(1, len(support_items)),
+        )
+    }
     return len(grounded_pairs) < len(claim_pairs)
 
 
@@ -4245,6 +4264,20 @@ def _find_symbolic_equality_support_path(
     if len(relation_segments) != 2:
         return []
     source_segment, target_segment = relation_segments
+    return _find_symbolic_support_path_between_segments(
+        source_segment,
+        target_segment,
+        support_pairs,
+    )
+
+
+def _find_symbolic_support_path_between_segments(
+    source_segment,
+    target_segment,
+    support_pairs,
+):
+    source_segment = _canonical_support_segment_token(source_segment)
+    target_segment = _canonical_support_segment_token(target_segment)
     if source_segment == target_segment:
         return []
 
@@ -4278,6 +4311,130 @@ def _find_symbolic_equality_support_path(
             seen_states.add(state)
             queue.append((next_segment, next_path_indices, next_used_supports))
     return []
+
+
+def _find_ratio_pair_grounding_bundle(
+    pair,
+    support_items,
+    support_pairs,
+    selected_refs=None,
+    max_supports=4,
+    ref_source_priority=None,
+):
+    if max_supports <= 0:
+        return []
+
+    pair = {
+        _canonical_support_segment_token(segment)
+        for segment in (pair or [])
+        if segment
+    }
+    if len(pair) != 2:
+        return []
+
+    selected_refs = set(selected_refs or [])
+    ref_source_priority = ref_source_priority or (lambda ref: 0)
+    selected_count = len(selected_refs)
+    best_bundle = []
+    best_key = None
+
+    for item in support_items or []:
+        ref = str(item.get("ref", ""))
+        relation = item.get("relation", "")
+        segments = set(item.get("segments") or [])
+        keywords = set(item.get("keywords") or set())
+        triangle_family = item.get("triangle_family", "")
+        if not ref or not relation or not segments:
+            continue
+
+        direct_pair = pair.issubset(segments)
+        candidate_refs = [ref]
+        path_length = 0
+
+        if not direct_pair:
+            if triangle_family not in {"similar", "congruent"} and "ratio" not in keywords:
+                continue
+            overlap_segments = pair & segments
+            if not overlap_segments:
+                continue
+
+            best_path_refs = None
+            best_path_key = None
+            for anchored_segment in sorted(overlap_segments):
+                other_pair_segments = list(pair - {anchored_segment})
+                if not other_pair_segments:
+                    continue
+                missing_pair_segment = other_pair_segments[0]
+                for carrier_segment in sorted(segments - {anchored_segment}):
+                    path_indices = _find_symbolic_support_path_between_segments(
+                        carrier_segment,
+                        missing_pair_segment,
+                        support_pairs,
+                    )
+                    if not path_indices:
+                        continue
+                    path_refs = []
+                    for pair_index in path_indices:
+                        path_ref = support_pairs[pair_index][0]
+                        if path_ref not in path_refs:
+                            path_refs.append(path_ref)
+                    new_ref_count = len(
+                        [
+                            candidate_ref
+                            for candidate_ref in [ref] + path_refs
+                            if candidate_ref not in selected_refs
+                        ]
+                    )
+                    path_key = (
+                        -new_ref_count,
+                        -len(path_refs),
+                        sum(
+                            1
+                            for path_ref in path_refs
+                            if str(path_ref).lower().startswith("coordinate_checks[")
+                        ),
+                        -len(str(relation)),
+                        ref.lower(),
+                    )
+                    if best_path_key is None or path_key > best_path_key:
+                        best_path_key = path_key
+                        best_path_refs = path_refs
+            if not best_path_refs:
+                continue
+            candidate_refs = [ref] + best_path_refs
+            path_length = len(best_path_refs)
+
+        deduped_candidate_refs = []
+        for candidate_ref in candidate_refs:
+            if candidate_ref not in deduped_candidate_refs:
+                deduped_candidate_refs.append(candidate_ref)
+        new_ref_count = len(
+            [
+                candidate_ref
+                for candidate_ref in deduped_candidate_refs
+                if candidate_ref not in selected_refs
+            ]
+        )
+        if selected_count + new_ref_count > max_supports:
+            continue
+
+        candidate_key = (
+            1 if direct_pair else 0,
+            1 if "midpoint" in keywords else 0,
+            1 if "equal" in keywords else 0,
+            1 if triangle_family in {"similar", "congruent"} else 0,
+            1 if "ratio" in keywords else 0,
+            -new_ref_count,
+            -path_length,
+            ref_source_priority(ref),
+            -len(str(relation)),
+            ref.lower(),
+        )
+        if best_key is None or candidate_key > best_key:
+            best_key = candidate_key
+            best_bundle = deduped_candidate_refs
+
+    return best_bundle
 
 
 def select_symbolic_equality_path_support_refs(
@@ -4334,8 +4491,14 @@ def select_ratio_pair_support_refs(
         return []
 
     claim_pairs = [
-        {match.group(1).lower(), match.group(2).lower()},
-        {match.group(3).lower(), match.group(4).lower()},
+        {
+            _canonical_support_segment_token(match.group(1).lower()),
+            _canonical_support_segment_token(match.group(2).lower()),
+        },
+        {
+            _canonical_support_segment_token(match.group(3).lower()),
+            _canonical_support_segment_token(match.group(4).lower()),
+        },
     ]
 
     def ref_source_priority(ref):
@@ -4352,33 +4515,42 @@ def select_ratio_pair_support_refs(
             return 1
         return 0
 
+    support_items = []
+    for item in support_catalog or []:
+        ref = item.get("ref", "")
+        relation = item.get("relation", "")
+        if not ref or not relation:
+            continue
+        support_items.append(
+            {
+                "ref": ref,
+                "relation": relation,
+                "segments": extract_relation_segment_tokens(relation),
+                "keywords": relation_text_keywords(relation),
+                "triangle_family": triangle_relation_family(relation),
+            }
+        )
+    support_pairs = [
+        (item["ref"], item["relation"])
+        for item in support_items
+        if extract_symbolic_equality_edges(item["relation"])
+    ]
+
     refs = []
     for pair in claim_pairs:
-        best_ref = ""
-        best_key = None
-        for item in support_catalog or []:
-            ref = item.get("ref", "")
-            relation = item.get("relation", "")
-            if not ref or ref in refs or not relation:
-                continue
-            relation_segments = extract_relation_segment_tokens(relation)
-            if not pair.issubset(relation_segments):
-                continue
-            relation_keywords = relation_text_keywords(relation)
-            relation_triangle_family = triangle_relation_family(relation)
-            key = (
-                1 if relation_triangle_family in {"similar", "congruent"} else 0,
-                1 if "midpoint" in relation_keywords else 0,
-                1 if "equal" in relation_keywords else 0,
-                ref_source_priority(ref),
-                -len(str(relation)),
-                ref.lower(),
-            )
-            if best_key is None or key > best_key:
-                best_key = key
-                best_ref = ref
-        if best_ref:
-            refs.append(best_ref)
+        bundle_refs = _find_ratio_pair_grounding_bundle(
+            pair,
+            support_items,
+            support_pairs,
+            selected_refs=refs,
+            max_supports=max_supports,
+            ref_source_priority=ref_source_priority,
+        )
+        for ref in bundle_refs:
+            if ref not in refs:
+                refs.append(ref)
+            if len(refs) >= max_supports:
+                break
         if len(refs) >= max_supports:
             break
     return refs
@@ -6143,13 +6315,20 @@ def build_scripted_dossier_skeleton(
             }
         )
 
-    coordinate_check_targets = [normalized_goal_finish]
-    if merged_aux_goal_tail and aux_goal_bridge_tail_relations:
-        coordinate_check_targets.insert(0, aux_goal_bridge_tail_relations[-1])
-    elif tail_relations_for_chain:
-        coordinate_check_targets.insert(0, tail_relations_for_chain[-1])
-    elif selected_bridge_specs:
-        coordinate_check_targets.insert(0, selected_bridge_specs[-1].get("relation", ""))
+    coordinate_check_targets = []
+    for candidate_relation in [
+        normalized_goal_finish,
+        tail_relations_for_chain[-1] if tail_relations_for_chain else "",
+        aux_goal_bridge_tail_relations[-1]
+        if merged_aux_goal_tail and aux_goal_bridge_tail_relations
+        else "",
+        selected_bridge_specs[-1].get("relation", "")
+        if selected_bridge_specs and not tail_relations_for_chain
+        else "",
+    ]:
+        normalized_candidate = normalize_relation_surface(candidate_relation).strip()
+        if normalized_candidate and normalized_candidate not in coordinate_check_targets:
+            coordinate_check_targets.append(normalized_candidate)
 
     coordinate_checks = build_scripted_dossier_coordinate_checks(
         coordinate_candidates,
@@ -6457,6 +6636,32 @@ def build_scripted_dossier_writer_body(plan):
             base_target = max(base_target, 2)
         target_cap = min(len(candidates), max_items)
 
+        ratio_seed_relations = []
+        if "ratio" in claim_keywords and target_cap > 0:
+            support_catalog = [
+                {
+                    "ref": candidate.get("ref", ""),
+                    "relation": candidate.get("relation", ""),
+                }
+                for candidate in candidates
+            ]
+            ratio_seed_refs = select_ratio_pair_support_refs(
+                claim,
+                support_catalog,
+                max_supports=target_cap,
+            )
+            for ref in ratio_seed_refs:
+                matching_relation = next(
+                    (
+                        candidate.get("relation", "")
+                        for candidate in candidates
+                        if candidate.get("ref", "") == ref
+                    ),
+                    "",
+                )
+                if matching_relation and matching_relation not in ratio_seed_relations:
+                    ratio_seed_relations.append(matching_relation)
+
         def select_next_candidate(remaining, covered_segments):
             best_candidate = None
             best_key = None
@@ -6485,9 +6690,24 @@ def build_scripted_dossier_writer_body(plan):
                     best_candidate = candidate
             return best_candidate
 
-        selected_relations = []
+        selected_relations = ratio_seed_relations[:target_cap]
         covered_segments = set()
-        remaining = candidates[:]
+        for relation in selected_relations:
+            matching_candidate = next(
+                (
+                    candidate
+                    for candidate in candidates
+                    if candidate.get("relation", "") == relation
+                ),
+                None,
+            )
+            if matching_candidate is not None:
+                covered_segments.update((matching_candidate.get("segments") or set()) & claim_segments)
+        remaining = [
+            candidate
+            for candidate in candidates
+            if candidate.get("relation", "") not in selected_relations
+        ]
 
         initial_target = min(base_target, target_cap)
         while remaining and len(selected_relations) < initial_target:
