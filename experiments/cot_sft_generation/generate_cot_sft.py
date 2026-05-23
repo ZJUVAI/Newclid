@@ -5194,14 +5194,57 @@ def tail_route_can_start_without_prefix(
         for item in support_catalog
         if item.get("ref") in set(support_refs)
     ]
+    step = {
+        "relation": first_relation,
+        "approved_route_relation": first_relation,
+    }
     unsupported_segments = find_unsupported_bridge_relation_segments(
-        {
-            "relation": first_relation,
-            "approved_route_relation": first_relation,
-        },
+        step,
         resolved_support_relations,
     )
-    return len(unsupported_segments) <= 1
+    if len(unsupported_segments) > 1:
+        return False
+    if high_level_step_lacks_directional_support(
+        step,
+        resolved_support_relations,
+        known_points,
+        support_refs=support_refs,
+    ):
+        return False
+    if high_level_step_lacks_symbolic_directional_coverage(
+        step,
+        resolved_support_relations,
+        known_points,
+        support_refs=support_refs,
+    ):
+        return False
+    if similar_step_lacks_local_correspondence_support(
+        step,
+        resolved_support_relations,
+        known_points,
+        support_refs=support_refs,
+    ):
+        return False
+    if ratio_step_lacks_pairwise_support(
+        step,
+        resolved_support_relations,
+    ):
+        return False
+    if low_level_equality_claim_lacks_symbolic_support(
+        step,
+        resolved_support_relations,
+        known_points,
+        support_refs=support_refs,
+    ):
+        return False
+    if congruent_step_lacks_noncoordinate_correspondence_support(
+        step,
+        resolved_support_relations,
+        known_points,
+        support_refs=support_refs,
+    ):
+        return False
+    return True
 
 
 def maybe_choose_scripted_dossier_plan(

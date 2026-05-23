@@ -724,6 +724,30 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             or "bridge_chain must not be empty" in message
         )
 
+    def test_build_scripted_dossier_skeleton_keeps_real_simtrir_prefix_bridge_when_tail_only_start_lacks_local_support(self):
+        record = self._load_quality_review_record(2)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+
+        def passthrough_validate(raw_dossier, *args, **kwargs):
+            return True, "forced", raw_dossier
+
+        with patch(
+            "experiments.cot_sft_generation.generate_cot_sft.validate_dossier_plan_response",
+            side_effect=passthrough_validate,
+        ):
+            ok, message, dossier = build_scripted_dossier_skeleton(
+                record,
+                aux_part,
+                sanitized_rest,
+                record["point_coords_grid"],
+                "simtrir b d e c e g",
+            )
+
+        self.assertTrue(ok, message)
+        self.assertIsNotNone(dossier)
+        self.assertGreaterEqual(len(dossier.get("bridge_chain", [])), 1)
+        self.assertEqual(dossier["bridge_chain"][0]["claim"], "a, b, f, h are concyclic")
+
     def test_build_scripted_dossier_skeleton_rejects_real_contri_benchmark_sample_with_coordinate_only_closure(self):
         record = self._load_quality_review_record(4)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
