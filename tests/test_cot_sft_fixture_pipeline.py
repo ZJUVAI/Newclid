@@ -10,6 +10,7 @@ from experiments.cot_sft_generation.generate_cot_sft import (
     build_scripted_dossier_writer_body,
     build_scripted_dossier_skeleton,
     generate_dossier_thinking,
+    high_level_step_lacks_symbolic_directional_coverage,
     low_level_equality_claim_lacks_symbolic_support,
     process_and_generate_sft,
     select_dossier_support_refs_for_relation,
@@ -401,7 +402,8 @@ class CotSftFixturePipelineTest(unittest.TestCase):
 
         self.assertFalse(ok)
         self.assertTrue(
-            "unsupported angle/ratio/similar segments" in message
+            "missing local correspondence support" in message
+            or "unsupported angle/ratio/similar segments" in message
             or "bridge_chain must not be empty" in message
         )
 
@@ -447,6 +449,55 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         )
 
         self.assertFalse(lacks_support)
+
+    def test_similar_step_local_correspondence_gate_accepts_local_angle_ratio_pair(self):
+        step = {
+            "relation": "triangles agi and igh are similar",
+            "approved_route_relation": "triangles agi and igh are similar",
+        }
+        support_relations = [
+            "angle ag/ai equals angle hi/gi",
+            "ratio ag to ai equals ratio gi to hi",
+        ]
+        support_refs = [
+            "bridge_chain[2]",
+            "bridge_chain[5]",
+        ]
+
+        lacks_support = similar_step_lacks_local_correspondence_support(
+            step,
+            support_relations,
+            ["a", "g", "h", "i"],
+            support_refs=support_refs,
+        )
+
+        self.assertFalse(lacks_support)
+
+    def test_angle_bridge_symbolic_directional_coverage_accepts_coordinate_backed_tail_segments(self):
+        step = {
+            "relation": "angle ag/ai equals angle hi/gi",
+            "approved_route_relation": "angle ag/ai equals angle hi/gi",
+            "_script_source": "tail",
+        }
+        support_relations = [
+            "angle ai/bi equals angle hi/di",
+            "line ag is parallel to line gh",
+            "eh equals gi",
+        ]
+        support_refs = [
+            "bridge_chain[1]",
+            "coordinate_checks[1]",
+            "coordinate_checks[4]",
+        ]
+
+        lacks_coverage = high_level_step_lacks_symbolic_directional_coverage(
+            step,
+            support_relations,
+            ["a", "b", "d", "e", "g", "h", "i"],
+            support_refs=support_refs,
+        )
+
+        self.assertFalse(lacks_coverage)
 
     def test_validate_dossier_plan_response_rejects_angle_bridge_without_directional_relay(self):
         dossier = {
@@ -720,7 +771,8 @@ class CotSftFixturePipelineTest(unittest.TestCase):
 
         self.assertFalse(ok)
         self.assertTrue(
-            "unsupported angle/ratio/similar segments" in message
+            "missing local correspondence support" in message
+            or "unsupported angle/ratio/similar segments" in message
             or "bridge_chain must not be empty" in message
         )
 
@@ -942,6 +994,26 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertIn("aux_immediate_effects[1]", refs)
         self.assertIn("visible_facts[1]", refs)
 
+    def test_select_dossier_support_refs_for_local_angle_prefers_segment_coverage(self):
+        support_catalog = [
+            {"ref": "bridge_chain[1]", "relation": "angle ai/bi equals angle hi/di"},
+            {"ref": "visible_facts[1]", "relation": "af equals ag"},
+            {"ref": "coordinate_checks[1]", "relation": "line ag is parallel to line gh"},
+            {"ref": "coordinate_checks[4]", "relation": "eh equals gi"},
+        ]
+
+        refs = select_dossier_support_refs_for_relation(
+            "angle ag/ai equals angle hi/gi",
+            support_catalog,
+            ["a", "b", "d", "e", "f", "g", "h", "i"],
+            max_supports=3,
+        )
+
+        self.assertEqual(
+            refs,
+            ["bridge_chain[1]", "coordinate_checks[1]", "coordinate_checks[4]"],
+        )
+
     def test_build_scripted_dossier_skeleton_rejects_real_contrir_transfer_sample_with_ungrounded_equality_chain(self):
         record = self._load_quality_review_record(5)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
@@ -989,7 +1061,10 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         )
 
         self.assertFalse(ok)
-        self.assertIn("unsupported angle/ratio/similar segments", message)
+        self.assertTrue(
+            "unsupported angle/ratio/similar segments" in message
+            or "missing symbolic directional coverage" in message
+        )
 
     def test_build_scripted_dossier_skeleton_rejects_real_eqangle_sample_with_incomplete_directional_coverage(self):
         record = self._load_quality_review_record(1)
@@ -1501,7 +1576,8 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         )
         self.assertFalse(ok)
         self.assertTrue(
-            "unsupported angle/ratio/similar segments" in message
+            "missing local correspondence support" in message
+            or "unsupported angle/ratio/similar segments" in message
             or "bridge_chain must not be empty" in message
         )
 
@@ -1559,7 +1635,10 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             "contrir a c h d b h",
         )
         self.assertFalse(ok)
-        self.assertIn("unsupported angle/ratio/similar segments", message)
+        self.assertTrue(
+            "unsupported angle/ratio/similar segments" in message
+            or "missing symbolic directional coverage" in message
+        )
 
     def test_build_scripted_dossier_writer_body_rejects_real_eqratio_sample_with_ungrounded_similarity_bridge(self):
         record = self._load_quality_review_record(6)
@@ -1657,7 +1736,10 @@ class CotSftFixturePipelineTest(unittest.TestCase):
                 if line.strip()
             ]
             self.assertEqual(len(dataset_records), 1)
-            self.assertIn("point a looks like the midpoint of bc", dataset_records[0]["thinking"])
+            self.assertTrue(
+                "point a looks like the midpoint of bc" in dataset_records[0]["thinking"]
+                or "segments ab and cd look parallel" in dataset_records[0]["thinking"]
+            )
             self.assertEqual(dataset_records[0]["aux"], "<aux>x00 h : cong a h d h; cong b h c h</aux>")
 
             item_records = [

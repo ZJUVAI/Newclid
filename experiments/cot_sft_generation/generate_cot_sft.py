@@ -212,6 +212,9 @@ except ImportError:  # pragma: no cover - exercised in bare environments
 logger = logging.getLogger(__name__)
 
 
+RELAXED_COORDINATE_CANDIDATE_MAX_ITEMS = 256
+
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
 DEFAULT_INPUT_JSONL = REPO_ROOT / "datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl"
@@ -719,6 +722,19 @@ def resolve_support_refs(step, fact_lookup, candidate_lookup, prior_bridge_looku
         elif ref in prior_bridge_lookup:
             dependencies.append(prior_bridge_lookup[ref])
     return dependencies
+
+
+def resolve_dossier_support_relations(support_catalog, support_refs):
+    relation_by_ref = {
+        item.get("ref", ""): item.get("relation", "")
+        for item in support_catalog or []
+        if item.get("ref") and item.get("relation")
+    }
+    return [
+        relation_by_ref[ref]
+        for ref in (support_refs or [])
+        if relation_by_ref.get(ref)
+    ]
 
 
 def render_plan_coordinate_derivations(plan, point_coords):
@@ -1917,38 +1933,48 @@ def high_level_step_lacks_symbolic_directional_coverage(
     if not claim_segments:
         return False
     claim_points = extract_point_mentions(relation_text, point_names)
+    step_source = str(step.get("_script_source") or step.get("source") or "").strip().lower()
     support_refs = list(support_refs or [])
-    directional_keywords = {
-        "angle",
-        "ratio",
-        "similar",
-        "parallel",
-        "perpendicular",
-        "circle",
-        "collinear",
-    }
+    directional_keywords = {"angle", "ratio", "similar", "parallel", "perpendicular", "circle", "collinear"}
     symbolic_directional_segments = set()
+    grounded_segments = set()
+    saw_noncoordinate_directional = False
     for idx, support in enumerate(support_relations or []):
         if not isinstance(support, str) or not support.strip():
             continue
         support_ref = str(support_refs[idx]).lower() if idx < len(support_refs) else ""
-        if (
-            support_ref.startswith("image_scan[")
-            or support_ref.startswith("coordinate_checks[")
-        ):
-            continue
         support_keywords = relation_text_keywords(support)
         support_triangle_family = triangle_relation_family(support)
         if support_triangle_family not in {"similar", "congruent"} and not (
             support_keywords & directional_keywords
         ):
-            continue
+            if not support_ref.startswith("coordinate_checks["):
+                continue
         support_points = extract_point_mentions(support, point_names)
         if len(claim_points & support_points) < 2:
             continue
         support_segments = extract_relation_segment_tokens(support)
-        symbolic_directional_segments.update(claim_segments & support_segments)
-    return not claim_segments.issubset(symbolic_directional_segments)
+        overlap_segments = claim_segments & support_segments
+        if not overlap_segments:
+            continue
+        grounded_segments.update(overlap_segments)
+        if support_ref.startswith("image_scan["):
+            continue
+        if support_triangle_family in {"similar", "congruent"} or (
+            support_keywords & directional_keywords
+        ):
+            symbolic_directional_segments.update(overlap_segments)
+            if not support_ref.startswith("coordinate_checks["):
+                saw_noncoordinate_directional = True
+    if claim_segments.issubset(symbolic_directional_segments):
+        return False
+    if (
+        step_source == "tail"
+        and saw_noncoordinate_directional
+        and claim_segments.issubset(grounded_segments)
+    ):
+        return False
+    return True
 
 
 def similar_step_lacks_local_correspondence_support(
@@ -1972,6 +1998,7 @@ def similar_step_lacks_local_correspondence_support(
 
     support_refs = list(support_refs or [])
     local_support_signatures = set()
+    local_support_kinds = {}
     for idx, support in enumerate(support_relations or []):
         if not isinstance(support, str) or not support.strip():
             continue
@@ -1994,8 +2021,24 @@ def similar_step_lacks_local_correspondence_support(
         support_points = extract_point_mentions(support, point_names)
         if len(claim_points & support_points) < 3:
             continue
-        local_support_signatures.add(tuple(sorted(overlap_segments)))
+        signature = tuple(sorted(overlap_segments))
+        local_support_signatures.add(signature)
+        kinds = local_support_kinds.setdefault(signature, set())
+        if support_triangle_family in {"similar", "congruent"}:
+            kinds.add("triangle")
+        if "angle" in support_keywords:
+            kinds.add("angle")
+        if "ratio" in support_keywords:
+            kinds.add("ratio")
+        if support_keywords & {"equal", "midpoint"}:
+            kinds.add("equal")
         if len(local_support_signatures) >= 2:
+            return False
+
+    for kinds in local_support_kinds.values():
+        if ("angle" in kinds and "ratio" in kinds) or (
+            "triangle" in kinds and ("angle" in kinds or "ratio" in kinds)
+        ):
             return False
 
     return True
@@ -4283,6 +4326,133 @@ def select_ratio_pair_support_refs(
     return refs
 
 
+def select_segment_coverage_support_refs(
+    relation_text,
+    support_catalog,
+    point_names,
+    max_supports=2,
+):
+    relation_segments = extract_relation_segment_tokens(relation_text)
+    relation_points = extract_point_mentions(relation_text, point_names)
+    relation_keywords = relation_text_keywords(relation_text)
+    relation_triangle_family = triangle_relation_family(relation_text)
+    if len(relation_segments) < 2 or not (
+        relation_triangle_family or relation_keywords & {"angle", "ratio", "similar"}
+    ):
+        return []
+
+    angle_claim = (
+        "angle" in relation_keywords
+        and not relation_triangle_family
+        and "ratio" not in relation_keywords
+        and "similar" not in relation_keywords
+    )
+    ratio_claim = "ratio" in relation_keywords and not relation_triangle_family
+    similarity_claim = relation_triangle_family == "similar"
+
+    def ref_source_priority(ref):
+        lowered = str(ref or "").lower()
+        if lowered.startswith("bridge_chain["):
+            return 5
+        if lowered.startswith("visible_facts["):
+            return 4
+        if lowered.startswith("aux_immediate_effects["):
+            return 3
+        if lowered.startswith("coordinate_checks["):
+            return 2
+        if lowered.startswith("image_scan["):
+            return 1
+        return 0
+
+    candidates = []
+    for item in support_catalog or []:
+        ref = item.get("ref", "")
+        relation = item.get("relation", "")
+        if not ref or not relation:
+            continue
+        support_segments = extract_relation_segment_tokens(relation)
+        overlap_segments = relation_segments & support_segments
+        if not overlap_segments:
+            continue
+        support_points = extract_point_mentions(relation, point_names)
+        if len(relation_points & support_points) < 2 and len(overlap_segments) < 2:
+            continue
+        support_keywords = relation_text_keywords(relation)
+        support_triangle_family = triangle_relation_family(relation)
+        directional_support = bool(
+            support_triangle_family in {"similar", "congruent"}
+            or support_keywords & {"angle", "ratio", "parallel", "perpendicular", "circle", "collinear"}
+        )
+        equality_support = bool(support_keywords & {"equal", "midpoint"})
+        if ratio_claim:
+            relevance = (
+                2
+                if "ratio" in support_keywords or support_triangle_family in {"similar", "congruent"}
+                else 1
+                if support_keywords & {"angle", "equal", "midpoint", "parallel", "perpendicular", "circle", "collinear"}
+                else 0
+            )
+        elif similarity_claim:
+            relevance = (
+                2
+                if support_triangle_family in {"similar", "congruent"} or support_keywords & {"angle", "ratio"}
+                else 1
+                if support_keywords & {"equal", "parallel", "perpendicular", "circle", "collinear", "midpoint"}
+                else 0
+            )
+        elif angle_claim:
+            relevance = 2 if directional_support else 1 if equality_support else 0
+        else:
+            relevance = 1 if directional_support or equality_support else 0
+        candidates.append(
+            {
+                "ref": ref,
+                "relation": relation,
+                "segments": support_segments,
+                "keywords": support_keywords,
+                "triangle_family": support_triangle_family,
+                "source_priority": ref_source_priority(ref),
+                "relevance": relevance,
+            }
+        )
+
+    refs = []
+    covered_segments = set()
+    while len(refs) < max_supports:
+        missing_segments = relation_segments - covered_segments
+        best_candidate = None
+        best_key = None
+        for candidate in candidates:
+            ref = candidate["ref"]
+            if ref in refs:
+                continue
+            overlap_segments = candidate["segments"] & relation_segments
+            new_overlap_segments = overlap_segments & missing_segments
+            if not new_overlap_segments:
+                continue
+            key = (
+                len(new_overlap_segments),
+                candidate["relevance"],
+                len(overlap_segments),
+                candidate["source_priority"],
+                1 if candidate["triangle_family"] in {"similar", "congruent"} else 0,
+                1 if "angle" in candidate["keywords"] else 0,
+                1 if "ratio" in candidate["keywords"] else 0,
+                -len(candidate["relation"]),
+                ref.lower(),
+            )
+            if best_key is None or key > best_key:
+                best_key = key
+                best_candidate = candidate
+        if best_candidate is None:
+            break
+        refs.append(best_candidate["ref"])
+        covered_segments.update(best_candidate["segments"] & relation_segments)
+        if relation_segments.issubset(covered_segments):
+            break
+    return refs
+
+
 def select_dossier_support_refs_for_relation(
     relation_text,
     support_catalog,
@@ -4344,6 +4514,12 @@ def select_dossier_support_refs_for_relation(
         support_catalog,
         max_supports=max_supports,
     )
+    segment_coverage_refs = select_segment_coverage_support_refs(
+        relation_text,
+        support_catalog,
+        point_names,
+        max_supports=max_supports,
+    )
     ranked_supports = select_support_relations_for_step(
         relation_text,
         [item.get("relation", "") for item in support_catalog],
@@ -4363,6 +4539,7 @@ def select_dossier_support_refs_for_relation(
         + symbolic_equality_path_refs
         + symbolic_equality_refs
         + ratio_pair_refs
+        + segment_coverage_refs
         + symbolic_refs
         + relay_refs
         + ranked_refs
@@ -5378,11 +5555,10 @@ def tail_route_can_start_without_prefix(
         next_target_relation=next_relation,
         max_supports=max_supports,
     )
-    resolved_support_relations = [
-        item.get("relation", "")
-        for item in support_catalog
-        if item.get("ref") in set(support_refs)
-    ]
+    resolved_support_relations = resolve_dossier_support_relations(
+        support_catalog,
+        support_refs,
+    )
     step = {
         "relation": first_relation,
         "approved_route_relation": first_relation,
@@ -5523,7 +5699,7 @@ def build_scripted_dossier_skeleton(
     ]
     coordinate_candidates = build_hidden_coordinate_candidates(
         point_coords,
-        max_items=64,
+        max_items=RELAXED_COORDINATE_CANDIDATE_MAX_ITEMS,
         relax_type_limits=True,
     )
     scripted_plan = build_scripted_plan_skeleton(
@@ -5724,11 +5900,10 @@ def build_scripted_dossier_skeleton(
         )
         if not support_refs and support_catalog:
             support_refs = [support_catalog[0]["ref"]]
-        resolved_support_relations = [
-            item.get("relation", "")
-            for item in support_catalog
-            if item.get("ref") in set(support_refs)
-        ]
+        resolved_support_relations = resolve_dossier_support_relations(
+            support_catalog,
+            support_refs,
+        )
         unsupported_segments = find_unsupported_bridge_relation_segments(
             {
                 "relation": step.get("relation", ""),
@@ -6362,7 +6537,7 @@ def maybe_choose_scripted_dossier_writer_body(record, aux_part, visible_goal, pl
 
     coordinate_candidates = build_hidden_coordinate_candidates(
         get_point_coords(record),
-        max_items=64,
+        max_items=RELAXED_COORDINATE_CANDIDATE_MAX_ITEMS,
         relax_type_limits=True,
     )
     live_audit = audit_generation_quality(
@@ -8782,7 +8957,11 @@ def legacy_generate_thinking(
     raise RuntimeError("Legacy hybrid/llm generation path has been removed; use the model_evidence pipeline.")
     point_coords = get_point_coords(record)
     visible_goal = extract_problem_goal(record)
-    coordinate_candidates = build_hidden_coordinate_candidates(point_coords, max_items=64, relax_type_limits=True)
+    coordinate_candidates = build_hidden_coordinate_candidates(
+        point_coords,
+        max_items=RELAXED_COORDINATE_CANDIDATE_MAX_ITEMS,
+        relax_type_limits=True,
+    )
     visible_premise_summaries = build_visible_premise_summaries(record)
     plan_prompt = None
     plan_result = None
@@ -9107,7 +9286,7 @@ def process_and_generate_sft(
         result_data = None
         coordinate_candidates = build_hidden_coordinate_candidates(
             get_point_coords(record),
-            max_items=64,
+            max_items=RELAXED_COORDINATE_CANDIDATE_MAX_ITEMS,
             relax_type_limits=True,
         )
         generation_audit = audit_generation_quality(
