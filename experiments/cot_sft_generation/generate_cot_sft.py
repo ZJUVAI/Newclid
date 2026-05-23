@@ -660,6 +660,8 @@ def build_canonical_coordinate_relation(candidate):
         return f"{points[0]} is the midpoint of {points[1]}{points[2]}"
     if relation_type == "collinear" and len(points) >= 3:
         return f"{points[0]}, {points[1]}, and {points[2]} are collinear"
+    if relation_type in {"circle", "cyclic", "concyclic"} and len(points) >= 4:
+        return f"{points[0]}, {points[1]}, {points[2]}, {points[3]} are concyclic"
     return normalize_relation_surface((candidate.get("summary") or "").strip())
 
 
@@ -670,7 +672,7 @@ def build_image_coordinate_candidates(point_coords, visible_text_facts, max_item
         relax_type_limits=True,
     )
     visible_points = extract_visible_point_names(point_coords)
-    allowed_types = {"parallel", "perpendicular", "equal_length", "midpoint", "collinear"}
+    allowed_types = {"parallel", "perpendicular", "equal_length", "midpoint", "collinear", "circle"}
     items = []
     for raw_candidate in raw_candidates:
         relation_type = raw_candidate.get("relation_type")
@@ -1354,6 +1356,90 @@ def canonicalize_aux_direct_relations(items, aux_part, visible_points, preferred
         used_lower.add(fallback.lower())
 
     return cleaned[:max_len]
+
+
+def relation_mentions_any_target_points(relation_text, point_names, target_points):
+    target_point_set = {
+        point.lower()
+        for point in (target_points or [])
+        if isinstance(point, str) and point.strip()
+    }
+    if not relation_text or not target_point_set:
+        return False
+    relation_points = extract_point_mentions(relation_text, point_names)
+    return bool(relation_points & target_point_set)
+
+
+def extract_sameclock_concyclic_points(clause):
+    clause = re.sub(r"\[\d{3}\]", "", clause or "").strip()
+    tokens = clause.split()
+    if len(tokens) != 7 or tokens[0].lower() != "sameclock":
+        return []
+    points = [
+        token.lower()
+        for token in tokens[1:]
+        if re.fullmatch(r"[a-z]\w*", token, flags=re.IGNORECASE)
+    ]
+    if len(points) != 6:
+        return []
+
+    point_counts = {}
+    for point in points:
+        point_counts[point] = point_counts.get(point, 0) + 1
+    if sorted(point_counts.values()) != [1, 1, 2, 2]:
+        return []
+
+    ordered_unique_points = []
+    for point in points:
+        if point not in ordered_unique_points:
+            ordered_unique_points.append(point)
+    if len(ordered_unique_points) != 4:
+        return []
+    return sorted(ordered_unique_points)
+
+
+def build_hidden_sameclock_coordinate_candidates(
+    sanitized_rest,
+    visible_points,
+):
+    numerical_match = re.search(
+        r"<numerical_check>(.*?)</numerical_check>",
+        sanitized_rest or "",
+        re.DOTALL | re.IGNORECASE,
+    )
+    if not numerical_match:
+        return []
+
+    visible_point_set = {
+        point.lower()
+        for point in (visible_points or [])
+        if isinstance(point, str) and point.strip()
+    }
+    candidates = []
+    seen_relations = set()
+    raw_clauses = [
+        part.strip()
+        for part in numerical_match.group(1).split(";")
+        if part.strip()
+    ]
+    for clause in raw_clauses:
+        points = extract_sameclock_concyclic_points(clause)
+        if len(points) != 4 or any(point not in visible_point_set for point in points):
+            continue
+        relation = f"{points[0]}, {points[1]}, {points[2]}, {points[3]} are concyclic"
+        normalized_relation = normalize_relation_surface(relation).strip().lower()
+        if not normalized_relation or normalized_relation in seen_relations:
+            continue
+        seen_relations.add(normalized_relation)
+        candidates.append(
+            {
+                "relation_type": "circle",
+                "points": points,
+                "summary": relation,
+                "score": 0.0,
+            }
+        )
+    return candidates
 
 
 def build_hidden_proof_guidance(
@@ -3714,7 +3800,7 @@ def build_scripted_plan_skeleton(
             continue
         if not bridge_steps and known_points[len(visible_points):]:
             aux_points = known_points[len(visible_points):]
-            if not any(point in relation.lower() for point in aux_points):
+            if not relation_mentions_any_target_points(relation, known_points, aux_points):
                 continue
         if relation_duplicates_earlier_support(relation, novelty_supports, known_points):
             continue
@@ -4937,7 +5023,7 @@ def build_scripted_dossier_coordinate_checks(
     target_relations,
     max_items=4,
 ):
-    allowed_types = {"parallel", "perpendicular", "equal_length", "midpoint", "collinear"}
+    allowed_types = {"parallel", "perpendicular", "equal_length", "midpoint", "collinear", "circle"}
     visible_points = extract_visible_point_names(point_coords)
     target_relations = [
         relation
@@ -5015,11 +5101,11 @@ def build_scripted_dossier_coordinate_checks(
                 new_segment_overlap,
                 candidate["segment_overlap"],
                 candidate["point_overlap"],
-                1 if candidate["calc_type"] in {"midpoint", "collinear", "equal_length", "parallel", "perpendicular"} else 0,
-                -candidate["score"],
-                -len(candidate["relation"]),
-                -candidate["index"],
-            )
+            1 if candidate["calc_type"] in {"midpoint", "collinear", "equal_length", "parallel", "perpendicular", "circle"} else 0,
+            -candidate["score"],
+            -len(candidate["relation"]),
+            -candidate["index"],
+        )
             if best_key is None or key > best_key:
                 best_key = key
                 best_idx = idx
@@ -5389,6 +5475,47 @@ def relation_has_tautological_angle_side(relation):
         for item in match.groups()
     ]
     return left_first == left_second or right_first == right_second
+
+
+def tautological_angle_relation_is_useful_goal_tail_checkpoint(
+    relation,
+    ordered_route_relations,
+    goal_finish,
+    known_points,
+):
+    normalized_relation = normalize_relation_surface(relation or "").strip()
+    if not relation_has_tautological_angle_side(normalized_relation):
+        return False
+
+    relation_segments = extract_relation_segment_tokens(normalized_relation)
+    relation_points = extract_point_mentions(normalized_relation, known_points)
+    goal_segments = extract_relation_segment_tokens(goal_finish)
+    goal_points = extract_point_mentions(goal_finish, known_points)
+
+    start_index = 0
+    for idx, route_relation in enumerate(ordered_route_relations or []):
+        if relations_semantically_match(route_relation, normalized_relation, known_points):
+            start_index = idx + 1
+            break
+
+    for route_relation in (ordered_route_relations or [])[start_index:]:
+        normalized_route_relation = normalize_relation_surface(route_relation).strip()
+        if not normalized_route_relation:
+            continue
+        if relation_contains_forbidden_thinking_pattern(normalized_route_relation):
+            continue
+        if triangle_relation_family(normalized_route_relation) not in {"similar", "congruent"}:
+            continue
+        route_segments = extract_relation_segment_tokens(normalized_route_relation)
+        route_points = extract_point_mentions(normalized_route_relation, known_points)
+        if len(route_segments & relation_segments) < 2 or len(route_points & relation_points) < 3:
+            continue
+        if goal_finish and (
+            len(route_segments & goal_segments) < 2 or len(route_points & goal_points) < 3
+        ):
+            continue
+        return True
+    return False
 
 
 def relation_is_bare_point_equality(relation):
@@ -5887,7 +6014,15 @@ def build_dossier_goal_tail_relations(
             continue
         if (
             relation_has_tautological_ratio_side(normalized_relation)
-            or relation_has_tautological_angle_side(normalized_relation)
+            or (
+                relation_has_tautological_angle_side(normalized_relation)
+                and not tautological_angle_relation_is_useful_goal_tail_checkpoint(
+                    normalized_relation,
+                    ordered_route_relations,
+                    normalized_goal_finish,
+                    known_points,
+                )
+            )
             or relation_is_bare_point_equality(normalized_relation)
         ):
             continue
@@ -6311,6 +6446,12 @@ def build_scripted_dossier_skeleton(
         max_items=RELAXED_COORDINATE_CANDIDATE_MAX_ITEMS,
         relax_type_limits=True,
     )
+    visible_points = extract_visible_point_names(point_coords)
+    hidden_sameclock_coordinate_candidates = build_hidden_sameclock_coordinate_candidates(
+        sanitized_rest,
+        visible_points,
+    )
+    dossier_coordinate_candidates = coordinate_candidates + hidden_sameclock_coordinate_candidates
     scripted_plan = build_scripted_plan_skeleton(
         record,
         aux_part,
@@ -6346,7 +6487,7 @@ def build_scripted_dossier_skeleton(
         point.lower()
         for point in extract_aux_new_points(aux_part or "")
     ]
-    known_points = extract_visible_point_names(point_coords) + aux_points
+    known_points = visible_points + aux_points
     normalized_goal_finish = normalize_relation_surface(scripted_plan.get("goal_finish", ""))
     goal_tail_relations = build_dossier_goal_tail_relations(
         proof_guidance,
@@ -6354,7 +6495,7 @@ def build_scripted_dossier_skeleton(
         known_points,
     )
     goal_tail_mentions_aux = any(
-        any(point in relation.lower() for point in aux_points)
+        relation_mentions_any_target_points(relation, known_points, aux_points)
         for relation in goal_tail_relations
     )
     tail_relations_for_chain = goal_tail_relations
@@ -6379,7 +6520,7 @@ def build_scripted_dossier_skeleton(
         normalized_goal_finish,
         visible_facts,
         image_scan,
-        coordinate_candidates,
+        dossier_coordinate_candidates,
         point_coords,
         aux_immediate_effects,
         known_points,
@@ -6401,7 +6542,11 @@ def build_scripted_dossier_skeleton(
     )
     tail_chain_starts_from_aux = bool(
         tail_relations_for_chain
-        and any(point in tail_relations_for_chain[0].lower() for point in aux_points)
+        and relation_mentions_any_target_points(
+            tail_relations_for_chain[0],
+            known_points,
+            aux_points,
+        )
     )
     if (
         merged_aux_goal_tail
@@ -6436,7 +6581,7 @@ def build_scripted_dossier_skeleton(
     tail_relations_to_add = tail_relations_for_chain[-remaining_slots:] if remaining_slots else []
 
     def relation_is_viable_aux_reconnect(relation):
-        if not relation or not any(point in relation.lower() for point in aux_points):
+        if not relation or not relation_mentions_any_target_points(relation, known_points, aux_points):
             return False
         probe_tail = [relation]
         if appended_goal_tail_relations:
@@ -6446,7 +6591,7 @@ def build_scripted_dossier_skeleton(
             normalized_goal_finish,
             visible_facts,
             image_scan,
-            coordinate_candidates,
+            dossier_coordinate_candidates,
             point_coords,
             aux_immediate_effects,
             known_points,
@@ -6512,7 +6657,7 @@ def build_scripted_dossier_skeleton(
             coordinate_check_targets.append(normalized_candidate)
 
     coordinate_checks = build_scripted_dossier_coordinate_checks(
-        coordinate_candidates,
+        dossier_coordinate_candidates,
         point_coords,
         visible_facts,
         image_scan,
@@ -6787,6 +6932,16 @@ def build_scripted_dossier_writer_body(plan):
                 + [candidate.get("relation", "") for candidate in candidates]
             )
         )
+        visible_coordinate_candidates = [
+            candidate
+            for candidate in candidates
+            if not (
+                str(candidate.get("ref", "")).lower().startswith("coordinate_checks[")
+                and "circle" in relation_text_keywords(candidate.get("relation", ""))
+            )
+        ]
+        if visible_coordinate_candidates:
+            candidates = visible_coordinate_candidates
         non_tautological_candidates = [
             candidate
             for candidate in candidates
@@ -7480,7 +7635,7 @@ def validate_dossier_plan_response(
     coordinate_checks = dossier.get("coordinate_checks") or []
     if not isinstance(coordinate_checks, list):
         return False, "coordinate_checks must be a list", None
-    allowed_calc_types = {"parallel", "perpendicular", "equal_length", "midpoint", "collinear"}
+    allowed_calc_types = {"parallel", "perpendicular", "equal_length", "midpoint", "collinear", "circle"}
     cleaned_checks = []
     for idx, check in enumerate(coordinate_checks[: limits["coordinate_relations_max"]]):
         if not isinstance(check, dict):
@@ -7504,7 +7659,7 @@ def validate_dossier_plan_response(
             for point in (check.get("points") or [])
             if isinstance(point, str) and point.lower() in point_coords
         ]
-        min_point_count = 4 if calc_type in {"parallel", "perpendicular", "equal_length"} else 3
+        min_point_count = 4 if calc_type in {"parallel", "perpendicular", "equal_length", "circle"} else 3
         if len(points) < min_point_count:
             return False, (
                 f"coordinate_checks[{idx}].points must name at least {min_point_count} visible points"

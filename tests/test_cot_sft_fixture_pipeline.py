@@ -1037,6 +1037,30 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             "ad equals ae",
         )
 
+    def test_build_dossier_goal_tail_relations_keeps_real_eqratio_similarity_checkpoint_angle(self):
+        record = self._load_quality_review_record(6)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+        proof_guidance = build_hidden_proof_guidance(
+            sanitized_rest,
+            aux_part,
+            "eqratio b e c e d e b e",
+        )
+
+        goal_tail_relations = build_dossier_goal_tail_relations(
+            proof_guidance,
+            "eqratio b e c e d e b e",
+            list(record["point_coords_grid"]) + ["f", "g"],
+        )
+
+        self.assertEqual(
+            goal_tail_relations,
+            [
+                "angle bc/be equals angle ce/bd",
+                "angle be/be equals angle ce/de",
+                "triangles bce and dbe are similar",
+            ],
+        )
+
     def test_build_aux_goal_bridge_tail_relations_prefers_local_reconnect_on_sanitized_real_late_fact_sample(self):
         record = self._load_quality_review_record(9)
         aux_part, sanitized_rest = extract_aux_and_rest(record["llm_output_renamed"])
@@ -1470,7 +1494,48 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             [step.get("claim", "") for step in dossier.get("bridge_chain", [])],
         )
 
-    def test_build_scripted_dossier_skeleton_rejects_real_eqratio_benchmark_sample_with_ungrounded_similarity_bridge(self):
+    def test_build_scripted_dossier_skeleton_reconnects_real_eqratio_tail_after_tokenized_aux_detection(self):
+        record = self._load_quality_review_record(6)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+
+        def passthrough_validate(raw_dossier, *args, **kwargs):
+            return True, "forced", raw_dossier
+
+        with patch(
+            "experiments.cot_sft_generation.generate_cot_sft.validate_dossier_plan_response",
+            side_effect=passthrough_validate,
+        ):
+            ok, message, dossier = build_scripted_dossier_skeleton(
+                record,
+                aux_part,
+                sanitized_rest,
+                record["point_coords_grid"],
+                "eqratio b e c e d e b e",
+            )
+
+        self.assertTrue(ok, message)
+        self.assertIsNotNone(dossier)
+        bridge_claims = [
+            step.get("claim", "")
+            for step in dossier.get("bridge_chain", [])
+        ]
+        self.assertEqual(
+            bridge_claims,
+            [
+                "angle fg/dg equals angle de/dg",
+                "b, g, e are collinear",
+                "angle bc/be equals angle ce/bd",
+            ],
+        )
+        self.assertIn(
+            "b, c, d, e are concyclic",
+            [
+                check.get("relation", "")
+                for check in dossier.get("coordinate_checks", [])
+            ],
+        )
+
+    def test_build_scripted_dossier_skeleton_accepts_real_eqratio_benchmark_sample_with_reconnected_similarity_bridge(self):
         record = self._load_quality_review_record(6)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
 
@@ -1482,12 +1547,25 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             "eqratio b e c e d e b e",
         )
 
-        self.assertFalse(ok)
-        self.assertTrue(
-            "missing local correspondence support" in message
-            or "missing local pairwise support" in message
+        self.assertTrue(ok, message)
+        self.assertIsNotNone(dossier)
+        self.assertEqual(
+            dossier["goal_closure"][0]["claim"],
+            "ratio be to ce equals ratio de to be",
         )
-        self.assertIsNone(dossier)
+        self.assertIn(
+            "angle bc/be equals angle ce/bd",
+            dossier["goal_closure"][0].get("resolved_supports", []),
+        )
+        self.assertIn(
+            "b, c, d, e are concyclic",
+            dossier["goal_closure"][0].get("resolved_supports", []),
+        )
+        writer_body = build_scripted_dossier_writer_body(dossier)
+        self.assertNotIn(
+            "b, c, d, e are concyclic",
+            writer_body.lower(),
+        )
 
     def test_generate_dossier_thinking_plan_only_falls_back_to_scripted_skeleton(self):
         record, aux_part, sanitized_rest, scripted_dossier = self._build_clean_scripted_fallback_fixture()
@@ -1962,7 +2040,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             or "missing a non-coordinate side or triangle correspondence support" in message
         )
 
-    def test_build_scripted_dossier_writer_body_rejects_real_eqratio_sample_with_ungrounded_similarity_bridge(self):
+    def test_build_scripted_dossier_writer_body_accepts_real_eqratio_sample_with_reconnected_ratio_bridge(self):
         record = self._load_quality_review_record(6)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
         ok, message, dossier = build_scripted_dossier_skeleton(
@@ -1972,12 +2050,16 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             record["point_coords_grid"],
             "eqratio b e c e d e b e",
         )
-        self.assertFalse(ok)
-        self.assertTrue(
-            "missing local correspondence support" in message
-            or "missing local pairwise support" in message
+        self.assertTrue(ok, message)
+        self.assertIsNotNone(dossier)
+        writer_body = build_scripted_dossier_writer_body(dossier)
+        writer_ok, writer_message = validate_dossier_writer_body(
+            writer_body,
+            visible_goal="eqratio b e c e d e b e",
+            plan=dossier,
         )
-        self.assertIsNone(dossier)
+        self.assertTrue(writer_ok, writer_message)
+        self.assertNotIn("b, c, d, e are concyclic", writer_body.lower())
 
     def test_process_and_generate_sft_runs_offline_dossier_pipeline(self):
         record = {
