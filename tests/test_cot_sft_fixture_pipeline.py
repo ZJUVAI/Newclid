@@ -889,6 +889,25 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             {"bridge_chain[1]", "visible_facts[1]", "visible_facts[2]"},
         )
 
+    def test_select_dossier_support_refs_for_ratio_prefers_pair_grounding_supports(self):
+        support_catalog = [
+            {"ref": "bridge_chain[1]", "relation": "a, d, h are collinear"},
+            {"ref": "visible_facts[1]", "relation": "g is the midpoint of be"},
+            {"ref": "aux_immediate_effects[1]", "relation": "h is the midpoint of ad"},
+            {"ref": "visible_facts[2]", "relation": "line ad is parallel to line bc"},
+            {"ref": "visible_facts[3]", "relation": "line ac is perpendicular to line be"},
+        ]
+
+        refs = select_dossier_support_refs_for_relation(
+            "ratio ad to ah equals ratio be to eg",
+            support_catalog,
+            ["a", "b", "c", "d", "e", "g", "h"],
+            max_supports=4,
+        )
+
+        self.assertIn("aux_immediate_effects[1]", refs)
+        self.assertIn("visible_facts[1]", refs)
+
     def test_build_scripted_dossier_skeleton_rejects_real_contrir_transfer_sample_with_ungrounded_equality_chain(self):
         record = self._load_quality_review_record(5)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
@@ -954,6 +973,36 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertTrue(
             "missing symbolic directional coverage" in message
             or "bridge_chain must not be empty" in message
+        )
+
+    def test_build_scripted_dossier_skeleton_keeps_real_eqratio_pair_grounded_midpoint_bridge(self):
+        record = self._load_quality_review_record(0)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+
+        def passthrough_validate(raw_dossier, *args, **kwargs):
+            return True, "forced", raw_dossier
+
+        with patch(
+            "experiments.cot_sft_generation.generate_cot_sft.validate_dossier_plan_response",
+            side_effect=passthrough_validate,
+        ):
+            ok, message, dossier = build_scripted_dossier_skeleton(
+                record,
+                aux_part,
+                sanitized_rest,
+                record["point_coords_grid"],
+                "eqratio a e b d e g b f",
+            )
+
+        self.assertTrue(ok, message)
+        self.assertIsNotNone(dossier)
+        bridge_claims = [
+            step.get("claim", "")
+            for step in dossier.get("bridge_chain", [])
+        ]
+        self.assertIn(
+            "ratio ad to ah equals ratio be to eg",
+            bridge_claims,
         )
 
     def test_build_scripted_dossier_skeleton_real_simtri_tail_route_now_has_local_similarity_support(self):

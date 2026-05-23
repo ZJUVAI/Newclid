@@ -4219,6 +4219,70 @@ def select_symbolic_equality_path_support_refs(
     return refs
 
 
+def select_ratio_pair_support_refs(
+    relation_text,
+    support_catalog,
+    max_supports=2,
+):
+    match = re.search(
+        r"\bratio\s+([a-z0-9]+)\s+to\s+([a-z0-9]+)\s+equals\s+ratio\s+([a-z0-9]+)\s+to\s+([a-z0-9]+)\b",
+        normalize_relation_surface(relation_text or ""),
+        re.IGNORECASE,
+    )
+    if not match or max_supports <= 0:
+        return []
+
+    claim_pairs = [
+        {match.group(1).lower(), match.group(2).lower()},
+        {match.group(3).lower(), match.group(4).lower()},
+    ]
+
+    def ref_source_priority(ref):
+        lowered = str(ref or "").lower()
+        if lowered.startswith("bridge_chain["):
+            return 5
+        if lowered.startswith("aux_immediate_effects["):
+            return 4
+        if lowered.startswith("visible_facts["):
+            return 3
+        if lowered.startswith("coordinate_checks["):
+            return 2
+        if lowered.startswith("image_scan["):
+            return 1
+        return 0
+
+    refs = []
+    for pair in claim_pairs:
+        best_ref = ""
+        best_key = None
+        for item in support_catalog or []:
+            ref = item.get("ref", "")
+            relation = item.get("relation", "")
+            if not ref or ref in refs or not relation:
+                continue
+            relation_segments = extract_relation_segment_tokens(relation)
+            if not pair.issubset(relation_segments):
+                continue
+            relation_keywords = relation_text_keywords(relation)
+            relation_triangle_family = triangle_relation_family(relation)
+            key = (
+                1 if relation_triangle_family in {"similar", "congruent"} else 0,
+                1 if "midpoint" in relation_keywords else 0,
+                1 if "equal" in relation_keywords else 0,
+                ref_source_priority(ref),
+                -len(str(relation)),
+                ref.lower(),
+            )
+            if best_key is None or key > best_key:
+                best_key = key
+                best_ref = ref
+        if best_ref:
+            refs.append(best_ref)
+        if len(refs) >= max_supports:
+            break
+    return refs
+
+
 def select_dossier_support_refs_for_relation(
     relation_text,
     support_catalog,
@@ -4275,6 +4339,11 @@ def select_dossier_support_refs_for_relation(
         point_names,
         max_supports=max_supports,
     )
+    ratio_pair_refs = select_ratio_pair_support_refs(
+        relation_text,
+        support_catalog,
+        max_supports=max_supports,
+    )
     ranked_supports = select_support_relations_for_step(
         relation_text,
         [item.get("relation", "") for item in support_catalog],
@@ -4293,6 +4362,7 @@ def select_dossier_support_refs_for_relation(
         preferred_refs
         + symbolic_equality_path_refs
         + symbolic_equality_refs
+        + ratio_pair_refs
         + symbolic_refs
         + relay_refs
         + ranked_refs
