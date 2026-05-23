@@ -4822,7 +4822,7 @@ def prune_unreferenced_dossier_bridge_chain(bridge_chain, goal_support_refs, aux
         cleaned_step = {
             key: value
             for key, value in original_step.items()
-            if not str(key).startswith("_")
+            if key == "_script_source" or not str(key).startswith("_")
         }
         pruned_bridge_chain.append(
             {
@@ -5562,6 +5562,7 @@ def tail_route_can_start_without_prefix(
     step = {
         "relation": first_relation,
         "approved_route_relation": first_relation,
+        "_script_source": "tail",
     }
     unsupported_segments = find_unsupported_bridge_relation_segments(
         step,
@@ -5825,6 +5826,41 @@ def build_scripted_dossier_skeleton(
     ]
     remaining_slots = max(0, max_bridge_steps - len(selected_bridge_specs))
     tail_relations_to_add = tail_relations_for_chain[-remaining_slots:] if remaining_slots else []
+
+    def relation_is_viable_aux_reconnect(relation):
+        if not relation or not any(point in relation.lower() for point in aux_points):
+            return False
+        probe_tail = [relation]
+        if appended_goal_tail_relations:
+            probe_tail.append(appended_goal_tail_relations[0])
+        return tail_route_can_start_without_prefix(
+            probe_tail,
+            normalized_goal_finish,
+            visible_facts,
+            image_scan,
+            coordinate_candidates,
+            point_coords,
+            aux_immediate_effects,
+            known_points,
+        )
+
+    if (
+        merged_aux_goal_tail
+        and aux_points
+        and tail_relations_to_add
+        and not relation_is_viable_aux_reconnect(tail_relations_to_add[0])
+    ):
+        omitted_prefix_relations = tail_relations_for_chain[:-len(tail_relations_to_add)]
+        reconnect_relation = next(
+            (
+                relation
+                for relation in omitted_prefix_relations
+                if relation_is_viable_aux_reconnect(relation)
+            ),
+            "",
+        )
+        if reconnect_relation:
+            tail_relations_to_add = [reconnect_relation] + tail_relations_to_add[1:]
     for idx, relation in enumerate(tail_relations_to_add):
         if any(
             relations_semantically_match(
@@ -5917,6 +5953,7 @@ def build_scripted_dossier_skeleton(
             {
                 "relation": step.get("relation", ""),
                 "approved_route_relation": step.get("relation", ""),
+                "_script_source": step.get("source", ""),
             },
             resolved_support_relations,
             known_points,
@@ -5927,6 +5964,7 @@ def build_scripted_dossier_skeleton(
             {
                 "relation": step.get("relation", ""),
                 "approved_route_relation": step.get("relation", ""),
+                "_script_source": step.get("source", ""),
             },
             resolved_support_relations,
             known_points,
@@ -5937,6 +5975,7 @@ def build_scripted_dossier_skeleton(
             {
                 "relation": step.get("relation", ""),
                 "approved_route_relation": step.get("relation", ""),
+                "_script_source": step.get("source", ""),
             },
             resolved_support_relations,
             known_points,
@@ -5947,6 +5986,7 @@ def build_scripted_dossier_skeleton(
             {
                 "relation": step.get("relation", ""),
                 "approved_route_relation": step.get("relation", ""),
+                "_script_source": step.get("source", ""),
             },
             resolved_support_relations,
         ):
@@ -5955,6 +5995,7 @@ def build_scripted_dossier_skeleton(
             {
                 "relation": step.get("relation", ""),
                 "approved_route_relation": step.get("relation", ""),
+                "_script_source": step.get("source", ""),
             },
             resolved_support_relations,
             known_points,
@@ -5965,6 +6006,7 @@ def build_scripted_dossier_skeleton(
             {
                 "relation": step.get("relation", ""),
                 "approved_route_relation": step.get("relation", ""),
+                "_script_source": step.get("source", ""),
             },
             resolved_support_relations,
             known_points,
@@ -6930,6 +6972,7 @@ def validate_dossier_plan_response(
                 "relation": cleaned_claim,
                 "approved_route_relation": cleaned_claim,
                 "depends_on": resolved_supports[:],
+                "_script_source": step.get("_script_source", ""),
             }
             support_cap = min(
                 compute_bridge_step_required_support_cap(step_contract),
@@ -7029,6 +7072,7 @@ def validate_dossier_plan_response(
                     "required_supports": required_supports,
                     "min_support_mentions": min_support_mentions,
                     "why_next": cleaned_why_next,
+                    "_script_source": step.get("_script_source", ""),
                 }
             )
         return True, "ok", cleaned_steps

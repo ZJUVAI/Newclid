@@ -1029,7 +1029,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("bridge_chain must not be empty", message)
 
-    def test_build_scripted_dossier_skeleton_rejects_real_late_fact_simtrir_benchmark_sample_with_ungrounded_similarity_closure(self):
+    def test_build_scripted_dossier_skeleton_accepts_real_late_fact_simtrir_benchmark_sample_with_reconnected_similarity_closure(self):
         record = self._load_quality_review_record(9)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
 
@@ -1041,12 +1041,20 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             "simtrir a g i i g h",
         )
 
-        self.assertFalse(ok)
-        self.assertTrue(
-            "missing local correspondence support" in message
-            or "missing local pairwise support" in message
+        self.assertTrue(ok, message)
+        self.assertIsNotNone(dossier)
+        self.assertEqual(
+            dossier["bridge_chain"][0]["claim"],
+            "f, g, k are collinear",
         )
-        self.assertIsNone(dossier)
+        self.assertIn(
+            "ratio ag to ai equals ratio gi to hi",
+            dossier["goal_closure"][0]["resolved_supports"],
+        )
+        self.assertIn(
+            "angle ai/bi equals angle hi/di",
+            dossier["goal_closure"][0]["resolved_supports"],
+        )
 
     def test_build_scripted_dossier_skeleton_rejects_real_contrir_benchmark_sample_with_ungrounded_equality_transfer(self):
         record = self._load_quality_review_record(11)
@@ -1610,7 +1618,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             or "missing symbolic directional coverage" in message
         )
 
-    def test_build_scripted_dossier_writer_body_rejects_real_late_fact_simtrir_goal_closure_without_local_similarity_support(self):
+    def test_build_scripted_dossier_writer_body_accepts_real_late_fact_simtrir_goal_closure_with_local_similarity_support(self):
         record = self._load_quality_review_record(9)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
         ok, message, dossier = build_scripted_dossier_skeleton(
@@ -1620,9 +1628,10 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             record["point_coords_grid"],
             "simtrir a g i i g h",
         )
-        self.assertFalse(ok)
-        self.assertIn("missing local correspondence support", message)
-        self.assertIsNone(dossier)
+        self.assertTrue(ok, message)
+        writer_output = build_scripted_dossier_writer_body(dossier)
+        self.assertIn("f, g, k are collinear", writer_output)
+        self.assertIn("triangles agi and igh are similar", writer_output)
 
     def test_build_scripted_dossier_writer_body_rejects_real_contrir_sample_with_ungrounded_equality_transfer(self):
         record = self._load_quality_review_record(11)
