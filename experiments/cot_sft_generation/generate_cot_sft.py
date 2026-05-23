@@ -4484,6 +4484,12 @@ def build_aux_goal_bridge_tail_relations(
             continue
         if relation_contains_forbidden_thinking_pattern(relation):
             continue
+        if (
+            relation_has_tautological_ratio_side(relation)
+            or relation_has_tautological_angle_side(relation)
+            or relation_is_bare_point_equality(relation)
+        ):
+            continue
         relation_points = extract_point_mentions(relation, known_points)
         relation_segments = extract_relation_segment_tokens(relation)
         if not (relation_points & aux_point_set):
@@ -4513,6 +4519,32 @@ def relation_has_tautological_ratio_side(relation):
         for item in match.groups()
     ]
     return left_num == left_den or right_num == right_den
+
+
+def relation_has_tautological_angle_side(relation):
+    match = re.search(
+        r"\bangle\s+([a-z0-9]+)\s*/\s*([a-z0-9]+)\s+equals\s+angle\s+([a-z0-9]+)\s*/\s*([a-z0-9]+)\b",
+        normalize_relation_surface(relation or ""),
+        re.IGNORECASE,
+    )
+    if not match:
+        return False
+    left_first, left_second, right_first, right_second = [
+        item.lower()
+        for item in match.groups()
+    ]
+    return left_first == left_second or right_first == right_second
+
+
+def relation_is_bare_point_equality(relation):
+    match = re.fullmatch(
+        r"\s*([a-z])\s+equals\s+([a-z])\s*",
+        normalize_relation_surface(relation or ""),
+        re.IGNORECASE,
+    )
+    if not match:
+        return False
+    return match.group(1).lower() != match.group(2).lower()
 
 
 def triangle_relation_family(relation):
@@ -4622,6 +4654,12 @@ def build_dossier_goal_tail_relations(
             continue
         normalized_relation = normalize_relation_surface(relation)
         if relation_contains_forbidden_thinking_pattern(normalized_relation):
+            continue
+        if (
+            relation_has_tautological_ratio_side(normalized_relation)
+            or relation_has_tautological_angle_side(normalized_relation)
+            or relation_is_bare_point_equality(normalized_relation)
+        ):
             continue
         if relations_semantically_match(normalized_relation, normalized_goal_finish, known_points):
             continue
@@ -6167,6 +6205,18 @@ def validate_dossier_plan_response(
             cleaned_claim = normalize_relation_surface(cleaned_claim)
             if not relation_keyword_present(cleaned_claim):
                 return False, f"{field_name}[{idx}].claim must mention a concrete geometric relation", None
+            if relation_is_bare_point_equality(cleaned_claim):
+                return False, (
+                    f"{field_name}[{idx}].claim must not collapse two named points into a bare equality"
+                ), None
+            if relation_has_tautological_angle_side(cleaned_claim):
+                return False, (
+                    f"{field_name}[{idx}].claim must not use a tautological angle with the same ray on one side"
+                ), None
+            if relation_has_tautological_ratio_side(cleaned_claim):
+                return False, (
+                    f"{field_name}[{idx}].claim must not use a tautological ratio side"
+                ), None
             supports = [str(ref).strip() for ref in (step.get("supports") or []) if str(ref).strip()]
             if not supports:
                 return False, f"{field_name}[{idx}].supports must not be empty", None

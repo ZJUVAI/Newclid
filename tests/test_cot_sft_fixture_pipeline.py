@@ -730,9 +730,39 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             goal_tail_relations,
             [
                 "triangles bdj and jfb are congruent",
-                "j equals i",
+                "hj equals hi",
             ],
         )
+
+    def test_validate_dossier_plan_response_rejects_bare_point_equality_claim(self):
+        record, aux_part, _, _ = self._build_clean_scripted_fallback_fixture()
+        dossier = json.loads(json.dumps(DOSSIER_PLAN_OUTPUT))
+        dossier["bridge_chain"][0]["claim"] = "j equals i"
+
+        ok, message, _ = validate_dossier_plan_response(
+            dossier,
+            point_coords=record["point_coords_grid"],
+            visible_goal="ad equals bc",
+            aux_part=aux_part,
+        )
+
+        self.assertFalse(ok)
+        self.assertIn("bare equality", message)
+
+    def test_validate_dossier_plan_response_rejects_tautological_angle_claim(self):
+        record, aux_part, _, dossier = self._build_clean_scripted_fallback_fixture()
+        dossier = json.loads(json.dumps(dossier))
+        dossier["goal_closure"][0]["claim"] = "angle be/be equals angle ce/de"
+
+        ok, message, _ = validate_dossier_plan_response(
+            dossier,
+            point_coords=record["point_coords_grid"],
+            visible_goal="ad equals bc",
+            aux_part=aux_part,
+        )
+
+        self.assertFalse(ok)
+        self.assertIn("tautological angle", message)
 
     def test_build_scripted_dossier_skeleton_rejects_real_contrir_transfer_sample_with_ungrounded_equality_chain(self):
         record = self._load_quality_review_record(5)
