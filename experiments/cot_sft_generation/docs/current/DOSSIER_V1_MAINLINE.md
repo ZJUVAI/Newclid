@@ -11,19 +11,28 @@
 
 - 默认链路：`--generation-style dossier_v1`
 - fallback：`--generation-style model_evidence_legacy`
-- 当前默认模型 live 证据：
+- 当前仓库内可复用的人审证据：
   - [summary.json](/root/GenesisGeo-cot/experiments/cot_sft_generation/generated/dossier_v1_stratified4_rerun4_20260520_artifacts_20260520_062623/summary.json)
   - [semantic_audits.jsonl](/root/GenesisGeo-cot/experiments/cot_sft_generation/generated/dossier_v1_stratified4_rerun4_20260520_artifacts_20260520_062623/semantic_audits.jsonl)
-- 结论：
+- 该证据的结论：
   - `surface_pass = 3/4`
   - `semantic_pass = 0/3`
   - `manual_critical_error = 3/3`
+- 最新严格门控证据目前还只在 `/tmp`，需视为 temporary evidence：
+  - `/tmp/cot_sft_quality_review_v1_full12_20260522_postsimbridge_artifacts_20260522_125400/summary.json`
+  - 对应代码：`f7b54cc`
+  - 结果：
+    - `successful_items = 0/12`
+    - `surface_pass_items = 0/12`
+    - `surface_fail_items = 12/12`
+    - `semantic_review_status = not_reviewed`
 
 这说明：
 
 - orchestration 已经跑通。
 - schema / support / critic handoff 的机械摩擦已经明显下降。
-- 当前主问题已经收敛成真实语义问题，而不是格式问题。
+- weak bridge false positive 又被继续压下去了一层。
+- 但当前主问题已经从“格式摩擦”进一步收敛成“无法稳定构造 grounded positive bridge chain”，而不是单纯再多拦几条弱 closure 就能解决。
 
 ## 2. 下个会话不要再做什么
 
@@ -83,6 +92,34 @@ legacy 现在只保留三种用途：
   - 新 validator 没有“误杀”语义好样本；它主要是在把原本会伪装成 `surface_pass` 的坏 route 显式打回
   - 下一轮主线不应继续只加 prompt 约束，而应优先把 smaller-claim decomposition 更前置地脚本化，例如进入 planner skeleton / bridge staging
 
+## 3.2 2026-05-23 当前 full-12 状态
+
+- `f7b54cc` 把 similarity 的 local-correspondence gate 从“只拦带 aux 点的 similarity bridge”扩展成“所有 similarity bridge claim 都要过门”。
+- 自动验证：
+  - `python -m unittest discover -s tests -p 'test_cot_sft_*.py'`
+    - `Ran 115 tests ... OK`
+  - `python experiments/cot_sft_generation/maintenance_smoke_check.py`
+    - 全部检查通过
+- 随后在当前代码上完成的 full-12 run：
+  - `/tmp/cot_sft_quality_review_v1_full12_20260522_postsimbridge_artifacts_20260522_125400/summary.json`
+  - 结果：
+    - `successful_items = 0/12`
+    - `surface_pass_items = 0/12`
+    - `surface_fail_items = 12/12`
+- 代表性失败族：
+  - `unsupported angle/ratio/similar segments before supports ground them`
+  - `missing symbolic directional coverage`
+  - `missing local pairwise support`
+  - `missing local correspondence support`
+  - `scripted dossier skeleton invalid: bridge_chain must not be empty`
+- 这轮结果的意义不是“质量达标”，而是：
+  - fail-closed 已经足够强，弱 similarity / ratio / angle closure 更难混成 `surface_pass`
+  - 但召回已经塌到 `0/12`，说明当前真正卡住的是正例构造能力，而不是 gate 还不够严
+- 因此，下一步最值钱的工作不是继续加严 similarity / ratio gate，而是恢复 grounded positive：
+  - `eqratio`：先让 scripted `bridge_chain` 真正非空，并给 ratio closure 提供 local pairwise support
+  - `simtri` / `simtrir`：先补 locally grounded predecessor relation，再谈 full similarity closure
+  - `eqangle`：优先修 planner hygiene，避免 fresh points / invalid supports 在 closure 才第一次出现
+
 ## 4. 下个会话最应该看的样本
 
 优先看这三个 `surface_pass` 但 `semantic_fail` 的样本：
@@ -109,18 +146,16 @@ legacy 现在只保留三种用途：
 
 只按这个顺序推进：
 
-1. 先选一个失败模式
+1. 先恢复一个 grounded positive family，而不是继续找新的 gate 往下压
    - 推荐优先级：
-   - `bridge_unsupported`
-   - `not_visible_only`
-   - writer length overflow
+   - `eqratio`：`bridge_chain must not be empty` 与 `missing local pairwise support`
+   - `simtri` / `simtrir`：`missing local correspondence support`
+   - `eqangle`：fresh points / invalid supports / closure staging
 
-2. 只改与该失败模式直接相关的一层
-   - planner prompt
-   - dossier validator
-   - critic prompt
-   - writer validator
-   - 不要同时大改多层
+2. 先改正例构造最相关的一层
+   - 优先：`scripted dossier skeleton` / planner normalization / support pruning
+   - 其次：critic 或 writer
+   - 当前不推荐把“再加一层 stricter similarity/ratio gate”当成第一步
 
 - 2026-05-22 的补充判断：
   - `not_visible_only` 已经通过 runtime boundary checks 明显收紧
@@ -129,13 +164,21 @@ legacy 现在只保留三种用途：
     - planner skeleton / scripted bridge decomposition
     - 再考虑 critic 或 writer
 
+- 2026-05-23 的补充判断：
+  - 最新 full-12 已经是 `0/12 surface_pass`
+  - 所以下一轮的成功标准不再是“再少放过几个坏样本”，而是“恢复出少量真正站得住的正例”
+  - 如果只看到 gate 更严、`surface_pass` 继续维持 `0`，那不算向最终目标前进
+
 3. 跑最小回归
    - `python -m unittest discover -s tests -p 'test_cot_sft_*.py'`
    - `python experiments/cot_sft_generation/maintenance_smoke_check.py`
 
-4. 跑新链路 live benchmark
-   - 默认先跑 `quality_review_v1` 的 `quick6_goal_aux_balanced` 前缀。
-   - 如果只是很快看一眼脚本层有没有明显退化，才退回 `-n 4` 的 `quick4_balanced`。
+4. 先跑定向小回放，再回到 full benchmark
+   - 先挑 `2-3` 个代表性失败样本：
+     - 一个 `bridge_chain must not be empty`
+     - 一个 `missing local pairwise support`
+     - 一个 `missing local correspondence support`
+   - 只有恢复出至少 `1-2` 个 grounded 正例后，再回到 `quality_review_v1` 的 `quick6` 或 full-12
 
 ```bash
 python experiments/cot_sft_generation/generate_cot_sft.py \
@@ -187,7 +230,7 @@ python experiments/cot_sft_generation/semantic_review.py \
 
 更合格的短期目标是：
 
-- 至少压掉一类明确的 semantic failure
+- 至少恢复一类 grounded positive bridge chain
 - 在新 run 里拿到更少的 `bridge_unsupported` / `goal_finish_unclosed`
 - 或者拿到第一批真正可记作 `semantic_pass` 的样本
 

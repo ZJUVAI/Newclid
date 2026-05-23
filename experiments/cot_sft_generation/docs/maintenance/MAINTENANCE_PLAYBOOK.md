@@ -9,6 +9,26 @@
 
 开始改文档前，先看 [DOC_BOUNDARIES.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/DOC_BOUNDARIES.md)。这一步的作用是先确认目标文件是否可改，而不是先默认所有文档都能重写。
 
+## 0.1 文档时效规则
+
+- 只要一轮迭代满足下面任一条件，就必须在同一工作轮次同步更新文档，最好与代码放在同一 commit：
+  - 当前质量判断发生变化
+  - 下一步主线方向发生变化
+  - 新 benchmark / semantic review 证据已经足以改变结论
+  - validator、artifacts schema、benchmark protocol 或 review protocol 发生变化
+- 最少要同步的文件：
+  - [current/STATUS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/STATUS.md)
+  - [history/EXPERIMENT_LOG.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/history/EXPERIMENT_LOG.md)
+  - 如果主线判断或下一步方向变了，还要同步 [current/DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/DOSSIER_V1_MAINLINE.md)
+- 如果改动直接改变了当前代码实际做什么，还要同步：
+  - [current/CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/CURRENT_DESIGN.md)
+  - 对应的 schema / reference 文档
+- 如果证据只存在 `/tmp`，文档里必须明确写：
+  - 它只是 temporary evidence
+  - 精确路径
+  - 关键指标
+  - 不能假设后续会话还会主动去翻 `/tmp`
+
 ## 1. 文件分工
 
 ### 1.1 顶层说明文档
@@ -401,6 +421,7 @@ Codex 可以基于对话上下文推进，但长期维护不能依赖“之前�
 2. 对应文档是否同步了
   - `README.md`
   - `CURRENT_DESIGN.md`
+  - `DOSSIER_V1_MAINLINE.md`
   - `ARTIFACT_SCHEMA.md`
   - `STATUS.md`
   - `EXPERIMENT_LOG.md`

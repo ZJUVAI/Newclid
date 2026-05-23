@@ -2,6 +2,65 @@
 
 本文件用于实时记录 `experiments/cot_sft_generation` 近期实验、证据和当前运行状态。
 
+## 2026-05-22 weak similarity bridge gate 继续收紧，但 full-12 进入 `0/12`
+
+### 本轮实现
+
+- `f7b54cc` `Reject weak similarity bridge steps without local correspondence support`
+  - 真实变化：
+    - `similar_step_with_aux_lacks_local_correspondence_support(...)`
+      -> `similar_step_lacks_local_correspondence_support(...)`
+    - local-correspondence support 不再只要求给“带 aux 点的 similarity bridge”
+    - 现在所有 similarity bridge claim 都要过同一层 gate，包括 goal-side similarity closure
+  - 目的：
+    - 继续压掉“看起来像 similarity bridge，但 supports 只覆盖一半对象”的弱闭环
+
+- 同轮测试补强：
+  - `tests/test_cot_sft_fixture_pipeline.py`
+  - 新增 synthetic clean scripted-fallback fixture，避免 fallback/control-flow 测试继续把 benchmark sample6 当正例依赖
+  - 新增 regression：
+    - `test_similar_step_local_correspondence_gate_rejects_nonaux_similarity_bridge`
+  - 这条 regression 直接覆盖了 `triangles bce and dbe are similar` 这类不含 aux 点、但缺 local correspondence support 的弱 bridge
+
+### 自动验证
+
+- `python -m unittest discover -s tests -p 'test_cot_sft_*.py'`
+  - 当前结果：`Ran 115 tests ... OK`
+- `python experiments/cot_sft_generation/maintenance_smoke_check.py`
+  - 当前结果：全部检查通过
+
+### live run 记录
+
+- 最新完整 full-12 证据目前仍在 `/tmp`，应视为 temporary evidence：
+  - `/tmp/cot_sft_quality_review_v1_full12_20260522_postsimbridge_artifacts_20260522_125400/summary.json`
+  - 对应输出：
+    - `/tmp/cot_sft_quality_review_v1_full12_20260522_postsimbridge.jsonl`
+  - 模型：`qwen/qwen2.5-vl-72b-instruct`
+  - 结果：
+    - `successful_items`: `0/12`
+    - `failed_items`: `12/12`
+    - `surface_pass_items`: `0/12`
+    - `surface_fail_items`: `12/12`
+    - `avg_attempts_used`: `3.0`
+- 当前 full-12 里最稳定的失败族：
+  - `unsupported angle/ratio/similar segments before supports ground them`
+  - `missing symbolic directional coverage`
+  - `missing local pairwise support`
+  - `missing local correspondence support`
+  - `scripted dossier skeleton invalid: bridge_chain must not be empty`
+
+### 当前判断
+
+- 这轮 `0/12` 不是“质量已经达标”，而是：
+  - 弱 similarity / ratio / angle route 更少继续伪装成 `surface_pass`
+  - 当前主线已经明显 fail-closed
+- 但它同时也说明：
+  - 当前瓶颈不再是 prompt 还不够严
+  - 当前更大的缺口是 `scripted dossier skeleton` 和 planner hygiene 还不能稳定恢复 grounded positive chain
+- 因此，下个阶段最值得做的不是继续 prompt-only tightening 或再叠一层 gate，而是：
+  - 先恢复 `eqratio` / `simtri` 这类正例构造能力
+  - 先让 `bridge_chain` 真正非空、support 真正 local，再回到 full-12 看是否能恢复少量真实正例
+
 ## 2026-05-22 boundary checks 生效，但 prompt-only tightening 仍不足
 
 ### 本轮实现

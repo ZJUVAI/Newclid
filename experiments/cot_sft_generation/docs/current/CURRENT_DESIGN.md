@@ -31,6 +31,11 @@
   - `generated/dossier_v1_stratified4_rerun4_20260520_artifacts_20260520_062623/summary.json`
   - 结果：`3/4 surface_pass`
   - 同一 run 的人工/Codex 语义审读结果：`0/3 semantic_pass`，`3/3 manual_critical_error`
+- 2026-05-22 的最新严格门控证据目前仍是临时 `/tmp` artifact：
+  - `/tmp/cot_sft_quality_review_v1_full12_20260522_postsimbridge_artifacts_20260522_125400/summary.json`
+  - 结果：`0/12 surface_pass`
+  - 对应实现变化：similarity bridge 的 local-correspondence gate 已从“只拦带 aux 点的 similarity claim”扩展为“所有 similarity bridge claim 都必须过门”
+  - 含义：当前 runtime 对 weak angle / ratio / similarity closure 明显更 fail-closed；下一步方向见 `DOSSIER_V1_MAINLINE.md`
 
 下面详细字段说明里仍保留了 legacy `model_evidence` 的字段和 contract，目的是方便维护 fallback 路线；当 README、STATUS 与本文件局部描述有冲突时，以 README 和 STATUS 中的最新 rollout 状态为准。
 
@@ -184,6 +189,10 @@ legacy `model_evidence_legacy` 的流程如下，保留原说明用于 fallback 
 3. route grounding
    - `coordinate_relations` 必须贴合 hidden coordinate candidates
    - `bridge_steps` 必须尽量贴合 hidden proof guidance 给出的真实 bridge / finish 路线
+   - `angle` / `ratio` / `similarity` 这类高阶 bridge 或 closure 现在不能只靠 wording 过关：
+     - `angle` goal-side closure 需要 symbolic directional coverage
+     - `ratio` claim 需要 local pairwise support
+     - `similarity` claim 不论是否含 aux 点，都需要 local correspondence support
 
 4. 脚本自动补充的派生字段
    - `bridge_relations`

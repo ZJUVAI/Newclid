@@ -133,6 +133,40 @@
     - 一些样本虽然 `surface_pass`，但后半段 route 仍然是伪闭环
     - 这说明 `dossier_v1` 已经把端到端 orchestration 跑通，但默认 `qwen` 还没有给出可直接批量使用的语义质量
 
+### 阶段 9：继续收紧 weak bridge gate，但 full-12 已进入 fail-closed
+
+- 2026-05-22 这轮继续把“看起来顺、实际支撑不足”的弱闭环显式打回，最近一串关键提交包括：
+  - `923c571`：`Reject angle closures without directional coverage`
+  - `cf0a871`：`Reject ratio closures without local pair support`
+  - `1aa1191`：`Reject weak similarity closures without local correspondence support`
+  - `f7b54cc`：`Reject weak similarity bridge steps without local correspondence support`
+- 其中 `f7b54cc` 的真实变化不是再加一条 prompt 约束，而是把 similarity 的 local-correspondence gate 从“只拦 aux-point similarity bridge”扩展成“所有 similarity bridge claim 都要过门”。
+- 自动验证：
+  - `python -m unittest discover -s tests -p 'test_cot_sft_*.py'`
+    - 当前结果：`Ran 115 tests ... OK`
+  - `python experiments/cot_sft_generation/maintenance_smoke_check.py`
+    - 当前结果：全部检查通过
+- 最新完整 live 证据目前仍是临时 `/tmp` artifact：
+  - `/tmp/cot_sft_quality_review_v1_full12_20260522_postsimbridge_artifacts_20260522_125400/summary.json`
+  - 结果：
+    - `successful_items`: `0/12`
+    - `surface_pass_items`: `0/12`
+    - `surface_fail_items`: `12/12`
+    - `semantic_review_status`: `not_reviewed`
+- 这轮 `0/12` 不能当成质量达标，只能说明：
+  - angle / ratio / similarity 这三类弱闭环更少伪装成 `surface_pass`
+  - 但当前 `scripted dossier skeleton` 与 planner hygiene 还不能稳定恢复 grounded positive chain
+- 最新 full-12 暴露的主错误族已经比较稳定：
+  - `unsupported angle/ratio/similar segments before supports ground them`
+  - `missing symbolic directional coverage`
+  - `missing local pairwise support`
+  - `missing local correspondence support`
+  - `scripted dossier skeleton invalid: bridge_chain must not be empty`
+- 当前主结论：
+  - 在“不要放出表面通过但语义站不住的数据”这件事上，当前实现更安全了
+  - 但主线已经进入 zero-recall 的 fail-closed 状态，离“可批量产出高质量样本”仍有明显距离
+  - 下一步不应继续优先加严 gate，而应优先恢复真正站得住的正例，重点看 `eqratio` / `simtri` 这类 scripted bridge construction 与 planner support hygiene
+
 ## 当前流程概括
 
 - 当前默认主链：`dossier_v1`
