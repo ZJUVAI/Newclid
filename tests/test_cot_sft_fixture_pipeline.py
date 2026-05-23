@@ -5,10 +5,12 @@ from pathlib import Path
 from unittest.mock import patch
 
 from experiments.cot_sft_generation.generate_cot_sft import (
+    build_aux_goal_bridge_tail_relations,
     build_dossier_goal_tail_relations,
     build_hidden_proof_guidance,
     build_scripted_dossier_writer_body,
     build_scripted_dossier_skeleton,
+    extract_aux_and_rest,
     generate_dossier_thinking,
     high_level_step_lacks_symbolic_directional_coverage,
     low_level_equality_claim_lacks_symbolic_support,
@@ -869,6 +871,28 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             goal_tail_relations,
         )
 
+    def test_build_aux_goal_bridge_tail_relations_prefers_local_reconnect_on_sanitized_real_late_fact_sample(self):
+        record = self._load_quality_review_record(9)
+        aux_part, sanitized_rest = extract_aux_and_rest(record["llm_output_renamed"])
+        proof_guidance = build_hidden_proof_guidance(
+            sanitized_rest,
+            aux_part,
+            "simtrir a g i i g h",
+        )
+
+        tail_relations = build_aux_goal_bridge_tail_relations(
+            proof_guidance,
+            "triangles agi and igh are similar",
+            ["j", "k"],
+            list(record["point_coords_grid"]) + ["j", "k"],
+        )
+
+        self.assertEqual(
+            tail_relations[0],
+            "f, g, k are collinear",
+        )
+        self.assertNotIn("circle g d e k", tail_relations)
+
     def test_build_scripted_dossier_skeleton_keeps_real_late_fact_similarity_precheckpoint_bridge(self):
         record = self._load_quality_review_record(9)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
@@ -897,6 +921,33 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertIn(
             "angle ai/bi equals angle hi/di",
             bridge_claims,
+        )
+
+    def test_build_scripted_dossier_skeleton_accepts_real_late_fact_sample_on_actual_sanitized_pipeline_path(self):
+        record = self._load_quality_review_record(9)
+        aux_part, sanitized_rest = extract_aux_and_rest(record["llm_output_renamed"])
+
+        ok, message, dossier = build_scripted_dossier_skeleton(
+            record,
+            aux_part,
+            sanitized_rest,
+            record["point_coords_grid"],
+            "simtrir a g i i g h",
+        )
+
+        self.assertTrue(ok, message)
+        self.assertIsNotNone(dossier)
+        bridge_claims = [
+            step.get("claim", "")
+            for step in dossier.get("bridge_chain", [])
+        ]
+        self.assertEqual(
+            bridge_claims[0],
+            "f, g, k are collinear",
+        )
+        self.assertIn(
+            "triangles agi and igh are similar",
+            build_scripted_dossier_writer_body(dossier),
         )
 
     def test_validate_dossier_plan_response_rejects_bare_point_equality_claim(self):

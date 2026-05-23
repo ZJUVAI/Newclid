@@ -4894,6 +4894,65 @@ def prune_unreferenced_dossier_coordinate_checks(coordinate_checks, bridge_chain
     return pruned_coordinate_checks, pruned_bridge_chain, pruned_goal_support_refs
 
 
+def aux_goal_bridge_relation_locality_priority(relation):
+    keywords = relation_text_keywords(relation)
+    triangle_family = triangle_relation_family(relation)
+    if "circle" in keywords:
+        return 0
+    if keywords & {"equal", "midpoint"}:
+        return 3
+    if keywords & {"collinear", "parallel", "perpendicular"}:
+        return 2
+    if triangle_family in {"similar", "congruent"} or keywords & {"angle", "ratio"}:
+        return 1
+    return 0
+
+
+def should_defer_broad_aux_goal_bridge_relation(
+    relation,
+    remaining_relations,
+    target_segments,
+    target_points,
+    aux_point_set,
+    known_points,
+):
+    relation_keywords = relation_text_keywords(relation)
+    if "circle" not in relation_keywords:
+        return False
+
+    relation_points = extract_point_mentions(relation, known_points)
+    if len(relation_points) < 4:
+        return False
+
+    for candidate in remaining_relations or []:
+        lowered_candidate = candidate.lower()
+        if lowered_candidate == relation.lower():
+            continue
+        if relation_contains_forbidden_thinking_pattern(candidate):
+            continue
+        if (
+            relation_has_tautological_ratio_side(candidate)
+            or relation_has_tautological_angle_side(candidate)
+            or relation_is_bare_point_equality(candidate)
+        ):
+            continue
+        candidate_points = extract_point_mentions(candidate, known_points)
+        candidate_segments = extract_relation_segment_tokens(candidate)
+        if not (candidate_points & aux_point_set):
+            continue
+        if not (
+            (candidate_segments & target_segments)
+            or (candidate_points & target_points)
+        ):
+            continue
+        if aux_goal_bridge_relation_locality_priority(candidate) < 2:
+            continue
+        if len(candidate_points) >= len(relation_points):
+            continue
+        return True
+    return False
+
+
 def build_aux_goal_bridge_tail_relations(
     proof_guidance,
     goal_finish,
@@ -4923,7 +4982,8 @@ def build_aux_goal_bridge_tail_relations(
     selected = []
     seen_relations = {normalized_goal_finish.lower()}
 
-    for relation in reversed(ordered_route_relations):
+    for route_index in range(len(ordered_route_relations) - 1, -1, -1):
+        relation = ordered_route_relations[route_index]
         lowered_relation = relation.lower()
         if lowered_relation in seen_relations:
             continue
@@ -4940,6 +5000,15 @@ def build_aux_goal_bridge_tail_relations(
         if not (relation_points & aux_point_set):
             continue
         if not ((relation_segments & target_segments) or (relation_points & target_points)):
+            continue
+        if should_defer_broad_aux_goal_bridge_relation(
+            relation,
+            ordered_route_relations[:route_index],
+            target_segments,
+            target_points,
+            aux_point_set,
+            known_points,
+        ):
             continue
         selected.append(relation)
         seen_relations.add(lowered_relation)
