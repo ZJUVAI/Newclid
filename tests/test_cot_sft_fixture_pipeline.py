@@ -983,6 +983,40 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             )
         )
 
+    def test_build_scripted_dossier_skeleton_filters_tautological_ratio_bridge_from_real_simtri_route(self):
+        record = self._load_quality_review_record(8)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+
+        def passthrough_validate(raw_dossier, *args, **kwargs):
+            return True, "forced", raw_dossier
+
+        with patch(
+            "experiments.cot_sft_generation.generate_cot_sft.validate_dossier_plan_response",
+            side_effect=passthrough_validate,
+        ):
+            ok, message, dossier = build_scripted_dossier_skeleton(
+                record,
+                aux_part,
+                sanitized_rest,
+                record["point_coords_grid"],
+                "simtri a b e d c a",
+            )
+
+        self.assertTrue(ok, message)
+        self.assertIsNotNone(dossier)
+        bridge_claims = [
+            step.get("claim", "")
+            for step in dossier.get("bridge_chain", [])
+        ]
+        goal_claims = [
+            step.get("claim", "")
+            for step in dossier.get("goal_closure", [])
+        ]
+        self.assertNotIn(
+            "ratio ab to ac equals ratio ag to ag",
+            bridge_claims + goal_claims,
+        )
+
     def test_build_scripted_dossier_skeleton_rejects_real_eqratio_benchmark_sample_with_ungrounded_similarity_bridge(self):
         record = self._load_quality_review_record(6)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)

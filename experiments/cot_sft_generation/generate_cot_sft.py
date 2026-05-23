@@ -3466,11 +3466,27 @@ def build_scripted_plan_skeleton(
         proof_guidance_payload=proof_guidance_payload,
     )
 
-    route_relations = proof_guidance_payload.get("ordered_route_relations") or (
+    raw_route_relations = proof_guidance_payload.get("ordered_route_relations") or (
         proof_guidance_payload.get("aux_bridge_relations", [])
         + proof_guidance_payload.get("bridge_relations", [])
         + proof_guidance_payload.get("goal_finish_relations", [])
     )
+    route_relations = []
+    for relation in raw_route_relations:
+        if not isinstance(relation, str) or not relation.strip():
+            continue
+        normalized_relation = normalize_relation_surface(relation).strip()
+        if not normalized_relation:
+            continue
+        if relation_contains_forbidden_thinking_pattern(normalized_relation):
+            continue
+        if (
+            relation_has_tautological_ratio_side(normalized_relation)
+            or relation_has_tautological_angle_side(normalized_relation)
+            or relation_is_bare_point_equality(normalized_relation)
+        ):
+            continue
+        route_relations.append(normalized_relation)
     observation_relations = build_observation_relations_for_skeleton(
         coordinate_candidates,
         route_relations,
