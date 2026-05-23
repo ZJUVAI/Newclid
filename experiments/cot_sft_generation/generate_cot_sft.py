@@ -1984,7 +1984,7 @@ def similar_step_lacks_local_correspondence_support(
         support_keywords = relation_text_keywords(support)
         support_triangle_family = triangle_relation_family(support)
         if support_triangle_family not in {"similar", "congruent"} and not (
-            support_keywords & {"angle", "ratio", "equal", "parallel", "perpendicular"}
+            support_keywords & {"angle", "ratio", "equal", "parallel", "perpendicular", "circle", "collinear"}
         ):
             continue
         support_segments = extract_relation_segment_tokens(support)
@@ -4818,6 +4818,101 @@ def find_triangle_transfer_checkpoint(
     return best_relation
 
 
+def similarity_local_support_relation(relation, goal_finish, known_points):
+    normalized_relation = normalize_relation_surface(relation or "").strip()
+    if not normalized_relation:
+        return False
+    relation_keywords = relation_text_keywords(normalized_relation)
+    relation_triangle_family = triangle_relation_family(normalized_relation)
+    if relation_triangle_family not in {"similar", "congruent"} and not (
+        relation_keywords & {"angle", "ratio", "parallel", "perpendicular", "circle", "collinear"}
+    ):
+        return False
+
+    goal_segments = extract_relation_segment_tokens(goal_finish)
+    goal_points = extract_point_mentions(goal_finish, known_points)
+    relation_segments = extract_relation_segment_tokens(normalized_relation)
+    relation_points = extract_point_mentions(normalized_relation, known_points)
+    return (
+        len(goal_segments & relation_segments) >= 3
+        and len(goal_points & relation_points) >= 3
+    )
+
+
+def find_similarity_goal_tail_checkpoint(
+    ordered_route_relations,
+    goal_finish,
+    goal_tail_relations,
+    known_points,
+):
+    normalized_goal_finish = normalize_relation_surface(goal_finish or "").strip()
+    if triangle_relation_family(normalized_goal_finish) != "similar":
+        return ""
+
+    existing_relations = [
+        normalize_relation_surface(relation).strip()
+        for relation in (goal_tail_relations or [])
+        if isinstance(relation, str) and relation.strip()
+    ]
+    if sum(
+        1
+        for relation in existing_relations
+        if similarity_local_support_relation(relation, normalized_goal_finish, known_points)
+    ) >= 2:
+        return ""
+
+    existing_lower = {relation.lower() for relation in existing_relations}
+    goal_segments = extract_relation_segment_tokens(normalized_goal_finish)
+    goal_points = extract_point_mentions(normalized_goal_finish, known_points)
+
+    best_relation = ""
+    best_key = None
+    for route_relation in reversed(ordered_route_relations or []):
+        normalized_route_relation = normalize_relation_surface(route_relation).strip()
+        if not normalized_route_relation:
+            continue
+        if relations_semantically_match(
+            normalized_route_relation,
+            normalized_goal_finish,
+            known_points,
+        ):
+            continue
+        lowered = normalized_route_relation.lower()
+        if lowered in existing_lower:
+            continue
+        if relation_contains_forbidden_thinking_pattern(normalized_route_relation):
+            continue
+        if (
+            relation_has_tautological_ratio_side(normalized_route_relation)
+            or relation_has_tautological_angle_side(normalized_route_relation)
+            or relation_is_bare_point_equality(normalized_route_relation)
+        ):
+            continue
+        if not similarity_local_support_relation(
+            normalized_route_relation,
+            normalized_goal_finish,
+            known_points,
+        ):
+            continue
+        relation_keywords = relation_text_keywords(normalized_route_relation)
+        relation_triangle_family = triangle_relation_family(normalized_route_relation)
+        relation_segments = extract_relation_segment_tokens(normalized_route_relation)
+        relation_points = extract_point_mentions(normalized_route_relation, known_points)
+        key = (
+            1 if relation_triangle_family in {"similar", "congruent"} else 0,
+            1 if "angle" in relation_keywords else 0,
+            1 if "ratio" in relation_keywords else 0,
+            len(goal_segments & relation_segments),
+            len(goal_points & relation_points),
+            -len(normalized_route_relation),
+            normalized_route_relation.lower(),
+        )
+        if best_key is None or key > best_key:
+            best_key = key
+            best_relation = normalized_route_relation
+    return best_relation
+
+
 def build_dossier_goal_tail_relations(
     proof_guidance,
     goal_finish,
@@ -4889,6 +4984,15 @@ def build_dossier_goal_tail_relations(
             )
             if checkpoint_relation:
                 goal_tail_relations = [checkpoint_relation, transfer_relation]
+
+    similarity_checkpoint_relation = find_similarity_goal_tail_checkpoint(
+        ordered_route_relations,
+        normalized_goal_finish,
+        goal_tail_relations,
+        known_points,
+    )
+    if similarity_checkpoint_relation:
+        goal_tail_relations = [similarity_checkpoint_relation] + goal_tail_relations
     return goal_tail_relations
 
 
