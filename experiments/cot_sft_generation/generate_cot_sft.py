@@ -20,6 +20,7 @@ import random
 import re
 import sys
 import time
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
@@ -1761,6 +1762,12 @@ def compute_bridge_step_required_support_cap(step):
         return 2
     relation_text = step.get("approved_route_relation") or step.get("relation", "")
     relation_keywords = relation_text_keywords(relation_text)
+    if (
+        not triangle_relation_family(relation_text)
+        and "equal" in relation_keywords
+        and not relation_keywords & {"angle", "ratio", "similar", "parallel", "perpendicular", "circle", "collinear"}
+    ):
+        return 4
     if relation_keywords & {"similar", "ratio"}:
         return 4 if len(extract_relation_segment_tokens(relation_text)) >= 4 else 3
     if relation_keywords & {"angle"}:
@@ -2051,6 +2058,11 @@ def low_level_equality_claim_lacks_symbolic_support(
     claim_segments = extract_relation_segment_tokens(relation_text)
     claim_points = extract_point_mentions(relation_text, point_names)
     support_refs = list(support_refs or [])
+    support_pairs = [
+        (str(support_refs[idx]).lower() if idx < len(support_refs) else "", support)
+        for idx, support in enumerate(support_relations or [])
+        if isinstance(support, str) and support.strip()
+    ]
 
     symbolic_segment_coverage = set()
     symbolic_point_support_count = 0
@@ -2085,6 +2097,19 @@ def low_level_equality_claim_lacks_symbolic_support(
     if exact_symbolic_match:
         return False
     if claim_segments:
+        symbolic_path = _find_symbolic_equality_support_path(
+            relation_text,
+            [
+                (support_ref, support_text)
+                for support_ref, support_text in support_pairs
+                if not (
+                    support_ref.startswith("image_scan[")
+                    or support_ref.startswith("coordinate_checks[")
+                )
+            ],
+        )
+        if symbolic_path:
+            return False
         return not claim_segments.issubset(symbolic_segment_coverage)
     if len(claim_points) >= 2:
         return symbolic_point_support_count < 2
@@ -4048,6 +4073,136 @@ def select_symbolic_equality_support_refs(
     return [item[-1] for item in candidates[:max_supports]]
 
 
+def _canonical_support_segment_token(segment_text):
+    normalized = str(segment_text or "").strip().lower()
+    if len(normalized) != 2:
+        return normalized
+    return "".join(sorted(normalized))
+
+
+def extract_symbolic_equality_edges(relation_text):
+    normalized_relation = normalize_relation_surface(relation_text or "").strip().lower()
+    if not normalized_relation:
+        return set()
+
+    edges = set()
+    for match in re.finditer(r"\b([a-z]{2})\b equals \b([a-z]{2})\b", normalized_relation):
+        edges.add(
+            tuple(
+                sorted(
+                    [
+                        _canonical_support_segment_token(match.group(1)),
+                        _canonical_support_segment_token(match.group(2)),
+                    ]
+                )
+            )
+        )
+
+    midpoint_match = re.fullmatch(
+        r"(?:point\s+)?([a-z])\s+is\s+the\s+midpoint\s+of\s+([a-z])([a-z])",
+        normalized_relation,
+    )
+    if midpoint_match:
+        midpoint = midpoint_match.group(1).lower()
+        endpoint_a = midpoint_match.group(2).lower()
+        endpoint_b = midpoint_match.group(3).lower()
+        edges.add(
+            tuple(
+                sorted(
+                    [
+                        _canonical_support_segment_token(midpoint + endpoint_a),
+                        _canonical_support_segment_token(midpoint + endpoint_b),
+                    ]
+                )
+            )
+        )
+
+    return edges
+
+
+def _find_symbolic_equality_support_path(
+    relation_text,
+    support_pairs,
+):
+    relation_segments = list(sorted(extract_relation_segment_tokens(relation_text)))
+    if len(relation_segments) != 2:
+        return []
+    source_segment, target_segment = relation_segments
+    if source_segment == target_segment:
+        return []
+
+    adjacency = {}
+    for pair_index, (_, relation_text_value) in enumerate(support_pairs):
+        for left_segment, right_segment in extract_symbolic_equality_edges(relation_text_value):
+            adjacency.setdefault(left_segment, []).append((right_segment, pair_index))
+            adjacency.setdefault(right_segment, []).append((left_segment, pair_index))
+
+    if source_segment not in adjacency or target_segment not in adjacency:
+        return []
+
+    queue = deque([(source_segment, [], set())])
+    seen_states = {(source_segment, frozenset())}
+    while queue:
+        current_segment, path_indices, used_supports = queue.popleft()
+        if current_segment == target_segment:
+            return path_indices
+        for next_segment, pair_index in adjacency.get(current_segment, []):
+            next_used_supports = used_supports
+            next_path_indices = path_indices
+            if pair_index not in used_supports:
+                if len(path_indices) >= 4:
+                    continue
+                next_used_supports = set(used_supports)
+                next_used_supports.add(pair_index)
+                next_path_indices = path_indices + [pair_index]
+            state = (next_segment, frozenset(next_used_supports))
+            if state in seen_states:
+                continue
+            seen_states.add(state)
+            queue.append((next_segment, next_path_indices, next_used_supports))
+    return []
+
+
+def select_symbolic_equality_path_support_refs(
+    relation_text,
+    support_catalog,
+    max_supports=4,
+):
+    if max_supports <= 0:
+        return []
+
+    support_pairs = []
+    for item in support_catalog or []:
+        relation = item.get("relation", "")
+        ref = str(item.get("ref", ""))
+        if not relation or not ref:
+            continue
+        lowered_ref = ref.lower()
+        if (
+            lowered_ref.startswith("image_scan[")
+            or lowered_ref.startswith("coordinate_checks[")
+        ):
+            continue
+        if not extract_symbolic_equality_edges(relation):
+            continue
+        support_pairs.append((ref, relation))
+
+    path_indices = _find_symbolic_equality_support_path(
+        relation_text,
+        support_pairs,
+    )
+    if not path_indices:
+        return []
+    refs = []
+    for pair_index in path_indices:
+        ref = support_pairs[pair_index][0]
+        if ref not in refs:
+            refs.append(ref)
+        if len(refs) >= max_supports:
+            break
+    return refs
+
+
 def select_dossier_support_refs_for_relation(
     relation_text,
     support_catalog,
@@ -4057,6 +4212,12 @@ def select_dossier_support_refs_for_relation(
     max_supports=2,
 ):
     support_catalog = support_catalog or []
+    relation_keywords = relation_text_keywords(relation_text)
+    low_level_equality_claim = (
+        not triangle_relation_family(relation_text)
+        and "equal" in relation_keywords
+        and not relation_keywords & {"angle", "ratio", "similar", "parallel", "perpendicular", "circle", "collinear"}
+    )
     preferred_refs = map_support_relations_to_dossier_refs(
         preferred_supports or [],
         support_catalog,
@@ -4072,6 +4233,20 @@ def select_dossier_support_refs_for_relation(
         point_names,
         max_supports=max_supports,
     )
+    symbolic_equality_path_refs = select_symbolic_equality_path_support_refs(
+        relation_text,
+        support_catalog,
+        max_supports=max_supports,
+    )
+    if low_level_equality_claim and symbolic_equality_path_refs:
+        combined = []
+        for ref in preferred_refs + symbolic_equality_path_refs:
+            if ref not in combined:
+                combined.append(ref)
+            if len(combined) >= max_supports:
+                break
+        if combined:
+            return combined
     symbolic_equality_refs = select_symbolic_equality_support_refs(
         relation_text,
         support_catalog,
@@ -4098,7 +4273,14 @@ def select_dossier_support_refs_for_relation(
         max_supports=max_supports,
     )
     combined = []
-    for ref in preferred_refs + symbolic_equality_refs + symbolic_refs + relay_refs + ranked_refs:
+    for ref in (
+        preferred_refs
+        + symbolic_equality_path_refs
+        + symbolic_equality_refs
+        + symbolic_refs
+        + relay_refs
+        + ranked_refs
+    ):
         if ref not in combined:
             combined.append(ref)
         if len(combined) >= max_supports:

@@ -10,7 +10,9 @@ from experiments.cot_sft_generation.generate_cot_sft import (
     build_scripted_dossier_writer_body,
     build_scripted_dossier_skeleton,
     generate_dossier_thinking,
+    low_level_equality_claim_lacks_symbolic_support,
     process_and_generate_sft,
+    select_dossier_support_refs_for_relation,
     similar_step_lacks_local_correspondence_support,
     validate_dossier_plan_response,
     validate_dossier_writer_body,
@@ -763,6 +765,52 @@ class CotSftFixturePipelineTest(unittest.TestCase):
 
         self.assertFalse(ok)
         self.assertIn("tautological angle", message)
+
+    def test_low_level_equality_claim_accepts_transitive_symbolic_support_chain(self):
+        step = {
+            "relation": "af equals ad",
+            "approved_route_relation": "af equals ad",
+        }
+        support_relations = [
+            "ac equals af",
+            "ac equals bd",
+            "ad equals bd",
+        ]
+        support_refs = [
+            "bridge_chain[1]",
+            "visible_facts[1]",
+            "visible_facts[2]",
+        ]
+
+        lacks_support = low_level_equality_claim_lacks_symbolic_support(
+            step,
+            support_relations,
+            ["a", "b", "c", "d", "e", "f"],
+            support_refs=support_refs,
+        )
+
+        self.assertFalse(lacks_support)
+
+    def test_select_dossier_support_refs_for_equality_prefers_transitive_chain(self):
+        support_catalog = [
+            {"ref": "bridge_chain[1]", "relation": "ac equals af"},
+            {"ref": "visible_facts[1]", "relation": "ac equals bd"},
+            {"ref": "visible_facts[2]", "relation": "ad equals bd"},
+            {"ref": "visible_facts[3]", "relation": "ab equals ac"},
+        ]
+
+        refs = select_dossier_support_refs_for_relation(
+            "af equals ad",
+            support_catalog,
+            ["a", "b", "c", "d", "e", "f"],
+            max_supports=4,
+        )
+
+        self.assertEqual(len(refs), 3)
+        self.assertEqual(
+            set(refs),
+            {"bridge_chain[1]", "visible_facts[1]", "visible_facts[2]"},
+        )
 
     def test_build_scripted_dossier_skeleton_rejects_real_contrir_transfer_sample_with_ungrounded_equality_chain(self):
         record = self._load_quality_review_record(5)
