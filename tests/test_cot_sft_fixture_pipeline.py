@@ -501,6 +501,31 @@ class CotSftFixturePipelineTest(unittest.TestCase):
 
         self.assertFalse(lacks_coverage)
 
+    def test_angle_bridge_symbolic_directional_coverage_accepts_symbolic_equality_bridge_for_missing_ray(self):
+        step = {
+            "relation": "angle ab/ac equals angle ad/ae",
+            "approved_route_relation": "angle ab/ac equals angle ad/ae",
+        }
+        support_relations = [
+            "angle ac/ad equals angle cf/df",
+            "angle ab/bc equals angle bc/ac",
+            "ad equals ae",
+        ]
+        support_refs = [
+            "bridge_chain[1]",
+            "visible_facts[1]",
+            "bridge_chain[2]",
+        ]
+
+        lacks_coverage = high_level_step_lacks_symbolic_directional_coverage(
+            step,
+            support_relations,
+            ["a", "b", "c", "d", "e", "f"],
+            support_refs=support_refs,
+        )
+
+        self.assertFalse(lacks_coverage)
+
     def test_validate_dossier_plan_response_rejects_angle_bridge_without_directional_relay(self):
         dossier = {
             "visible_facts": [
@@ -871,6 +896,26 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             goal_tail_relations,
         )
 
+    def test_build_dossier_goal_tail_relations_prepends_goal_side_equality_checkpoint_for_real_eqangle_sample(self):
+        record = self._load_quality_review_record(1)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+        proof_guidance = build_hidden_proof_guidance(
+            sanitized_rest,
+            aux_part,
+            "eqangle a b a c a d a e",
+        )
+
+        goal_tail_relations = build_dossier_goal_tail_relations(
+            proof_guidance,
+            "angle ab/ac equals angle ad/ae",
+            list(record["point_coords_grid"]) + ["f"],
+        )
+
+        self.assertEqual(
+            goal_tail_relations[0],
+            "ad equals ae",
+        )
+
     def test_build_aux_goal_bridge_tail_relations_prefers_local_reconnect_on_sanitized_real_late_fact_sample(self):
         record = self._load_quality_review_record(9)
         aux_part, sanitized_rest = extract_aux_and_rest(record["llm_output_renamed"])
@@ -1125,7 +1170,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             or "missing symbolic directional coverage" in message
         )
 
-    def test_build_scripted_dossier_skeleton_rejects_real_eqangle_sample_with_incomplete_directional_coverage(self):
+    def test_build_scripted_dossier_skeleton_accepts_real_eqangle_sample_with_symbolic_goal_side_equality_bridge(self):
         record = self._load_quality_review_record(1)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
 
@@ -1137,10 +1182,15 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             "eqangle a b a c a d a e",
         )
 
-        self.assertFalse(ok)
-        self.assertTrue(
-            "missing symbolic directional coverage" in message
-            or "bridge_chain must not be empty" in message
+        self.assertTrue(ok, message)
+        self.assertIsNotNone(dossier)
+        bridge_claims = [
+            step.get("claim", "")
+            for step in dossier.get("bridge_chain", [])
+        ]
+        self.assertIn(
+            "ad equals ae",
+            bridge_claims,
         )
 
     def test_build_scripted_dossier_skeleton_keeps_real_eqratio_pair_grounded_midpoint_bridge(self):
@@ -1607,7 +1657,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertIn("missing local pairwise support", message)
         self.assertIsNone(dossier)
 
-    def test_build_scripted_dossier_writer_body_rejects_real_eqangle_sample_with_incomplete_directional_coverage(self):
+    def test_build_scripted_dossier_writer_body_accepts_real_eqangle_sample_with_symbolic_goal_side_equality_bridge(self):
         record = self._load_quality_review_record(1)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
         ok, message, dossier = build_scripted_dossier_skeleton(
@@ -1617,11 +1667,10 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             record["point_coords_grid"],
             "eqangle a b a c a d a e",
         )
-        self.assertFalse(ok)
-        self.assertTrue(
-            "missing symbolic directional coverage" in message
-            or "bridge_chain must not be empty" in message
-        )
+        self.assertTrue(ok, message)
+        writer_output = build_scripted_dossier_writer_body(dossier)
+        self.assertIn("ad equals ae", writer_output)
+        self.assertIn("angle ab/ac equals angle ad/ae", writer_output)
 
     def test_build_scripted_dossier_writer_body_rejects_real_simtrir_sample_with_ungrounded_goal_closure(self):
         record = self._load_quality_review_record(2)

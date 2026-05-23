@@ -1929,7 +1929,10 @@ def high_level_step_lacks_symbolic_directional_coverage(
     if "angle" not in relation_keywords or relation_keywords & {"ratio", "similar"}:
         return False
 
-    claim_segments = extract_relation_segment_tokens(relation_text)
+    claim_segments = {
+        _canonical_support_segment_token(segment)
+        for segment in extract_relation_segment_tokens(relation_text)
+    }
     if not claim_segments:
         return False
     claim_points = extract_point_mentions(relation_text, point_names)
@@ -1939,33 +1942,66 @@ def high_level_step_lacks_symbolic_directional_coverage(
     symbolic_directional_segments = set()
     grounded_segments = set()
     saw_noncoordinate_directional = False
+    symbolic_equality_edges = set()
     for idx, support in enumerate(support_relations or []):
         if not isinstance(support, str) or not support.strip():
             continue
         support_ref = str(support_refs[idx]).lower() if idx < len(support_refs) else ""
         support_keywords = relation_text_keywords(support)
         support_triangle_family = triangle_relation_family(support)
-        if support_triangle_family not in {"similar", "congruent"} and not (
-            support_keywords & directional_keywords
-        ):
-            if not support_ref.startswith("coordinate_checks["):
-                continue
         support_points = extract_point_mentions(support, point_names)
         if len(claim_points & support_points) < 2:
             continue
-        support_segments = extract_relation_segment_tokens(support)
+        support_segments = {
+            _canonical_support_segment_token(segment)
+            for segment in extract_relation_segment_tokens(support)
+        }
         overlap_segments = claim_segments & support_segments
         if not overlap_segments:
             continue
+        supports_directional = bool(
+            support_triangle_family in {"similar", "congruent"}
+            or support_keywords & directional_keywords
+        )
+        supports_symbolic_equality = bool(
+            not (
+                support_ref.startswith("image_scan[")
+                or support_ref.startswith("coordinate_checks[")
+            )
+            and extract_symbolic_equality_edges(support)
+        )
+        if not supports_directional and not (
+            support_ref.startswith("coordinate_checks[")
+            or supports_symbolic_equality
+        ):
+            continue
         grounded_segments.update(overlap_segments)
+        if not (
+            support_ref.startswith("image_scan[")
+            or support_ref.startswith("coordinate_checks[")
+        ):
+            symbolic_equality_edges.update(extract_symbolic_equality_edges(support))
         if support_ref.startswith("image_scan["):
             continue
-        if support_triangle_family in {"similar", "congruent"} or (
-            support_keywords & directional_keywords
-        ):
+        if supports_directional:
             symbolic_directional_segments.update(overlap_segments)
             if not support_ref.startswith("coordinate_checks["):
                 saw_noncoordinate_directional = True
+    if symbolic_equality_edges and symbolic_directional_segments:
+        adjacency = {}
+        for left_segment, right_segment in symbolic_equality_edges:
+            adjacency.setdefault(left_segment, set()).add(right_segment)
+            adjacency.setdefault(right_segment, set()).add(left_segment)
+        expanded_segments = set(symbolic_directional_segments)
+        queue = deque(symbolic_directional_segments)
+        while queue:
+            current_segment = queue.popleft()
+            for next_segment in adjacency.get(current_segment, ()):
+                if next_segment in expanded_segments:
+                    continue
+                expanded_segments.add(next_segment)
+                queue.append(next_segment)
+        symbolic_directional_segments = expanded_segments
     if claim_segments.issubset(symbolic_directional_segments):
         return False
     if (
@@ -5340,6 +5376,126 @@ def find_similarity_goal_tail_precheckpoint(
     return best_relation
 
 
+def angle_goal_local_support_relation(relation, goal_finish, known_points):
+    normalized_relation = normalize_relation_surface(relation or "").strip()
+    if not normalized_relation:
+        return False
+    relation_keywords = relation_text_keywords(normalized_relation)
+    relation_triangle_family = triangle_relation_family(normalized_relation)
+    if relation_triangle_family not in {"similar", "congruent"} and not (
+        relation_keywords & {"angle", "ratio", "equal", "midpoint", "parallel", "perpendicular", "circle", "collinear"}
+    ):
+        return False
+
+    goal_segments = extract_relation_segment_tokens(goal_finish)
+    goal_points = extract_point_mentions(goal_finish, known_points)
+    relation_segments = extract_relation_segment_tokens(normalized_relation)
+    relation_points = extract_point_mentions(normalized_relation, known_points)
+    segment_overlap = len(goal_segments & relation_segments)
+    point_overlap = len(goal_points & relation_points)
+    if segment_overlap >= 3 and point_overlap >= 3:
+        return True
+    if relation_keywords & {"equal", "midpoint"}:
+        return segment_overlap >= 2 and point_overlap >= 3
+    return False
+
+
+def find_angle_goal_tail_precheckpoint(
+    ordered_route_relations,
+    goal_finish,
+    goal_tail_relations,
+    known_points,
+):
+    normalized_goal_finish = normalize_relation_surface(goal_finish or "").strip()
+    goal_keywords = relation_text_keywords(normalized_goal_finish)
+    if "angle" not in goal_keywords or goal_keywords & {"ratio", "similar"}:
+        return ""
+
+    existing_relations = [
+        normalize_relation_surface(relation).strip()
+        for relation in (goal_tail_relations or [])
+        if isinstance(relation, str) and relation.strip()
+    ]
+    local_support_relations = [
+        relation
+        for relation in existing_relations
+        if angle_goal_local_support_relation(
+            relation,
+            normalized_goal_finish,
+            known_points,
+        )
+    ]
+    if len(local_support_relations) >= 2:
+        return ""
+
+    anchor_index = len(ordered_route_relations or [])
+    if local_support_relations:
+        anchor_relation = local_support_relations[0]
+        for idx, route_relation in enumerate(ordered_route_relations or []):
+            if relations_semantically_match(route_relation, anchor_relation, known_points):
+                anchor_index = idx
+                break
+
+    existing_lower = {relation.lower() for relation in existing_relations}
+    goal_segments = extract_relation_segment_tokens(normalized_goal_finish)
+    goal_points = extract_point_mentions(normalized_goal_finish, known_points)
+
+    best_relation = ""
+    best_key = None
+    for route_relation in reversed((ordered_route_relations or [])[:anchor_index]):
+        normalized_route_relation = normalize_relation_surface(route_relation).strip()
+        if not normalized_route_relation:
+            continue
+        lowered = normalized_route_relation.lower()
+        if lowered in existing_lower:
+            continue
+        if relations_semantically_match(
+            normalized_route_relation,
+            normalized_goal_finish,
+            known_points,
+        ):
+            continue
+        if relation_contains_forbidden_thinking_pattern(normalized_route_relation):
+            continue
+        if (
+            relation_has_tautological_ratio_side(normalized_route_relation)
+            or relation_has_tautological_angle_side(normalized_route_relation)
+            or relation_is_bare_point_equality(normalized_route_relation)
+        ):
+            continue
+        if not angle_goal_local_support_relation(
+            normalized_route_relation,
+            normalized_goal_finish,
+            known_points,
+        ):
+            continue
+        relation_keywords = relation_text_keywords(normalized_route_relation)
+        relation_triangle_family = triangle_relation_family(normalized_route_relation)
+        relation_segments = extract_relation_segment_tokens(normalized_route_relation)
+        relation_points = extract_point_mentions(normalized_route_relation, known_points)
+        segment_overlap = len(goal_segments & relation_segments)
+        point_overlap = len(goal_points & relation_points)
+        goal_pure_relation = int(
+            bool(relation_segments)
+            and set(relation_segments).issubset(goal_segments)
+        )
+        key = (
+            goal_pure_relation,
+            segment_overlap,
+            point_overlap,
+            1 if "angle" in relation_keywords else 0,
+            1 if relation_triangle_family in {"similar", "congruent"} else 0,
+            1 if "ratio" in relation_keywords else 0,
+            1 if relation_keywords & {"equal", "midpoint"} else 0,
+            -len(normalized_route_relation),
+            normalized_route_relation.lower(),
+        )
+        if best_key is None or key > best_key:
+            best_key = key
+            best_relation = normalized_route_relation
+    return best_relation
+
+
 def build_dossier_goal_tail_relations(
     proof_guidance,
     goal_finish,
@@ -5428,6 +5584,14 @@ def build_dossier_goal_tail_relations(
     )
     if similarity_precheckpoint_relation:
         goal_tail_relations = [similarity_precheckpoint_relation] + goal_tail_relations
+    angle_precheckpoint_relation = find_angle_goal_tail_precheckpoint(
+        ordered_route_relations,
+        normalized_goal_finish,
+        goal_tail_relations,
+        known_points,
+    )
+    if angle_precheckpoint_relation:
+        goal_tail_relations = [angle_precheckpoint_relation] + goal_tail_relations
     return goal_tail_relations
 
 
