@@ -1699,12 +1699,20 @@ def choose_required_supports_for_bridge_step(step, point_names, max_supports=2):
     next_target_relation = step.get("next_target_relation", "")
 
     low_level_relation_families = {"collinear", "midpoint", "equal", "parallel", "perpendicular"}
+    high_level_relation = bool(
+        triangle_relation_family(relation_text)
+        or relation_keywords & {"angle", "ratio", "similar"}
+    )
     exact_semantic_matches = [
         dependency
         for dependency in dependencies
         if relations_semantically_match(dependency, relation_text, point_names)
     ]
-    if relation_keywords & low_level_relation_families and exact_semantic_matches:
+    if (
+        not high_level_relation
+        and relation_keywords & low_level_relation_families
+        and exact_semantic_matches
+    ):
         exact_semantic_matches = sorted(
             exact_semantic_matches,
             key=lambda dependency: (
@@ -1778,6 +1786,7 @@ def compute_bridge_step_required_support_cap(step):
         return 2
     relation_text = step.get("approved_route_relation") or step.get("relation", "")
     relation_keywords = relation_text_keywords(relation_text)
+    relation_segments = extract_relation_segment_tokens(relation_text)
     if (
         not triangle_relation_family(relation_text)
         and "equal" in relation_keywords
@@ -1785,8 +1794,10 @@ def compute_bridge_step_required_support_cap(step):
     ):
         return 4
     if relation_keywords & {"similar", "ratio"}:
-        return 4 if len(extract_relation_segment_tokens(relation_text)) >= 4 else 3
+        return 4 if len(relation_segments) >= 4 else 3
     if relation_keywords & {"angle"}:
+        if len(relation_segments) >= 4:
+            return 5
         return 3
     return 2
 
@@ -4763,14 +4774,41 @@ def select_dossier_support_refs_for_relation(
         point_names,
         max_supports=max_supports,
     )
+    angle_claim = (
+        "angle" in relation_keywords
+        and not triangle_relation_family(relation_text)
+        and "ratio" not in relation_keywords
+        and "similar" not in relation_keywords
+    )
+    if angle_claim:
+        support_catalog_by_ref = {
+            str(item.get("ref", "")): item
+            for item in support_catalog
+            if isinstance(item, dict) and item.get("ref")
+        }
+        angle_bridge_segment_refs = []
+        remaining_segment_coverage_refs = []
+        for ref in segment_coverage_refs:
+            item = support_catalog_by_ref.get(str(ref), {})
+            bridge_keywords = relation_text_keywords(item.get("relation", ""))
+            if bridge_keywords & {"equal", "midpoint"}:
+                angle_bridge_segment_refs.append(ref)
+            else:
+                remaining_segment_coverage_refs.append(ref)
+        secondary_refs = (
+            angle_bridge_segment_refs
+            + symbolic_refs
+            + remaining_segment_coverage_refs
+        )
+    else:
+        secondary_refs = segment_coverage_refs + symbolic_refs
     combined = []
     for ref in (
         preferred_refs
         + symbolic_equality_path_refs
         + symbolic_equality_refs
         + ratio_pair_refs
-        + segment_coverage_refs
-        + symbolic_refs
+        + secondary_refs
         + relay_refs
         + ranked_refs
     ):

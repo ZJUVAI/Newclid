@@ -1213,7 +1213,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
 
         self.assertEqual(
             refs,
-            ["bridge_chain[1]", "coordinate_checks[1]", "coordinate_checks[4]"],
+            ["bridge_chain[1]", "coordinate_checks[4]", "coordinate_checks[1]"],
         )
 
     def test_build_scripted_dossier_skeleton_rejects_real_contrir_transfer_sample_with_ungrounded_equality_chain(self):
@@ -1298,6 +1298,32 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertIn(
             "ad equals ae",
             bridge_claims,
+        )
+
+    def test_build_scripted_dossier_skeleton_accepts_real_eqangle_sample_with_ratio_similarity_tail(self):
+        record = self._load_quality_review_record(7)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+
+        ok, message, dossier = build_scripted_dossier_skeleton(
+            record,
+            aux_part,
+            sanitized_rest,
+            record["point_coords_grid"],
+            "eqangle a e c e d f c f",
+        )
+
+        self.assertTrue(ok, message)
+        self.assertIsNotNone(dossier)
+        bridge_claims = [step.get("claim", "") for step in dossier.get("bridge_chain", [])]
+        self.assertIn(
+            "ratio ac to ae equals ratio cd to cf",
+            bridge_claims,
+        )
+        goal_step = dossier["goal_closure"][0]
+        self.assertEqual(goal_step["claim"], "angle ae/ce equals angle df/cf")
+        self.assertIn(
+            "triangles ace and cdf are similar",
+            goal_step.get("resolved_supports", []),
         )
 
     def test_build_scripted_dossier_skeleton_keeps_real_eqratio_pair_grounded_midpoint_bridge(self):
