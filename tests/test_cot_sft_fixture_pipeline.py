@@ -806,11 +806,45 @@ class CotSftFixturePipelineTest(unittest.TestCase):
 
         self.assertEqual(
             goal_tail_relations[0],
+            "angle ai/bi equals angle hi/di",
+        )
+        self.assertEqual(
+            goal_tail_relations[1],
             "angle ag/ai equals angle hi/gi",
         )
         self.assertNotIn(
             "triangles agi and igh are similar",
             goal_tail_relations,
+        )
+
+    def test_build_scripted_dossier_skeleton_keeps_real_late_fact_similarity_precheckpoint_bridge(self):
+        record = self._load_quality_review_record(9)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+
+        def passthrough_validate(raw_dossier, *args, **kwargs):
+            return True, "forced", raw_dossier
+
+        with patch(
+            "experiments.cot_sft_generation.generate_cot_sft.validate_dossier_plan_response",
+            side_effect=passthrough_validate,
+        ):
+            ok, message, dossier = build_scripted_dossier_skeleton(
+                record,
+                aux_part,
+                sanitized_rest,
+                record["point_coords_grid"],
+                "simtrir a g i i g h",
+            )
+
+        self.assertTrue(ok, message)
+        self.assertIsNotNone(dossier)
+        bridge_claims = [
+            step.get("claim", "")
+            for step in dossier.get("bridge_chain", [])
+        ]
+        self.assertIn(
+            "angle ai/bi equals angle hi/di",
+            bridge_claims,
         )
 
     def test_validate_dossier_plan_response_rejects_bare_point_equality_claim(self):
