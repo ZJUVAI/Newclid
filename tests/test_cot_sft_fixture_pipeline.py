@@ -1368,7 +1368,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             dossier["goal_closure"][0]["resolved_supports"],
         )
 
-    def test_build_scripted_dossier_skeleton_rejects_real_contrir_benchmark_sample_with_ungrounded_equality_transfer(self):
+    def test_build_scripted_dossier_skeleton_accepts_real_contrir_benchmark_sample_with_goal_local_directional_support(self):
         record = self._load_quality_review_record(11)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
 
@@ -1380,11 +1380,30 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             "contrir a c h d b h",
         )
 
-        self.assertFalse(ok)
-        self.assertTrue(
-            "unsupported angle/ratio/similar segments" in message
-            or "missing symbolic directional coverage" in message
-            or "missing a non-coordinate side or triangle correspondence support" in message
+        self.assertTrue(ok, message)
+        self.assertIsNotNone(dossier)
+        self.assertEqual(
+            [
+                step.get("claim", "")
+                for step in dossier.get("bridge_chain", [])
+            ],
+            [
+                "a, c, i are collinear",
+                "bh equals ch",
+                "angle ac/bh equals angle ch/bd",
+            ],
+        )
+        self.assertEqual(
+            dossier["goal_closure"][0]["claim"],
+            "triangles ach and dbh are congruent",
+        )
+        self.assertIn(
+            "angle ac/bh equals angle ch/bd",
+            dossier["goal_closure"][0]["resolved_supports"],
+        )
+        self.assertIn(
+            "bh equals ch",
+            dossier["goal_closure"][0]["resolved_supports"],
         )
 
     def test_build_scripted_dossier_skeleton_accepts_real_eqangle_sample_with_symbolic_goal_side_equality_bridge(self):
@@ -2074,7 +2093,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertIn("f, g, k are collinear", writer_output)
         self.assertIn("triangles agi and igh are similar", writer_output)
 
-    def test_build_scripted_dossier_writer_body_rejects_real_contrir_sample_with_ungrounded_equality_transfer(self):
+    def test_build_scripted_dossier_writer_body_accepts_real_contrir_sample_with_goal_local_directional_support(self):
         record = self._load_quality_review_record(11)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
         ok, message, dossier = build_scripted_dossier_skeleton(
@@ -2084,12 +2103,11 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             record["point_coords_grid"],
             "contrir a c h d b h",
         )
-        self.assertFalse(ok)
-        self.assertTrue(
-            "unsupported angle/ratio/similar segments" in message
-            or "missing symbolic directional coverage" in message
-            or "missing a non-coordinate side or triangle correspondence support" in message
-        )
+        self.assertTrue(ok, message)
+        writer_output = build_scripted_dossier_writer_body(dossier)
+        self.assertIn("bh equals ch", writer_output)
+        self.assertIn("angle ac/bh equals angle ch/bd", writer_output)
+        self.assertIn("triangles ach and dbh are congruent", writer_output)
 
     def test_build_scripted_dossier_writer_body_accepts_real_eqratio_sample_with_reconnected_ratio_bridge(self):
         record = self._load_quality_review_record(6)

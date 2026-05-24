@@ -2325,6 +2325,7 @@ def low_level_equality_claim_lacks_symbolic_support(
 
     claim_segments = extract_relation_segment_tokens(relation_text)
     claim_points = extract_point_mentions(relation_text, point_names)
+    step_source = str(step.get("_script_source") or step.get("source") or "").strip().lower()
     support_refs = list(support_refs or [])
     support_pairs = [
         (str(support_refs[idx]).lower() if idx < len(support_refs) else "", support)
@@ -2378,6 +2379,36 @@ def low_level_equality_claim_lacks_symbolic_support(
         )
         if symbolic_path:
             return False
+        if step_source == "tail":
+            exact_coordinate_match = False
+            contextual_point_coverage = set()
+            contextual_equal_like_supports = 0
+            for idx, support in enumerate(support_relations or []):
+                if not isinstance(support, str) or not support.strip():
+                    continue
+                support_ref = str(support_refs[idx]).lower() if idx < len(support_refs) else ""
+                if support_ref.startswith("image_scan["):
+                    continue
+                if support_ref.startswith("coordinate_checks["):
+                    if relations_semantically_match(support, relation_text, point_names):
+                        exact_coordinate_match = True
+                    continue
+                support_points = extract_point_mentions(support, point_names)
+                contextual_point_coverage.update(claim_points & support_points)
+                support_keywords = relation_text_keywords(support)
+                support_triangle_family = triangle_relation_family(support)
+                if support_triangle_family in {"similar", "congruent"} or support_keywords & {
+                    "equal",
+                    "midpoint",
+                }:
+                    contextual_equal_like_supports += 1
+            if (
+                exact_coordinate_match
+                and claim_points
+                and claim_points.issubset(contextual_point_coverage)
+                and contextual_equal_like_supports >= 2
+            ):
+                return False
         return not claim_segments.issubset(symbolic_segment_coverage)
     if len(claim_points) >= 2:
         return symbolic_point_support_count < 2
@@ -4881,6 +4912,21 @@ def select_dossier_support_refs_for_relation(
     max_supports=2,
 ):
     support_catalog = support_catalog or []
+
+    def ref_source_priority(ref):
+        lowered_ref = str(ref).lower()
+        if lowered_ref.startswith("bridge_chain["):
+            return 4
+        if lowered_ref.startswith("visible_facts["):
+            return 3
+        if lowered_ref.startswith("aux_immediate_effects["):
+            return 2
+        if lowered_ref.startswith("coordinate_checks["):
+            return 1
+        if lowered_ref.startswith("image_scan["):
+            return 0
+        return -1
+
     relation_keywords = relation_text_keywords(relation_text)
     relation_triangle_family = triangle_relation_family(relation_text)
     low_level_equality_claim = (
@@ -5004,6 +5050,67 @@ def select_dossier_support_refs_for_relation(
         if isinstance(item, dict) and item.get("ref")
     }
     relation_segments = extract_relation_segment_tokens(relation_text)
+    relation_points = extract_point_mentions(relation_text, point_names)
+
+    def select_coordinate_backed_equality_context_refs():
+        if not low_level_equality_claim:
+            return []
+        exact_coordinate_refs = [
+            ref
+            for ref, item in support_catalog_by_ref.items()
+            if ref.lower().startswith("coordinate_checks[")
+            and relations_semantically_match(item.get("relation", ""), relation_text, point_names)
+        ]
+        if not exact_coordinate_refs:
+            return []
+
+        selected = [exact_coordinate_refs[0]]
+        covered_claim_points = set()
+        while len(selected) < max_supports:
+            missing_points = relation_points - covered_claim_points
+            best_item = None
+            best_key = None
+            for item in support_catalog:
+                ref = str(item.get("ref", ""))
+                relation = item.get("relation", "")
+                lowered_ref = ref.lower()
+                if (
+                    ref in selected
+                    or not relation
+                    or lowered_ref.startswith("image_scan[")
+                    or lowered_ref.startswith("coordinate_checks[")
+                ):
+                    continue
+                support_points = extract_point_mentions(relation, point_names)
+                overlap_points = relation_points & support_points
+                if not overlap_points:
+                    continue
+                support_keywords = relation_text_keywords(relation)
+                support_triangle_family = triangle_relation_family(relation)
+                new_points = overlap_points - covered_claim_points
+                key = (
+                    len(new_points),
+                    1 if support_triangle_family in {"similar", "congruent"} else 0,
+                    1 if support_keywords & {"equal", "midpoint"} else 0,
+                    1 if support_keywords & {"angle", "parallel", "perpendicular", "circle", "collinear"} else 0,
+                    len(overlap_points),
+                    ref_source_priority(ref),
+                    -len(relation),
+                    lowered_ref,
+                )
+                if best_key is None or key > best_key:
+                    best_key = key
+                    best_item = item
+            if best_item is None:
+                break
+            best_ref = str(best_item.get("ref", ""))
+            selected.append(best_ref)
+            covered_claim_points.update(
+                relation_points & extract_point_mentions(best_item.get("relation", ""), point_names)
+            )
+            if relation_points and relation_points.issubset(covered_claim_points):
+                break
+        return selected
 
     def grounded_claim_segments(refs):
         grounded_segments = set()
@@ -5104,6 +5211,16 @@ def select_dossier_support_refs_for_relation(
             replace_index = min(removable_candidates)[-1]
             combined[replace_index] = best_ref
             missing_segments = relation_segments - grounded_claim_segments(combined)
+    if low_level_equality_claim and not symbolic_equality_path_refs:
+        coordinate_context_refs = select_coordinate_backed_equality_context_refs()
+        if coordinate_context_refs:
+            merged = []
+            for ref in preferred_refs + coordinate_context_refs + combined:
+                if ref not in merged:
+                    merged.append(ref)
+                if len(merged) >= max_supports:
+                    break
+            combined = merged
     return combined
 
 
@@ -6671,6 +6788,18 @@ def build_scripted_dossier_skeleton(
     ]
     remaining_slots = max(0, max_bridge_steps - len(selected_bridge_specs))
     tail_relations_to_add = tail_relations_for_chain[-remaining_slots:] if remaining_slots else []
+    goal_finish_segments = extract_relation_segment_tokens(normalized_goal_finish)
+    goal_finish_points = extract_point_mentions(normalized_goal_finish, known_points)
+
+    def goal_side_overlap_key(relation):
+        relation_segments = extract_relation_segment_tokens(relation)
+        relation_points = extract_point_mentions(relation, known_points)
+        return (
+            len(goal_finish_segments & relation_segments),
+            len(goal_finish_points & relation_points),
+            1 if triangle_relation_family(relation) == triangle_relation_family(normalized_goal_finish) else 0,
+            -len(relation),
+        )
 
     def relation_is_viable_aux_reconnect(relation):
         if not relation or not relation_mentions_any_target_points(relation, known_points, aux_points):
@@ -6715,6 +6844,54 @@ def build_scripted_dossier_skeleton(
             )
             for candidate in selected_bridge_specs
         ):
+            duplicate_index = next(
+                (
+                    candidate_idx
+                    for candidate_idx, candidate in enumerate(selected_bridge_specs)
+                    if relations_semantically_match(
+                        relation,
+                        candidate.get("relation", ""),
+                        known_points,
+                    )
+                ),
+                None,
+            )
+            if duplicate_index is not None:
+                existing_candidate = selected_bridge_specs[duplicate_index]
+                if (
+                    str(existing_candidate.get("source", "")).lower() == "tail"
+                ):
+                    existing_relation = existing_candidate.get("relation", "")
+                    existing_is_tautological = (
+                        relation_has_tautological_angle_side(existing_relation)
+                        or relation_has_tautological_ratio_side(existing_relation)
+                    )
+                    relation_is_tautological = (
+                        relation_has_tautological_angle_side(relation)
+                        or relation_has_tautological_ratio_side(relation)
+                    )
+                    should_replace_duplicate = False
+                    if not relation_is_tautological or existing_is_tautological:
+                        should_replace_duplicate = (
+                            goal_side_overlap_key(relation)
+                            > goal_side_overlap_key(existing_relation)
+                        )
+                    if not should_replace_duplicate:
+                        continue
+                    next_relation = (
+                        tail_relations_to_add[idx + 1]
+                        if idx + 1 < len(tail_relations_to_add)
+                        else normalized_goal_finish
+                    )
+                    selected_bridge_specs[duplicate_index] = {
+                        "relation": relation,
+                        "preferred_supports": [],
+                        "why_next": build_canonical_bridge_unlock(
+                            next_relation,
+                            final_step=(idx == len(tail_relations_to_add) - 1),
+                        ),
+                        "source": "tail",
+                    }
             continue
         next_relation = (
             tail_relations_to_add[idx + 1]
