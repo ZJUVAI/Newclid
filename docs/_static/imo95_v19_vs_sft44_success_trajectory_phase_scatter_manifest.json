@@ -1,0 +1,601 @@
+{
+  "beam_size": 512,
+  "single_plot": {
+    "run_dir": "results/pre_grpo_vlm_sft44_checkpoint20084_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_vlm_sft44_checkpoint-20084_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260522T073225Z",
+    "output_path": "docs/_static/imo95_sft44_success_trajectory_phase_scatter.png",
+    "solved_problem_count": 58,
+    "intermediate_point_count": 78,
+    "depth_counts": {
+      "0": 51,
+      "1": 23,
+      "2": 4
+    }
+  },
+  "compare_plot": {
+    "sft44_run_dir": "results/pre_grpo_vlm_sft44_checkpoint20084_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_vlm_sft44_checkpoint-20084_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260522T073225Z",
+    "v19_run_dir": "results/v19_lr5e6_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_v0-20260508-105855_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260521T133115Z",
+    "output_path": "docs/_static/imo95_v19_vs_sft44_success_trajectory_phase_scatter.png",
+    "sft44": {
+      "solved_problem_count": 58,
+      "intermediate_point_count": 78,
+      "depth_counts": {
+        "0": 51,
+        "1": 23,
+        "2": 4
+      }
+    },
+    "v19": {
+      "solved_problem_count": 58,
+      "intermediate_point_count": 71,
+      "depth_counts": {
+        "0": 51,
+        "1": 17,
+        "2": 3
+      }
+    },
+    "pairing": {
+      "matched_pair_count": 66,
+      "sft44_only_pair_count": 12,
+      "v19_only_pair_count": 5,
+      "common_problem_count": 50,
+      "delta_counts": {
+        "v19_worse": 38,
+        "unchanged": 11,
+        "v19_better": 17
+      },
+      "depth_counts": {
+        "common": {
+          "0": 50,
+          "1": 15,
+          "2": 1
+        },
+        "sft44_only": {
+          "0": 1,
+          "1": 8,
+          "2": 3
+        },
+        "v19_only": {
+          "0": 1,
+          "1": 2,
+          "2": 2
+        }
+      },
+      "sample_sft44_only": [
+        {
+          "problem_name": "imo_1983_p2",
+          "depth": 1
+        },
+        {
+          "problem_name": "imo_sl_2008_g1a_variant",
+          "depth": 1
+        },
+        {
+          "problem_name": "imo_sl_2008_g1a_variant2",
+          "depth": 1
+        },
+        {
+          "problem_name": "imo_sl_2008_g1b",
+          "depth": 2
+        },
+        {
+          "problem_name": "imo_sl_2011_g5",
+          "depth": 1
+        },
+        {
+          "problem_name": "imo_sl_2013_g2",
+          "depth": 0
+        },
+        {
+          "problem_name": "imo_sl_2013_g2",
+          "depth": 1
+        },
+        {
+          "problem_name": "imo_sl_2013_g2",
+          "depth": 2
+        },
+        {
+          "problem_name": "imo_sl_2016_g5_variant",
+          "depth": 2
+        },
+        {
+          "problem_name": "imo_sl_2017_g3_variant",
+          "depth": 1
+        },
+        {
+          "problem_name": "imo_sl_2019_g2",
+          "depth": 1
+        },
+        {
+          "problem_name": "imo_sl_2019_g2_variant",
+          "depth": 1
+        }
+      ],
+      "sample_v19_only": [
+        {
+          "problem_name": "imo_sl_1999_g6",
+          "depth": 0
+        },
+        {
+          "problem_name": "imo_sl_1999_g6",
+          "depth": 1
+        },
+        {
+          "problem_name": "imo_sl_1999_g6",
+          "depth": 2
+        },
+        {
+          "problem_name": "imo_sl_2007_g3",
+          "depth": 2
+        },
+        {
+          "problem_name": "imo_sl_2020_g8",
+          "depth": 1
+        }
+      ],
+      "rank_deltas": [
+        {
+          "problem_name": "imo_1983_p2",
+          "depth": 0,
+          "sft44_rank": 2,
+          "v19_rank": 7,
+          "delta": 5
+        },
+        {
+          "problem_name": "imo_sl_2000_g6",
+          "depth": 0,
+          "sft44_rank": 2,
+          "v19_rank": 19,
+          "delta": 17
+        },
+        {
+          "problem_name": "imo_sl_2002_g7",
+          "depth": 0,
+          "sft44_rank": 9,
+          "v19_rank": 9,
+          "delta": 0
+        },
+        {
+          "problem_name": "imo_sl_2002_g7",
+          "depth": 1,
+          "sft44_rank": 34,
+          "v19_rank": 40,
+          "delta": 6
+        },
+        {
+          "problem_name": "imo_sl_2002_g7",
+          "depth": 2,
+          "sft44_rank": 326,
+          "v19_rank": 75,
+          "delta": -251
+        },
+        {
+          "problem_name": "imo_sl_2004_g4a",
+          "depth": 0,
+          "sft44_rank": 7,
+          "v19_rank": 9,
+          "delta": 2
+        },
+        {
+          "problem_name": "imo_sl_2006_g4",
+          "depth": 0,
+          "sft44_rank": 2,
+          "v19_rank": 3,
+          "delta": 1
+        },
+        {
+          "problem_name": "imo_sl_2006_g6",
+          "depth": 0,
+          "sft44_rank": 7,
+          "v19_rank": 3,
+          "delta": -4
+        },
+        {
+          "problem_name": "imo_sl_2007_g2_variant",
+          "depth": 0,
+          "sft44_rank": 25,
+          "v19_rank": 18,
+          "delta": -7
+        },
+        {
+          "problem_name": "imo_sl_2007_g3",
+          "depth": 0,
+          "sft44_rank": 7,
+          "v19_rank": 1,
+          "delta": -6
+        },
+        {
+          "problem_name": "imo_sl_2007_g3",
+          "depth": 1,
+          "sft44_rank": 303,
+          "v19_rank": 94,
+          "delta": -209
+        },
+        {
+          "problem_name": "imo_sl_2008_g1a_variant",
+          "depth": 0,
+          "sft44_rank": 1,
+          "v19_rank": 28,
+          "delta": 27
+        },
+        {
+          "problem_name": "imo_sl_2008_g1a_variant2",
+          "depth": 0,
+          "sft44_rank": 1,
+          "v19_rank": 3,
+          "delta": 2
+        },
+        {
+          "problem_name": "imo_sl_2008_g1b",
+          "depth": 0,
+          "sft44_rank": 7,
+          "v19_rank": 10,
+          "delta": 3
+        },
+        {
+          "problem_name": "imo_sl_2008_g1b",
+          "depth": 1,
+          "sft44_rank": 9,
+          "v19_rank": 198,
+          "delta": 189
+        },
+        {
+          "problem_name": "imo_sl_2009_g4",
+          "depth": 0,
+          "sft44_rank": 6,
+          "v19_rank": 12,
+          "delta": 6
+        },
+        {
+          "problem_name": "imo_sl_2009_g4",
+          "depth": 1,
+          "sft44_rank": 110,
+          "v19_rank": 82,
+          "delta": -28
+        },
+        {
+          "problem_name": "imo_sl_2010_g2_variant",
+          "depth": 0,
+          "sft44_rank": 9,
+          "v19_rank": 7,
+          "delta": -2
+        },
+        {
+          "problem_name": "imo_sl_2010_g2b",
+          "depth": 0,
+          "sft44_rank": 2,
+          "v19_rank": 5,
+          "delta": 3
+        },
+        {
+          "problem_name": "imo_sl_2010_g4",
+          "depth": 0,
+          "sft44_rank": 1,
+          "v19_rank": 4,
+          "delta": 3
+        },
+        {
+          "problem_name": "imo_sl_2010_g4",
+          "depth": 1,
+          "sft44_rank": 21,
+          "v19_rank": 39,
+          "delta": 18
+        },
+        {
+          "problem_name": "imo_sl_2011_g5",
+          "depth": 0,
+          "sft44_rank": 13,
+          "v19_rank": 6,
+          "delta": -7
+        },
+        {
+          "problem_name": "imo_sl_2011_g8",
+          "depth": 0,
+          "sft44_rank": 8,
+          "v19_rank": 5,
+          "delta": -3
+        },
+        {
+          "problem_name": "imo_sl_2012_g4",
+          "depth": 0,
+          "sft44_rank": 7,
+          "v19_rank": 4,
+          "delta": -3
+        },
+        {
+          "problem_name": "imo_sl_2012_g4_variant",
+          "depth": 0,
+          "sft44_rank": 7,
+          "v19_rank": 7,
+          "delta": 0
+        },
+        {
+          "problem_name": "imo_sl_2012_g5",
+          "depth": 0,
+          "sft44_rank": 2,
+          "v19_rank": 3,
+          "delta": 1
+        },
+        {
+          "problem_name": "imo_sl_2012_g5",
+          "depth": 1,
+          "sft44_rank": 108,
+          "v19_rank": 311,
+          "delta": 203
+        },
+        {
+          "problem_name": "imo_sl_2014_g4",
+          "depth": 0,
+          "sft44_rank": 3,
+          "v19_rank": 1,
+          "delta": -2
+        },
+        {
+          "problem_name": "imo_sl_2014_g5",
+          "depth": 0,
+          "sft44_rank": 8,
+          "v19_rank": 11,
+          "delta": 3
+        },
+        {
+          "problem_name": "imo_sl_2015_g3_variant",
+          "depth": 0,
+          "sft44_rank": 1,
+          "v19_rank": 10,
+          "delta": 9
+        },
+        {
+          "problem_name": "imo_sl_2015_g5",
+          "depth": 0,
+          "sft44_rank": 3,
+          "v19_rank": 3,
+          "delta": 0
+        },
+        {
+          "problem_name": "imo_sl_2015_g5_variant",
+          "depth": 0,
+          "sft44_rank": 14,
+          "v19_rank": 19,
+          "delta": 5
+        },
+        {
+          "problem_name": "imo_sl_2015_g5_variant",
+          "depth": 1,
+          "sft44_rank": 406,
+          "v19_rank": 447,
+          "delta": 41
+        },
+        {
+          "problem_name": "imo_sl_2016_g5_variant",
+          "depth": 0,
+          "sft44_rank": 2,
+          "v19_rank": 20,
+          "delta": 18
+        },
+        {
+          "problem_name": "imo_sl_2016_g5_variant",
+          "depth": 1,
+          "sft44_rank": 13,
+          "v19_rank": 438,
+          "delta": 425
+        },
+        {
+          "problem_name": "imo_sl_2016_g6",
+          "depth": 0,
+          "sft44_rank": 7,
+          "v19_rank": 7,
+          "delta": 0
+        },
+        {
+          "problem_name": "imo_sl_2016_g6",
+          "depth": 1,
+          "sft44_rank": 27,
+          "v19_rank": 35,
+          "delta": 8
+        },
+        {
+          "problem_name": "imo_sl_2016_g6_variant",
+          "depth": 0,
+          "sft44_rank": 8,
+          "v19_rank": 16,
+          "delta": 8
+        },
+        {
+          "problem_name": "imo_sl_2016_g6_variant",
+          "depth": 1,
+          "sft44_rank": 132,
+          "v19_rank": 329,
+          "delta": 197
+        },
+        {
+          "problem_name": "imo_sl_2016_g7a",
+          "depth": 0,
+          "sft44_rank": 1,
+          "v19_rank": 7,
+          "delta": 6
+        },
+        {
+          "problem_name": "imo_sl_2017_g1",
+          "depth": 0,
+          "sft44_rank": 7,
+          "v19_rank": 6,
+          "delta": -1
+        },
+        {
+          "problem_name": "imo_sl_2017_g3",
+          "depth": 0,
+          "sft44_rank": 3,
+          "v19_rank": 3,
+          "delta": 0
+        },
+        {
+          "problem_name": "imo_sl_2017_g3_variant",
+          "depth": 0,
+          "sft44_rank": 1,
+          "v19_rank": 21,
+          "delta": 20
+        },
+        {
+          "problem_name": "imo_sl_2018_g1",
+          "depth": 0,
+          "sft44_rank": 7,
+          "v19_rank": 11,
+          "delta": 4
+        },
+        {
+          "problem_name": "imo_sl_2018_g2",
+          "depth": 0,
+          "sft44_rank": 15,
+          "v19_rank": 1,
+          "delta": -14
+        },
+        {
+          "problem_name": "imo_sl_2019_g2",
+          "depth": 0,
+          "sft44_rank": 5,
+          "v19_rank": 26,
+          "delta": 21
+        },
+        {
+          "problem_name": "imo_sl_2019_g2_variant",
+          "depth": 0,
+          "sft44_rank": 5,
+          "v19_rank": 26,
+          "delta": 21
+        },
+        {
+          "problem_name": "imo_sl_2019_g3",
+          "depth": 0,
+          "sft44_rank": 3,
+          "v19_rank": 3,
+          "delta": 0
+        },
+        {
+          "problem_name": "imo_sl_2019_g3",
+          "depth": 1,
+          "sft44_rank": 189,
+          "v19_rank": 226,
+          "delta": 37
+        },
+        {
+          "problem_name": "imo_sl_2019_g6",
+          "depth": 0,
+          "sft44_rank": 1,
+          "v19_rank": 9,
+          "delta": 8
+        },
+        {
+          "problem_name": "imo_sl_2019_g6",
+          "depth": 1,
+          "sft44_rank": 25,
+          "v19_rank": 42,
+          "delta": 17
+        },
+        {
+          "problem_name": "imo_sl_2019_g7",
+          "depth": 0,
+          "sft44_rank": 6,
+          "v19_rank": 6,
+          "delta": 0
+        },
+        {
+          "problem_name": "imo_sl_2019_g7_variant",
+          "depth": 0,
+          "sft44_rank": 3,
+          "v19_rank": 4,
+          "delta": 1
+        },
+        {
+          "problem_name": "imo_sl_2020_g2",
+          "depth": 0,
+          "sft44_rank": 4,
+          "v19_rank": 5,
+          "delta": 1
+        },
+        {
+          "problem_name": "imo_sl_2020_g2",
+          "depth": 1,
+          "sft44_rank": 204,
+          "v19_rank": 113,
+          "delta": -91
+        },
+        {
+          "problem_name": "imo_sl_2020_g7a",
+          "depth": 0,
+          "sft44_rank": 6,
+          "v19_rank": 6,
+          "delta": 0
+        },
+        {
+          "problem_name": "imo_sl_2020_g7a",
+          "depth": 1,
+          "sft44_rank": 354,
+          "v19_rank": 409,
+          "delta": 55
+        },
+        {
+          "problem_name": "imo_sl_2020_g8",
+          "depth": 0,
+          "sft44_rank": 32,
+          "v19_rank": 14,
+          "delta": -18
+        },
+        {
+          "problem_name": "imo_sl_2020_g8_variant",
+          "depth": 0,
+          "sft44_rank": 13,
+          "v19_rank": 18,
+          "delta": 5
+        },
+        {
+          "problem_name": "imo_sl_2020_g8_variant",
+          "depth": 1,
+          "sft44_rank": 279,
+          "v19_rank": 328,
+          "delta": 49
+        },
+        {
+          "problem_name": "imo_sl_2021_g4",
+          "depth": 0,
+          "sft44_rank": 15,
+          "v19_rank": 15,
+          "delta": 0
+        },
+        {
+          "problem_name": "imo_sl_2021_g4_variant",
+          "depth": 0,
+          "sft44_rank": 15,
+          "v19_rank": 15,
+          "delta": 0
+        },
+        {
+          "problem_name": "imo_sl_2022_g2_variant",
+          "depth": 0,
+          "sft44_rank": 11,
+          "v19_rank": 9,
+          "delta": -2
+        },
+        {
+          "problem_name": "imo_sl_2022_g3",
+          "depth": 0,
+          "sft44_rank": 1,
+          "v19_rank": 1,
+          "delta": 0
+        },
+        {
+          "problem_name": "imo_sl_2022_g3_variant",
+          "depth": 0,
+          "sft44_rank": 12,
+          "v19_rank": 1,
+          "delta": -11
+        },
+        {
+          "problem_name": "imo_sl_2022_g4",
+          "depth": 0,
+          "sft44_rank": 4,
+          "v19_rank": 7,
+          "delta": 3
+        }
+      ]
+    }
+  }
+}

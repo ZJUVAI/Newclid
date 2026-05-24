@@ -14,6 +14,19 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 
+def analysis_run_id(run_dir: Path) -> str:
+    return run_dir.name
+
+
+def default_analysis_paths(run_dir: Path) -> dict[str, Path]:
+    run_id = analysis_run_id(run_dir)
+    analysis_dir = run_dir / "analysis"
+    return {
+        "steps_csv": analysis_dir / f"success_trajectory_beam_rank_steps_{run_id}.csv",
+        "summary_json": analysis_dir / f"success_trajectory_beam_rank_summary_{run_id}.json",
+    }
+
+
 def load_jsonl(path: Path) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     with open(path, encoding="utf-8") as fp:
@@ -407,8 +420,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument("--run_dir", required=True)
     parser.add_argument("--beam_size", type=int, default=512)
-    parser.add_argument("--steps_csv", required=True)
-    parser.add_argument("--summary_json", required=True)
+    parser.add_argument("--steps_csv")
+    parser.add_argument("--summary_json")
     parser.add_argument("--plot_png", required=True)
     parser.add_argument("--phase_plot_png", required=True)
     return parser
@@ -417,10 +430,15 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = build_parser().parse_args()
     run_dir = Path(args.run_dir)
+    derived_paths = default_analysis_paths(run_dir)
+    steps_csv_path = Path(args.steps_csv) if args.steps_csv else derived_paths["steps_csv"]
+    summary_json_path = (
+        Path(args.summary_json) if args.summary_json else derived_paths["summary_json"]
+    )
     step_rows, summary = analyze_run(run_dir=run_dir, beam_size=args.beam_size)
-    write_csv(Path(args.steps_csv), step_rows)
-    Path(args.summary_json).parent.mkdir(parents=True, exist_ok=True)
-    Path(args.summary_json).write_text(
+    write_csv(steps_csv_path, step_rows)
+    summary_json_path.parent.mkdir(parents=True, exist_ok=True)
+    summary_json_path.write_text(
         json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8"
     )
     plot_frontier_rank_distribution(
