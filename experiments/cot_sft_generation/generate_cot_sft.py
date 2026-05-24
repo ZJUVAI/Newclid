@@ -6977,12 +6977,14 @@ def build_scripted_dossier_skeleton(
     coordinate_check_targets = []
     for candidate_relation in [
         normalized_goal_finish,
-        tail_relations_for_chain[-1] if tail_relations_for_chain else "",
+        *[
+            relation
+            for relation in tail_relations_to_add
+            if relation_text_keywords(relation) & {"angle", "ratio", "similar"}
+            or triangle_relation_family(relation)
+        ],
         aux_goal_bridge_tail_relations[-1]
         if merged_aux_goal_tail and aux_goal_bridge_tail_relations
-        else "",
-        selected_bridge_specs[-1].get("relation", "")
-        if selected_bridge_specs and not tail_relations_for_chain
         else "",
     ]:
         normalized_candidate = normalize_relation_surface(candidate_relation).strip()

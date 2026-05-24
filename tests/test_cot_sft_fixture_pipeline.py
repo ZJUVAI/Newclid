@@ -231,6 +231,16 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         ]
         return records[index]
 
+    @staticmethod
+    def _load_fixed_v104sample_record(index):
+        benchmark_path = Path("experiments/cot_sft_generation/benchmarks/fixed_v104sample_input.jsonl")
+        records = [
+            json.loads(line)
+            for line in benchmark_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        return records[index]
+
     def _build_clean_scripted_fallback_fixture(self):
         record = {
             "nl_problem": "Observe the diagram and justify the target relation.",
@@ -1167,6 +1177,36 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertIn(
             "triangles agi and igh are similar",
             build_scripted_dossier_writer_body(dossier),
+        )
+
+    def test_build_scripted_dossier_skeleton_keeps_real_eqratio_tail_ratio_bridge_when_coordinate_targets_cover_route(self):
+        record = self._load_fixed_v104sample_record(0)
+        aux_part, sanitized_rest = self._extract_aux_and_rest(record)
+
+        def passthrough_validate(raw_dossier, *args, **kwargs):
+            return True, "forced", raw_dossier
+
+        with patch(
+            "experiments.cot_sft_generation.generate_cot_sft.validate_dossier_plan_response",
+            side_effect=passthrough_validate,
+        ):
+            ok, message, dossier = build_scripted_dossier_skeleton(
+                record,
+                aux_part,
+                sanitized_rest,
+                record["point_coords_grid"],
+                "eqratio a e a f c e c j",
+            )
+
+        self.assertTrue(ok, message)
+        self.assertIsNotNone(dossier)
+        bridge_claims = [
+            step.get("claim", "")
+            for step in dossier.get("bridge_chain", [])
+        ]
+        self.assertIn(
+            "ratio bf to cf equals ratio dg to de",
+            bridge_claims,
         )
 
     def test_validate_dossier_plan_response_rejects_bare_point_equality_claim(self):
