@@ -1965,14 +1965,78 @@ def find_unsupported_bridge_relation_segments(step, support_relations):
     relation_keywords = relation_text_keywords(relation_text)
     if not relation_keywords & {"angle", "ratio", "similar"}:
         return []
-    relation_segments = extract_relation_segment_tokens(relation_text)
+    relation_segments = {
+        _canonical_support_segment_token(segment)
+        for segment in extract_relation_segment_tokens(relation_text)
+    }
     if not relation_segments:
         return []
     grounded_segments = set()
+    support_points = set()
+    symbolic_equality_edges = set()
+    symbolic_equality_support_count = 0
+    directional_support_count = 0
     for support in support_relations or []:
         if isinstance(support, str) and support.strip():
-            grounded_segments.update(extract_relation_segment_tokens(support))
-    return sorted(relation_segments - grounded_segments)
+            support_segments = {
+                _canonical_support_segment_token(segment)
+                for segment in extract_relation_segment_tokens(support)
+            }
+            grounded_segments.update(relation_segments & support_segments)
+            support_points.update(
+                point
+                for segment in support_segments
+                if len(segment) == 2
+                for point in segment
+            )
+            equality_edges = extract_symbolic_equality_edges(support)
+            if equality_edges:
+                symbolic_equality_support_count += 1
+                symbolic_equality_edges.update(equality_edges)
+            support_keywords = relation_text_keywords(support)
+            support_triangle_family = triangle_relation_family(support)
+            if support_triangle_family in {"similar", "congruent"} or support_keywords & {
+                "angle",
+                "ratio",
+                "parallel",
+                "perpendicular",
+                "circle",
+                "collinear",
+            }:
+                directional_support_count += 1
+    if symbolic_equality_edges and grounded_segments:
+        adjacency = {}
+        for left_segment, right_segment in symbolic_equality_edges:
+            adjacency.setdefault(left_segment, set()).add(right_segment)
+            adjacency.setdefault(right_segment, set()).add(left_segment)
+        expanded_segments = set(grounded_segments)
+        queue = deque(grounded_segments)
+        while queue:
+            current_segment = queue.popleft()
+            for next_segment in adjacency.get(current_segment, ()):
+                if next_segment in expanded_segments:
+                    continue
+                expanded_segments.add(next_segment)
+                queue.append(next_segment)
+        grounded_segments = expanded_segments
+    unsupported_segments = sorted(relation_segments - grounded_segments)
+    if triangle_relation_family(relation_text) == "similar":
+        claim_points = {
+            point
+            for segment in relation_segments
+            if len(segment) == 2
+            for point in segment
+        }
+        if (
+            len(unsupported_segments) <= 2
+            and len(grounded_segments) >= max(4, len(relation_segments) - 2)
+            and claim_points
+            and claim_points.issubset(support_points)
+            and symbolic_equality_support_count >= 2
+            and directional_support_count >= 1
+        ):
+            return []
+    return unsupported_segments
 
 
 def high_level_step_lacks_directional_support(step, support_relations, point_names, support_refs=None):
@@ -4201,7 +4265,7 @@ def select_symbolic_directional_support_refs(
     relation_keywords = relation_text_keywords(relation_text)
     relation_triangle_family = triangle_relation_family(relation_text)
     if relation_triangle_family:
-        if relation_triangle_family != "similar":
+        if relation_triangle_family not in {"similar", "congruent"}:
             return []
     elif not (relation_keywords & {"angle", "ratio", "similar"}):
         return []
@@ -4221,16 +4285,40 @@ def select_symbolic_directional_support_refs(
         support_triangle_family = triangle_relation_family(relation)
         support_segments = extract_relation_segment_tokens(relation)
         support_points = extract_point_mentions(relation, point_names)
+        allowed_support_keywords = {
+            "angle",
+            "ratio",
+            "similar",
+            "parallel",
+            "perpendicular",
+            "circle",
+            "collinear",
+        }
+        if relation_triangle_family == "congruent":
+            allowed_support_keywords |= {"equal", "midpoint"}
         if support_triangle_family not in {"similar", "congruent"} and not (
-            support_keywords & {"angle", "ratio", "similar", "parallel", "perpendicular", "circle", "collinear"}
+            support_keywords & allowed_support_keywords
         ):
             continue
         segment_overlap = len(support_segments & relation_segments)
         point_overlap = len(support_points & relation_points)
         if segment_overlap <= 0:
             continue
+        triangle_priority = 0
+        angle_priority = 0
+        equality_priority = 0
+        locality_priority = 0
+        if relation_triangle_family == "congruent":
+            triangle_priority = 1 if support_triangle_family in {"similar", "congruent"} else 0
+            angle_priority = 1 if "angle" in support_keywords else 0
+            equality_priority = 1 if support_keywords & {"equal", "midpoint"} else 0
+            locality_priority = 0 if support_keywords & {"circle", "collinear"} else 1
         candidates.append(
             (
+                triangle_priority,
+                angle_priority,
+                equality_priority,
+                locality_priority,
                 segment_overlap,
                 point_overlap,
                 1 if lowered_ref.startswith("bridge_chain[") else 0,
@@ -4794,8 +4882,9 @@ def select_dossier_support_refs_for_relation(
 ):
     support_catalog = support_catalog or []
     relation_keywords = relation_text_keywords(relation_text)
+    relation_triangle_family = triangle_relation_family(relation_text)
     low_level_equality_claim = (
-        not triangle_relation_family(relation_text)
+        not relation_triangle_family
         and "equal" in relation_keywords
         and not relation_keywords & {"angle", "ratio", "similar", "parallel", "perpendicular", "circle", "collinear"}
     )
@@ -4866,10 +4955,11 @@ def select_dossier_support_refs_for_relation(
     )
     angle_claim = (
         "angle" in relation_keywords
-        and not triangle_relation_family(relation_text)
+        and not relation_triangle_family
         and "ratio" not in relation_keywords
         and "similar" not in relation_keywords
     )
+    congruent_claim = relation_triangle_family == "congruent"
     if angle_claim:
         support_catalog_by_ref = {
             str(item.get("ref", "")): item
@@ -4890,6 +4980,8 @@ def select_dossier_support_refs_for_relation(
             + symbolic_refs
             + remaining_segment_coverage_refs
         )
+    elif congruent_claim:
+        secondary_refs = symbolic_refs + segment_coverage_refs
     else:
         secondary_refs = segment_coverage_refs + symbolic_refs
     combined = []

@@ -12,6 +12,7 @@ from experiments.cot_sft_generation.generate_cot_sft import (
     build_scripted_dossier_skeleton,
     congruent_step_lacks_noncoordinate_correspondence_support,
     extract_aux_and_rest,
+    find_unsupported_bridge_relation_segments,
     generate_dossier_thinking,
     high_level_step_lacks_symbolic_directional_coverage,
     low_level_equality_claim_lacks_symbolic_support,
@@ -549,6 +550,25 @@ class CotSftFixturePipelineTest(unittest.TestCase):
 
         self.assertTrue(lacks_support)
 
+    def test_find_unsupported_bridge_relation_segments_accepts_similarity_with_symbolic_side_grounding(self):
+        step = {
+            "relation": "triangles cgf and edf are similar",
+            "approved_route_relation": "triangles cgf and edf are similar",
+        }
+        support_relations = [
+            "cg equals cf",
+            "de equals ef",
+            "b, c, d, e are concyclic",
+            "line bc is perpendicular to line cg",
+        ]
+
+        unsupported_segments = find_unsupported_bridge_relation_segments(
+            step,
+            support_relations,
+        )
+
+        self.assertEqual(unsupported_segments, [])
+
     def test_angle_bridge_symbolic_directional_coverage_accepts_coordinate_backed_tail_segments(self):
         step = {
             "relation": "angle ag/ai equals angle hi/gi",
@@ -925,7 +945,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertGreaterEqual(len(dossier.get("bridge_chain", [])), 1)
         self.assertEqual(dossier["bridge_chain"][0]["claim"], "angle ab/af equals angle bh/fh")
 
-    def test_build_scripted_dossier_skeleton_rejects_real_contri_benchmark_sample_with_coordinate_only_closure(self):
+    def test_build_scripted_dossier_skeleton_accepts_real_contri_benchmark_sample_with_noncoordinate_triangle_closure(self):
         record = self._load_quality_review_record(4)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
 
@@ -937,10 +957,19 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             "contri b c f f e b",
         )
 
-        self.assertFalse(ok)
-        self.assertTrue(
-            "missing a non-coordinate side or triangle correspondence support" in message
-            or "missing symbolic directional coverage" in message
+        self.assertTrue(ok, message)
+        self.assertIsNotNone(dossier)
+        bridge_claims = [
+            step.get("claim", "")
+            for step in dossier.get("bridge_chain", [])
+        ]
+        self.assertIn(
+            "triangles cgf and edf are similar",
+            bridge_claims,
+        )
+        self.assertIn(
+            "triangles cgf and edf are similar",
+            dossier["goal_closure"][0].get("resolved_supports", []),
         )
 
     def test_build_dossier_goal_tail_relations_prefers_transfer_checkpoint_for_real_contrir_sample(self):
@@ -1273,6 +1302,29 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             refs,
             ["bridge_chain[1]", "coordinate_checks[4]", "coordinate_checks[1]"],
         )
+
+    def test_select_dossier_support_refs_for_congruent_prefers_noncoordinate_triangle_correspondence(self):
+        support_catalog = [
+            {"ref": "bridge_chain[1]", "relation": "angle be/bf equals angle cf/bf"},
+            {"ref": "bridge_chain[2]", "relation": "triangles cgf and edf are similar"},
+            {"ref": "visible_facts[1]", "relation": "b, c, d, e are concyclic"},
+            {"ref": "coordinate_checks[1]", "relation": "bc equals ef"},
+            {"ref": "coordinate_checks[2]", "relation": "be equals cf"},
+            {"ref": "image_scan[1]", "relation": "segments bc and ef look parallel"},
+        ]
+
+        refs = select_dossier_support_refs_for_relation(
+            "triangles bcf and feb are congruent",
+            support_catalog,
+            ["b", "c", "d", "e", "f", "g"],
+            max_supports=4,
+        )
+
+        self.assertEqual(
+            set(refs[:2]),
+            {"bridge_chain[1]", "bridge_chain[2]"},
+        )
+        self.assertNotIn("image_scan[1]", refs[:2])
 
     def test_build_scripted_dossier_skeleton_rejects_real_contrir_transfer_sample_with_ungrounded_equality_chain(self):
         record = self._load_quality_review_record(5)
@@ -1977,7 +2029,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("bridge_chain must not be empty", message)
 
-    def test_build_scripted_dossier_writer_body_rejects_real_contri_sample_with_coordinate_only_closure(self):
+    def test_build_scripted_dossier_writer_body_accepts_real_contri_sample_with_noncoordinate_triangle_closure(self):
         record = self._load_quality_review_record(4)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
         ok, message, dossier = build_scripted_dossier_skeleton(
@@ -1987,11 +2039,10 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             record["point_coords_grid"],
             "contri b c f f e b",
         )
-        self.assertFalse(ok)
-        self.assertTrue(
-            "missing a non-coordinate side or triangle correspondence support" in message
-            or "missing symbolic directional coverage" in message
-        )
+        self.assertTrue(ok, message)
+        writer_output = build_scripted_dossier_writer_body(dossier)
+        self.assertIn("triangles cgf and edf are similar", writer_output)
+        self.assertIn("triangles bcf and feb are congruent", writer_output)
 
     def test_build_scripted_dossier_writer_body_accepts_real_simtri_sample_with_congruent_midpoint_goal_support(self):
         record = self._load_quality_review_record(8)
