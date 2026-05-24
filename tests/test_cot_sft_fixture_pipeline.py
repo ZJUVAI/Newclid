@@ -1224,6 +1224,62 @@ class CotSftFixturePipelineTest(unittest.TestCase):
 
         self.assertFalse(lacks_support)
 
+    def test_low_level_equality_claim_accepts_scripted_contextual_aux_chain(self):
+        step = {
+            "relation": "cf equals cj",
+            "approved_route_relation": "cf equals cj",
+            "_script_source": "base",
+        }
+        support_relations = [
+            "line cf is perpendicular to line cj",
+            "bc equals cd",
+            "angle bf/cf equals angle fj/bf",
+            "bc equals cf",
+        ]
+        support_refs = [
+            "aux_immediate_effects[1]",
+            "visible_facts[1]",
+            "aux_immediate_effects[2]",
+            "visible_facts[3]",
+        ]
+
+        lacks_support = low_level_equality_claim_lacks_symbolic_support(
+            step,
+            support_relations,
+            ["b", "c", "d", "f", "j"],
+            support_refs=support_refs,
+        )
+
+        self.assertFalse(lacks_support)
+
+    def test_low_level_equality_claim_accepts_scripted_contextual_aux_transfer_chain(self):
+        step = {
+            "relation": "df equals dj",
+            "approved_route_relation": "df equals dj",
+            "_script_source": "base",
+        }
+        support_relations = [
+            "angle bf/cf equals angle fj/bf",
+            "segments bf and di look equal in length",
+            "cd equals cj",
+            "line bi is parallel to line df",
+        ]
+        support_refs = [
+            "aux_immediate_effects[2]",
+            "image_scan[4]",
+            "bridge_chain[2]",
+            "coordinate_checks[4]",
+        ]
+
+        lacks_support = low_level_equality_claim_lacks_symbolic_support(
+            step,
+            support_relations,
+            ["b", "c", "d", "f", "i", "j"],
+            support_refs=support_refs,
+        )
+
+        self.assertFalse(lacks_support)
+
     def test_select_dossier_support_refs_for_equality_prefers_transitive_chain(self):
         support_catalog = [
             {"ref": "bridge_chain[1]", "relation": "ac equals af"},
@@ -1326,7 +1382,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         )
         self.assertNotIn("image_scan[1]", refs[:2])
 
-    def test_build_scripted_dossier_skeleton_rejects_real_contrir_transfer_sample_with_ungrounded_equality_chain(self):
+    def test_build_scripted_dossier_skeleton_accepts_real_contrir_transfer_sample_with_scripted_contextual_equality_chain(self):
         record = self._load_quality_review_record(5)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
 
@@ -1338,8 +1394,25 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             "contrir b d i i f b",
         )
 
-        self.assertFalse(ok)
-        self.assertIn("bridge_chain must not be empty", message)
+        self.assertTrue(ok, message)
+        self.assertIsNotNone(dossier)
+        self.assertEqual(
+            [
+                step.get("claim", "")
+                for step in dossier.get("bridge_chain", [])
+            ],
+            [
+                "cf equals cj",
+                "cd equals cj",
+                "df equals dj",
+                "bf equals dj",
+                "triangles bdj and jfb are congruent",
+            ],
+        )
+        self.assertIn(
+            "triangles bdj and jfb are congruent",
+            dossier["goal_closure"][0].get("resolved_supports", []),
+        )
 
     def test_build_scripted_dossier_skeleton_accepts_real_late_fact_simtrir_benchmark_sample_with_reconnected_similarity_closure(self):
         record = self._load_quality_review_record(9)
@@ -2035,7 +2108,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         self.assertIn("ratio bd to be equals ratio ce to cg", writer_output)
         self.assertIn("triangles bde and ceg are similar", writer_output)
 
-    def test_build_scripted_dossier_writer_body_rejects_real_contrir_transfer_sample_with_ungrounded_equality_chain(self):
+    def test_build_scripted_dossier_writer_body_accepts_real_contrir_transfer_sample_with_scripted_contextual_equality_chain(self):
         record = self._load_quality_review_record(5)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
         ok, message, dossier = build_scripted_dossier_skeleton(
@@ -2045,8 +2118,11 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             record["point_coords_grid"],
             "contrir b d i i f b",
         )
-        self.assertFalse(ok)
-        self.assertIn("bridge_chain must not be empty", message)
+        self.assertTrue(ok, message)
+        writer_output = build_scripted_dossier_writer_body(dossier)
+        self.assertIn("cf equals cj", writer_output)
+        self.assertIn("triangles bdj and jfb are congruent", writer_output)
+        self.assertIn("triangles bdi and ifb are congruent", writer_output)
 
     def test_build_scripted_dossier_writer_body_accepts_real_contri_sample_with_noncoordinate_triangle_closure(self):
         record = self._load_quality_review_record(4)

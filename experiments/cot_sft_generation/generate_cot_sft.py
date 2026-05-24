@@ -2379,6 +2379,70 @@ def low_level_equality_claim_lacks_symbolic_support(
         )
         if symbolic_path:
             return False
+        if step_source in {"base", "tail"} and len(claim_segments) == 2 and len(claim_points) >= 3:
+            contextual_point_coverage = set()
+            contextual_pair_coverage = set()
+            contextual_directional_supports = 0
+            contextual_support_count = 0
+            noncoordinate_equal_like_supports = 0
+            noncoordinate_directional_supports = 0
+            claim_point_pairs = {
+                tuple(sorted((segment[0], segment[1])))
+                for segment in claim_segments
+                if len(segment) == 2
+            }
+            for idx, support in enumerate(support_relations or []):
+                if not isinstance(support, str) or not support.strip():
+                    continue
+                support_ref = str(support_refs[idx]).lower() if idx < len(support_refs) else ""
+                noncoordinate_support = not (
+                    support_ref.startswith("image_scan[")
+                    or support_ref.startswith("coordinate_checks[")
+                )
+                support_points = extract_point_mentions(support, point_names)
+                overlap_points = sorted(claim_points & support_points)
+                if len(overlap_points) < 2:
+                    continue
+                support_keywords = relation_text_keywords(support)
+                support_triangle_family = triangle_relation_family(support)
+                equal_like_support = bool(
+                    support_triangle_family in {"similar", "congruent"}
+                    or support_keywords & {"equal", "midpoint"}
+                )
+                directional_support = bool(
+                    support_triangle_family in {"similar", "congruent"}
+                    or support_keywords & {"angle", "parallel", "perpendicular", "circle", "collinear"}
+                )
+                if not (equal_like_support or directional_support):
+                    continue
+                contextual_support_count += 1
+                contextual_point_coverage.update(overlap_points)
+                for left_idx, left_point in enumerate(overlap_points):
+                    for right_point in overlap_points[left_idx + 1:]:
+                        contextual_pair_coverage.add(tuple(sorted((left_point, right_point))))
+                if directional_support:
+                    contextual_directional_supports += 1
+                if not noncoordinate_support:
+                    continue
+                if equal_like_support:
+                    noncoordinate_equal_like_supports += 1
+                if directional_support:
+                    noncoordinate_directional_supports += 1
+            if (
+                claim_point_pairs
+                and claim_point_pairs.issubset(contextual_pair_coverage)
+                and claim_points.issubset(contextual_point_coverage)
+                and noncoordinate_equal_like_supports >= 1
+                and (
+                    noncoordinate_directional_supports >= 2
+                    or (
+                        noncoordinate_directional_supports >= 1
+                        and contextual_directional_supports >= 2
+                    )
+                )
+                and contextual_support_count >= 3
+            ):
+                return False
         if step_source == "tail":
             exact_coordinate_match = False
             contextual_point_coverage = set()
