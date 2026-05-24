@@ -1,21 +1,22 @@
 # GRPO 迭代状态与后续计划
 
-最后更新：2026-05-18 | 当前 commit: `85885b0ad987b04d1776b501f15cedcee1c97bac`
+最后更新：2026-05-24 | 当前 commit: `7af5492f6a535d6181583593f98a3d597331c02d`
 
 ## 主要结果概览
 
-当前文档默认以**当前仓库下可复现的最新完整评估结果**为主；其中 full `imo_95` 主口径仍以 `v19` 的完整补跑结果为准，旧 commit / 旧 run 结果放在后文作为历史结果保留。
+当前文档默认以**当前仓库下可复现的最新完整评估结果**为主；full `imo_95` 主口径以 ddar bug fix（commit `ed0b877`）后的最新重跑结果为准，旧 commit / 旧 run 结果放在后文作为历史结果保留。
 
 | 版本 | agent / 评估链路 | dev_imo | imo_95 | 备注 |
 |------|------------------|---------|--------|------|
-| SFT baseline / pre-GRPO | `qwen3_vl_text` multiaux | 14/16 | 62/95 | 基线，`vlm_sft44 checkpoint-20084`，非当前 commit 历史结果（dev: `88851cfc` / imo95: `51686a42`） |
-| v17 checkpoint-500 | `qwen3_vl_text` multiaux | 14/16 | 61/95 | 5k `bucket_unified`，当前 commit 补跑 |
+| SFT baseline / pre-GRPO | `qwen3_vl_text` multiaux | 14/16 | 58/95 | 基线，`vlm_sft44 checkpoint-20084`，ddar bug fix 后重跑（20260522） |
+| v17 checkpoint-500 | `qwen3_vl_text` multiaux | 14/16 | 61/95 | 5k `bucket_unified`，ddar bug fix 前结果（commit `6e24d512`） |
 | v18 checkpoint-500 | `vlm` | 14/16 | 55/95 | 10k `bucket_unified`，非当前 commit 历史结果（`f384d702`） |
-| **v19 checkpoint-500** | **`qwen3_vl_text` multiaux** | **14/16** | **65/95** | **当前最强版本**，`select_balanced` 10k |
+| **v19 checkpoint-500** | **`qwen3_vl_text` multiaux** | **14/16** | **58/95** | **ddar bug fix 后重跑（20260521）**，`select_balanced` 10k |
 
 补充说明：
-- v19 在历史 run 中曾达到 `66/95`，但当前 commit 的主结果以最新完整补跑 `65/95` 为准。
+- ddar bug fix（commit `ed0b877`）后，sft44 和 v19 在 imo_95 上均为 58/95，GRPO 相对 baseline 的优势在当前 commit 下消失。v19 历史最高曾达 `66/95`（旧 run），bug fix 前最新完整补跑为 `65/95`（commit `6e24d512`），这些历史结果保留在下方来源列表中。
 - v17/v19 使用的是 `qwen3_vl_text` multiaux 评估链路；v18 历史结果来自更早的 `vlm` 链路，跨版本比较主要用于主线演进记录。
+- v17 尚未在 ddar bug fix 后重跑，其 61/95 为旧 commit 结果，与 sft44/v19 新结果不可直接比较。
 
 ## v20-v25 短推理消融概览
 
@@ -36,7 +37,7 @@
 - `group` reward scaling 很关键；`v21 -> v22` 从 `6/11` 直接回升到 `8/11`。
 - 在 `group + token` 这条线上，`grpo` 至少不弱于 `dr_grpo`；`v24=8/11`，而 `v23=6/11`。
 - 当前没有有效的 `dapo + group + token` 对照实验；旧版文档把 `v25` 写成这组参数是错误归因。
-- 当前最强的短推理对比口径仍是 `v22/v24=8/11`；但它们都还没有完整 `imo_95` 重跑，因此 full benchmark 主口径仍以 `v19=65/95` 为准。
+- 当前最强的短推理对比口径仍是 `v22/v24=8/11`；但它们都还没有完整 `imo_95` 重跑，因此 full benchmark 主口径仍以 `v19=58/95`（ddar bug fix 后）为准。
 
 主要证据：
 - [v20 dev_imo](/C20545/home/wangzi/GenesisGeo-grpo/results/v20_dapo_batchseq_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v0-20260515-153615_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260515T182641Z.csv), [v20 11题修正后汇总](/C20545/home/wangzi/GenesisGeo-grpo/results/v20_dapo_batchseq_checkpoint500_qwen3_vl_text_multiaux/imo95_score_diff_11_final.csv)
@@ -53,7 +54,7 @@
 - [benchmarks/imo95_score_diff_11.txt](/C20545/home/wangzi/GenesisGeo-grpo/benchmarks/imo95_score_diff_11.txt)
   - 格式与 `imo_95.txt` 完全一致，仍然是“题名行 + 题面行”的两行配对格式
   - 包含 `11` 道真正解释主比较 headline 分差的 swing 题
-  - 用途：快速复跑 `62/95 -> 61/95 -> 65/95` 这类主线 score delta 的关键题
+  - 用途：快速复跑主线 score delta 的关键题（基于 ddar bug fix 前的历史 run 构建，对应 `62/95 -> 61/95 -> 65/95`）
 - [benchmarks/imo95_mixed_outcomes_20.txt](/C20545/home/wangzi/GenesisGeo-grpo/benchmarks/imo95_mixed_outcomes_20.txt)
   - 同样保持与 `imo_95.txt` 一致的两行配对格式
   - 包含 `20` 道在 8 个完整 run 里曾出现 solved / unsolved 翻转的题
@@ -69,8 +70,9 @@
 - pre-GRPO multiaux baseline
   - agent：`qwen3_vl_text`
   - model：`vlm_sft44 checkpoint-20084`
-  - 结果 CSV：`results/pre_grpo_vlm_sft44_checkpoint20084_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_vlm_sft44_checkpoint-20084_sv1_d32_b512_s4_gbs2_gbt100_seed123_20260510T045624Z.csv`
-  - eval commit：`392ea7f6dd8d2f91824783494b78384c12db4428`
+  - **最新结果 CSV（ddar bug fix 后，20260522，58/95）**：`results/pre_grpo_vlm_sft44_checkpoint20084_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_vlm_sft44_checkpoint-20084_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260522T073225Z.csv`
+  - 历史结果 CSV（ddar bug fix 前，20260510，62/95）：`results/pre_grpo_vlm_sft44_checkpoint20084_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_vlm_sft44_checkpoint-20084_sv1_d32_b512_s4_gbs2_gbt100_seed123_20260510T045624Z.csv`
+  - eval commit（历史）：`392ea7f6dd8d2f91824783494b78384c12db4428`
 - v17 multiaux
   - agent：`qwen3_vl_text`
   - model：`models/grpo_vlm_sft44_geometry100k_v17_s1_4gpu_lr5e6/v0-20260423-165556/checkpoint-500`
@@ -79,8 +81,9 @@
 - v19 multiaux
   - agent：`qwen3_vl_text`
   - model：`models/grpo_vlm_sft44_geometry100k_v19_s1_4gpu_lr5e6/v0-20260508-105855/checkpoint-500`
-  - 结果 CSV：`results/v19_lr5e6_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_v0-20260508-105855_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260513T073845Z.csv`
-  - eval commit：`6e24d5121e6264eaf5f7c2dc30e184c52f8d5436`
+  - **最新结果 CSV（ddar bug fix 后，20260521，58/95）**：`results/v19_lr5e6_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_v0-20260508-105855_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260521T133115Z.csv`
+  - 历史结果 CSV（ddar bug fix 前，20260513，65/95）：`results/v19_lr5e6_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_v0-20260508-105855_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260513T073845Z.csv`
+  - eval commit（历史）：`6e24d5121e6264eaf5f7c2dc30e184c52f8d5436`
 - v17 singleaux
   - agent：`qwen3_vl_text`
   - model：`models/grpo_vlm_sft44_geometry100k_v17_s1_4gpu_lr5e6/v0-20260423-165556/checkpoint-500`
