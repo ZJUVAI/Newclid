@@ -308,6 +308,94 @@ beam 的真实排序规则来自：
 - `candidate_rank` 反映单次生成内部顺序。
 - `frontier_beam_rank` 才反映跨父节点竞争后，在全局下一层 frontier 中的位置。
 
+## 浅层解题分析（Shallow Solve Analysis）
+
+### 定义
+
+**浅层解题**：在 depth ≤ 1 时成功的题目，包括：
+- depth = -1：base DDAR 直接解出（无需搜索）
+- depth = 0：只需一步 aux 即可解出
+- depth = 1：需要两步 aux 才能解出
+
+### 整体统计
+
+| 指标 | v19 | sft44 |
+|------|-----|-------|
+| 总解题数 | 58/95 | 58/95 |
+| 浅层解题数（depth≤1） | 41/58 (70.7%) | 35/58 (60.3%) |
+| 深层解题数（depth≥2） | 17/58 (29.3%) | 23/58 (39.7%) |
+
+**关键发现**：
+- v19 在浅层解题比例上**高出 10.4 个百分点**（70.7% vs 60.3%）
+- 这意味着 v19 更倾向于在搜索早期就找到解，而 sft44 需要更深的搜索
+- 但这并未转化为总解题数优势（两者都是 58/95）
+
+### 深度分布细节
+
+| 深度 | v19 | sft44 | 差异 |
+|------|-----|-------|------|
+| base DDAR (depth=-1) | 1 | 1 | 0 |
+| depth=0 | 6 | 6 | 0 |
+| depth=1 | 34 | 28 | **+6** |
+| depth=2 | 14 | 20 | -6 |
+| depth=3 | 3 | 3 | 0 |
+
+**解读**：
+- v19 在 depth=1 多解出 6 题，但在 depth=2 少解出 6 题
+- 这是一个**深度迁移**现象，而非净增益
+- 说明 v19 的策略在浅层更有效，但在深层搜索能力反而下降
+
+### 共同浅层解题的 Beam Rank 比较
+
+在 34 道两者都在 depth≤1 成功的题目中，我们比较了它们在 depth 0 的 frontier beam rank：
+
+![Shallow Solve Beam Rank Comparison](./_static/shallow_solve_beam_rank_comparison.png)
+
+#### 统计摘要
+
+| 指标 | v19 | sft44 |
+|------|-----|-------|
+| 样本数 | 27 | 27 |
+| 最小值 | 1 | 1 |
+| 中位数 | 6 | 7 |
+| 平均值 | 7.1 | 7.1 |
+| 最大值 | 19 | 25 |
+
+#### 逐题比较
+
+在 27 道共同浅层解题中：
+- **v19 更好**（rank 更低）：10 题（37.0%）
+- **sft44 更好**（rank 更低）：10 题（37.0%）
+- **相同**：7 题（25.9%）
+
+**结论**：在浅层解题的 beam rank 上，v19 和 sft44 **基本持平**，没有系统性优势。
+
+#### 显著差异案例
+
+**v19 显著更好**（Δrank > 5）：
+
+1. `imo_sl_2018_g2`：sft=15 → v19=1（Δ=14）
+2. `imo_sl_2022_g3_variant`：sft=12 → v19=1（Δ=11）
+3. `imo_sl_2007_g2_variant`：sft=25 → v19=18（Δ=7）
+
+**v19 显著更差**（Δrank > 5）：
+
+1. `imo_sl_2000_g6`：sft=2 → v19=19（Δ=17）
+2. `imo_sl_2015_g3_variant`：sft=1 → v19=10（Δ=9）
+3. `imo_sl_2016_g7a`：sft=1 → v19=7（Δ=6）
+
+### 浅层分析结论
+
+1. **深度迁移而非净增益**：v19 的 +6 题 depth=1 优势被 -6 题 depth=2 劣势完全抵消，总解题数持平。
+
+2. **Beam rank 无系统性优势**：在共同浅层解题中，v19 和 sft44 的 depth 0 beam rank 分布几乎相同（中位数 6 vs 7，平均值均为 7.1）。
+
+3. **个体差异大于整体趋势**：存在显著的逐题波动（Δrank 最大达 17），但正负案例数量相当，说明 GRPO 训练**没有系统性地改善浅层搜索的排序质量**。
+
+4. **与全局分析一致**：这个结论与前文"v19 vs sft44 全局对比"中的发现一致——v19 在 66 个配对点中有 38 worse vs 17 better，说明策略 shift 是**分布性的而非能力性的**。
+
+---
+
 ## 相关文件
 
 - 评测运行：
@@ -316,3 +404,120 @@ beam 的真实排序规则来自：
   [success_trajectory_beam_rank_steps_eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_v0-20260508-105855_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260521T133115Z.csv](/C20545/home/wangzi/GenesisGeo-grpo/results/v19_lr5e6_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_v0-20260508-105855_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260521T133115Z/analysis/success_trajectory_beam_rank_steps_eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_v0-20260508-105855_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260521T133115Z.csv)
 - 汇总统计：
   [success_trajectory_beam_rank_summary_eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_v0-20260508-105855_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260521T133115Z.json](/C20545/home/wangzi/GenesisGeo-grpo/results/v19_lr5e6_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_v0-20260508-105855_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260521T133115Z/analysis/success_trajectory_beam_rank_summary_eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_v0-20260508-105855_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260521T133115Z.json)
+- 浅层解题分析图：
+  [shallow_solve_beam_rank_comparison.png](./_static/shallow_solve_beam_rank_comparison.png)
+
+---
+
+## Aux Segments 对比分析
+
+### 核心发现
+
+- **7 道 v19 优势题目**（v19 在 depth=1 解出，sft44 需要 depth=2）：v19 在 depth 0 使用了 **2.12x** 的 aux segments，但总 segments 反而更少（0.96x）。
+- **所有 57 道共同成功题目**：v19 和 sft44 的 aux segments 几乎完全相同（depth 0: 1.03x，总: 1.01x）。
+
+**关键结论**：v19 的"复杂第一步"策略只在特定的 7 道题目上有效，在整体上没有系统性优势。
+
+### 对比可视化
+
+![](./_static/v19_vs_sft44_aux_segments_all_vs_advantage.png)
+
+左列为 7 道 v19 优势题目，右列为所有 57 道共同成功题目。
+
+### 7 道 v19 优势题目的详细对比
+
+这些是 **v19 在 depth=1 就解出，但 sft44 需要 depth=2** 的题目。
+
+| 题目 | 模型 | 步数 | d0 Seg | d0 Pts | d1 Seg | d1 Pts | 总 Seg | 总 Pts |
+|------|------|------|--------|--------|--------|--------|--------|--------|
+| **imo_1983_p2** | v19 | 2 | 1 | 1 | 1 | 1 | 2 | 2 |
+| | sft44 | 3 | 1 | 1 | 1 | 1 | 3 | 3 |
+| | Δ | -1 | 0 | 0 | 0 | 0 | -1 | -1 |
+| **imo_sl_2008_g1a_variant** | v19 | 2 | 1 | 1 | 1 | 1 | 2 | 2 |
+| | sft44 | 3 | 1 | 1 | 1 | 1 | 3 | 3 |
+| | Δ | -1 | 0 | 0 | 0 | 0 | -1 | -1 |
+| **imo_sl_2008_g1a_variant2** | v19 | 2 | **6** | **6** | 1 | 1 | 7 | 7 |
+| | sft44 | 3 | 1 | 1 | 1 | 1 | 8 | 8 |
+| | Δ | -1 | **+5** | **+5** | 0 | 0 | -1 | -1 |
+| **imo_sl_2011_g5** | v19 | 2 | 1 | 1 | 2 | 2 | 3 | 3 |
+| | sft44 | 3 | 2 | 2 | 1 | 1 | 4 | 4 |
+| | Δ | -1 | -1 | -1 | +1 | +1 | -1 | -1 |
+| **imo_sl_2017_g3_variant** | v19 | 2 | **2** | **2** | 2 | 2 | **4** | **4** |
+| | sft44 | 3 | 1 | 1 | 1 | 1 | 3 | 3 |
+| | Δ | -1 | **+1** | **+1** | +1 | +1 | **+1** | **+1** |
+| **imo_sl_2019_g2** | v19 | 2 | **3** | **3** | 1 | 1 | **4** | **4** |
+| | sft44 | 3 | 1 | 1 | 1 | 1 | 3 | 3 |
+| | Δ | -1 | **+2** | **+2** | 0 | 0 | **+1** | **+1** |
+| **imo_sl_2019_g2_variant** | v19 | 2 | **3** | **3** | 1 | 1 | **4** | **4** |
+| | sft44 | 3 | 1 | 1 | 1 | 1 | 3 | 3 |
+| | Δ | -1 | **+2** | **+2** | 0 | 0 | **+1** | **+1** |
+
+#### 7 道优势题目统计摘要
+
+| 指标 | v19 | sft44 | v19/sft44 |
+|------|-----|-------|-----------|
+| Depth 0 平均 segments | **2.43** | 1.14 | **2.12x** |
+| Depth 0 最大值 | 6 | 2 | — |
+| 总平均 segments | 3.71 | 3.86 | 0.96x |
+| 平均步数 | 2 | 3 | — |
+
+Depth 0 对比：v19 更多 4/7，相同 2/7，v19 更少 1/7。
+
+#### 典型案例
+
+**`imo_sl_2008_g1a_variant2`**（最极端差异）：
+
+v19 depth 0（6 segments，6 points）：
+```
+k = on_aline k b d d b a, on_tline k c a b
+l = on_aline l c d d c a, angle_bisector l d a c
+m = on_line m a d, on_tline m l a d
+n = on_line n a c, on_tline n l a c
+o = on_line o c d, on_tline o l c d
+p = midpoint p k n
+```
+
+sft44 depth 0（1 segment，1 point）：
+```
+k = on_circum k a b g, on_line k b d
+```
+
+**`imo_sl_2019_g2` / `imo_sl_2019_g2_variant`**（两道变体题策略完全一致）：
+
+v19 depth 0（3 segments，3 points）：
+```
+m = on_tline m b b d, on_circle m b d
+n = on_pline n m b d, on_pline n d b m
+o = midpoint o b n
+```
+
+sft44 depth 0（1 segment，1 point）：
+```
+m = on_circle m h e, on_circle m i e
+```
+
+### 所有 57 道共同成功题目的统计
+
+| 指标 | v19 | sft44 | v19/sft44 |
+|------|-----|-------|-----------|
+| Depth 0 平均 segments | 2.11 | 2.05 | **1.03x** |
+| Depth 0 中位数 | 2.00 | 1.00 | — |
+| 总平均 segments | 4.04 | 3.98 | **1.01x** |
+| 总中位数 | 4.00 | 4.00 | — |
+| 平均步数 | 2.18 | 2.30 | — |
+
+Depth 0 对比：v19 更多 11/57（19.3%），相同 39/57（**68.4%**），v19 更少 7/57（12.3%）。
+
+总 segments 对比：v19 更多 12/57（21.1%），相同 35/57（**61.4%**），v19 更少 10/57（17.5%）。
+
+### Aux Segments 综合结论
+
+| 指标 | 7 道优势题目 | 所有 57 道题目 |
+|------|-------------|---------------|
+| Depth 0 segments (v19/sft44) | **2.12x** | **1.03x** |
+| 总 segments (v19/sft44) | 0.96x | 1.01x |
+
+v19 在 7 道特定题目上学会了使用更复杂的第一步（2.12x segments），但在整体 57 道题目上这个优势几乎消失（1.03x）。这 7 道题只占成功题目的 12%，局部优化被整体持平抵消，总解题数仍然是 58/95。
+
+- 图：[v19_vs_sft44_aux_segments_all_vs_advantage.png](./_static/v19_vs_sft44_aux_segments_all_vs_advantage.png)
+- 图：[v19_vs_sft44_aux_segments_comparison.png](./_static/v19_vs_sft44_aux_segments_comparison.png)
