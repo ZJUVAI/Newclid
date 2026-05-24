@@ -47,9 +47,12 @@ bool Coll::check_equations() const
     Point ref_c = _c;
 
     // 按 x 坐标排序，选择中位数点作为参考
-    if (ref_a.x() > ref_b.x()) std::swap(ref_a, ref_b);
-    if (ref_a.x() > ref_c.x()) std::swap(ref_a, ref_c);
-    if (ref_b.x() > ref_c.x()) std::swap(ref_b, ref_c);
+    if (ref_a.x() > ref_b.x())
+        std::swap(ref_a, ref_b);
+    if (ref_a.x() > ref_c.x())
+        std::swap(ref_a, ref_c);
+    if (ref_b.x() > ref_c.x())
+        std::swap(ref_b, ref_c);
     // 现在 ref_b 是 x 坐标中位数点，作为参考点
 
     // 以 ref_b 为参考点，计算叉积
@@ -88,8 +91,7 @@ vector<Coll> Coll::permutations() const
 bool Coll::is_between() const
 {
     // 判断三点是否共线
-    double cross = (_b.y() - _a.y()) * (_c.x() - _a.x()) - (_b.x() - _a.x()) * (_c.y() - _a.y());
-    if (fabs(cross) > 1e-9) // 不共线
+    if (!check_equations())
         return false;
 
     // 判断b是否在a和c之间（不包含端点）

@@ -39,7 +39,7 @@ DDARSolver::DDARSolver(Problem *problem, const std::map<std::string, bool> &conf
     {
         if (stmt->check_numerically())
         {
-            _ars.push_back(this->insert_statement(stmt));
+            _ars.push_back(this->insert_statement(stmt->normalize()));
         }
     }
 }
@@ -377,7 +377,7 @@ void DDARSolver::add_established_equations(Proof *pf)
         for (auto &old_pf : to_process)
         {
             auto stmt = old_pf->statement()->replace(p, q);
-            string key = stmt->to_string();
+            string key = stmt->normalize()->to_string();
             auto itr = _statement_proofs.find(key);
             if (itr != _statement_proofs.end())
             {
