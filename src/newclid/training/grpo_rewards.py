@@ -14,7 +14,11 @@ from typing import Any, Optional
 import numpy as np
 
 from newclid.DDAR.build import DDAR
-from newclid.configs import default_defs_path, default_rules_path
+from newclid.configs import (
+    default_defs_path,
+    default_rules_path,
+    load_default_ddar_runtime_config,
+)
 from newclid.formulations.definition import DefinitionJGEX
 from newclid.formulations.problem import ProblemJGEX
 from newclid.formulations.rule import Rule
@@ -261,14 +265,14 @@ class AuxRewardEvaluator:
         points = self._extract_points(proof)
         premises = self._extract_premises(proof)
         goals = self._extract_goals(proof)
+        ddar_config = load_default_ddar_runtime_config()
         solved, _ = DDAR.run_ddar(
             "",
             points,
             premises,
             goals,
             self.ddar_max_level,
-            True,
-            True,
+            ddar_config,
         )
         return solved
 

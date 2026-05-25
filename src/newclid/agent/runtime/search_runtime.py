@@ -13,6 +13,7 @@ import ray
 
 from newclid.DDAR.build import DDAR
 from newclid.algebraic_reasoning.algebraic_manipulator import AlgebraicManipulator
+from newclid.configs import load_default_ddar_runtime_config
 from newclid.dependencies.dependency_graph import DependencyGraph
 from newclid.formulations.clause import translate_sentence
 from newclid.formulations.definition import DefinitionJGEX
@@ -294,14 +295,14 @@ def extract_goals(proof: ProofState) -> list[tuple[str, list[str]]]:
 
 
 def run_ddar_on_proof(proof: ProofState) -> bool:
+    ddar_config = load_default_ddar_runtime_config()
     solved, _ = DDAR.run_ddar(
         "",
         extract_points(proof),
         extract_premises(proof),
         extract_goals(proof),
         500,
-        True,
-        True,
+        ddar_config,
     )
     return solved
 
@@ -416,7 +417,8 @@ def run_ddar_remote(
     try:
         ddar_start = time.time()
         del rules, start_time, timeout
-        solved, _ = DDAR.run_ddar("", points, premises, goals, 500, True, True)
+        ddar_config = load_default_ddar_runtime_config()
+        solved, _ = DDAR.run_ddar("", points, premises, goals, 500, ddar_config)
         ddar_engine_finished_at_unix_s = time.time()
         ddar_engine_work_time_s = ddar_engine_finished_at_unix_s - ddar_start
     except Exception as exc:

@@ -17,7 +17,11 @@ from newclid.algebraic_reasoning.algebraic_manipulator import (
 )
 from newclid.formulations.rule import Rule
 from newclid.proof import ProofState
-from newclid.configs import default_defs_path, default_rules_path
+from newclid.configs import (
+    default_defs_path,
+    default_rules_path,
+    load_default_ddar_runtime_config,
+)
 from newclid.agent.agents_interface import DeductiveAgent
 from newclid.formulations.problem import ProblemJGEX
 from newclid.proof_writing import write_proof_steps
@@ -42,8 +46,14 @@ def _run_ddar_in_subprocess(
     This function runs in a separate process and puts the result in a queue.
     """
     try:
+        ddar_config = load_default_ddar_runtime_config()
         solved, dep_graph = DDAR.run_ddar(
-            problem_name, points, premises, goals, max_level
+            problem_name,
+            points,
+            premises,
+            goals,
+            max_level,
+            ddar_config,
         )
         result_queue.put({"success": True, "solved": solved, "dep_graph": dep_graph})
     except Exception as e:

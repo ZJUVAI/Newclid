@@ -1,5 +1,6 @@
 import newclid
 import json
+from functools import lru_cache
 from pathlib import Path
 from typing import Dict
 
@@ -41,3 +42,12 @@ def load_solver_config(config_path: Path = None, **overrides) -> Dict[str, bool]
     config.update(overrides)
 
     return config
+
+
+@lru_cache(maxsize=None)
+def load_default_ddar_runtime_config(
+    using_log: bool = True,
+    using_exp: bool = True,
+) -> Dict[str, bool]:
+    """Return the default DDAR config with explicit runtime overrides."""
+    return load_solver_config(using_log=using_log, using_exp=using_exp)
