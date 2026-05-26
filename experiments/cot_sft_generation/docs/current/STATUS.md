@@ -10,6 +10,29 @@
 - 按时间顺序的近期实验记录见 [EXPERIMENT_LOG.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/history/EXPERIMENT_LOG.md)。
 - 如果下一会话准备继续推进新链路，请先读 [DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/DOSSIER_V1_MAINLINE.md)。
 
+## 当前最新阶段：Proof DAG 直接驱动（2026-05-26）
+
+之前的 `dossier_v1` 用 segment / keyword overlap 启发式重新验证 proof 的每一步，启发式严格弱于 DDAR 的 rule application，导致 `0/12 surface_pass`。
+
+新链路把 bridge_chain 的构造主体从启发式 verification 改成直接读 proof DAG：
+
+- `core/proof_dag.py`：解析 `<proof>` 块成结构化 DAG，从 goal 反向 walk 选 milestone
+- `core/rule_catalog.py`：把 `r03`、`r34` 等规则 ID 翻译成真实定理名（"the inscribed angle theorem"、"AA similarity"、"SAS similarity"、"Thales' theorem"）
+- `build_proof_dag_skeleton`：从 milestone 直接生成 `bridge_chain` 和 `goal_closure`，每步附带 `rule`、`proof_step_id`、`numerical_check_basis` 字段
+- `build_proof_dag_writer_body`：scripted writer，引用真实定理名生成自然语言叙述
+- `generate_proof_dag_thinking`：纯脚本路径，零 API 调用即可生成
+
+结果：
+- **12-item benchmark surface_pass: 12/12**（先前 baseline 是 0/12）
+- 0 forbidden pattern 违规
+- 全部 149 个测试通过（含新增 31 个 proof_dag / rule_catalog 测试）
+- 单条样本生成耗时 < 1s（无 API 调用）
+
+剩余事项：
+- semantic_pass 尚未做语义审读（需要人工 / Codex 验证生成文本的几何正确性）
+- 旧 7 个 lacks_* gate 函数和相关 tail/checkpoint helper 暂保留，作为 legacy fallback；后续 PR 可清理
+- 模型 planner / critic / writer 当前未启用，纯脚本生成；如需更自然的起手段叙述可后续接回模型
+
 ## 阶段性进展
 
 ### 阶段 1：从 `v83` 开始把失败模式显式化

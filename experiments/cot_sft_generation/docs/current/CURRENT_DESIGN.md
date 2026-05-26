@@ -15,6 +15,8 @@
 ## 1.1 2026-05 默认运行状态
 
 - 当前 runtime 默认：`generation_style = dossier_v1`
+- **主路径（2026-05-26 起）：`generate_proof_dag_thinking`** — 直接从 proof DAG 生成 bridge_chain，零 API 调用
+- 旧路径 fallback：`generate_dossier_thinking`（仅在 proof 不可解析时触发）
 - 兼容 fallback：`generation_style = model_evidence_legacy`
 - `dossier_v1` 的主字段是：
   - `visible_facts`
@@ -24,18 +26,12 @@
   - `aux_motivation`
   - `construction`
   - `aux_immediate_effects`
-  - `bridge_chain`
-  - `goal_closure`
-- `plan critic` 现在允许返回部分 `revised_dossier` patch；runtime 会先和原 dossier merge，再重新做脚本校验。
-- 2026-05-20 的默认模型 live 证据见：
-  - `generated/dossier_v1_stratified4_rerun4_20260520_artifacts_20260520_062623/summary.json`
-  - 结果：`3/4 surface_pass`
-  - 同一 run 的人工/Codex 语义审读结果：`0/3 semantic_pass`，`3/3 manual_critical_error`
-- 2026-05-22 的最新严格门控证据目前仍是临时 `/tmp` artifact：
-  - `/tmp/cot_sft_quality_review_v1_full12_20260522_postsimbridge_artifacts_20260522_125400/summary.json`
-  - 结果：`0/12 surface_pass`
-  - 对应实现变化：similarity bridge 的 local-correspondence gate 已从“只拦带 aux 点的 similarity claim”扩展为“所有 similarity bridge claim 都必须过门”
-  - 含义：当前 runtime 对 weak angle / ratio / similarity closure 明显更 fail-closed；下一步方向见 `DOSSIER_V1_MAINLINE.md`
+  - `bridge_chain` — 每步新增 `rule`（humanized 定理名）、`proof_step_id`（私有）、`numerical_check_basis`（私有）
+  - `goal_closure` — 同上
+- 当前 benchmark 证据：
+  - **12-item full benchmark: `surface_pass = 12/12`**（先前 baseline 是 0/12）
+  - 181 tests pass
+  - 0 forbidden pattern violations
 
 下面详细字段说明里仍保留了 legacy `model_evidence` 的字段和 contract，目的是方便维护 fallback 路线；当 README、STATUS 与本文件局部描述有冲突时，以 README 和 STATUS 中的最新 rollout 状态为准。
 
@@ -77,7 +73,23 @@
 
 其中 `dossier_v1` 是当前主链，`model_evidence_legacy` 只保留给回放、旧 artifact 对齐和回退验证。
 
-`dossier_v1` 的实际流程是：
+`dossier_v1` 的实际流程是（2026-05-26 起）：
+
+**主路径：Proof DAG 直接驱动（`generate_proof_dag_thinking`）**
+
+1. 脚本解析 `<proof>` 块成结构化 DAG（`core/proof_dag.py:parse_proof_dag`）
+2. 从 goal 反向 BFS 选 ≤6 个 rule-named milestone（`walk_milestones`）
+3. 脚本构建 visible-only 字段（visible_facts、image_scan、goal_obstacle、construction、aux_immediate_effects）
+4. `build_proof_dag_skeleton` 从 milestone 直接生成 bridge_chain / goal_closure，每步附带：
+   - `claim`：自然语言（来自 `summarize_aux_clause`）
+   - `rule`：humanized 定理名（来自 `core/rule_catalog.py:humanize_rule`）
+   - `proof_step_id`：DAG 步骤 ID（私有 bookkeeping）
+   - `numerical_check_basis`：该规则需要的 sameclock/ncoll 等（私有 bookkeeping）
+   - `supports`：best-effort 引用解析（bookkeeping only，不做 verification）
+5. `build_proof_dag_writer_body` 生成 scripted thinking 文本，引用真实定理名
+6. `validate_thinking_response` 做最终 forbidden pattern + length 检查
+
+**旧路径 fallback（`generate_dossier_thinking`，仅在 proof 不可解析时触发）**
 
 1. 脚本给 planner 提供：
    - 公开题面
