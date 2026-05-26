@@ -209,6 +209,13 @@ try:
 except ImportError:  # pragma: no cover - exercised in bare environments
     OpenAI = None
 
+try:
+    from .core.proof_dag import parse_proof_dag, walk_milestones
+    from .core.rule_catalog import humanize_rule, expected_numerical_predicates
+except ImportError:  # pragma: no cover - script execution path
+    from core.proof_dag import parse_proof_dag, walk_milestones  # type: ignore[no-redef]
+    from core.rule_catalog import humanize_rule, expected_numerical_predicates  # type: ignore[no-redef]
+
 logger = logging.getLogger(__name__)
 
 
@@ -1006,7 +1013,13 @@ def build_canonical_figure_overview(anchor_points, visible_relations, coordinate
 
 def build_canonical_goal_bottleneck(visible_goal):
     goal_spec = parse_goal_expression(visible_goal or "")
-    goal_points = [point.lower() for point in goal_spec.get("points", []) if isinstance(point, str)]
+    raw_points = [point.lower() for point in goal_spec.get("points", []) if isinstance(point, str)]
+    seen = set()
+    goal_points = []
+    for point in raw_points:
+        if point not in seen:
+            seen.add(point)
+            goal_points.append(point)
     point_text = join_natural_list(goal_points) if goal_points else "the named target points"
     predicate = (goal_spec.get("predicate") or "").lower()
     if "ratio" in predicate:
@@ -7173,6 +7186,232 @@ def build_scripted_dossier_skeleton(
     return True, "Valid scripted dossier skeleton", cleaned_dossier
 
 
+def build_proof_dag_skeleton(
+    record,
+    dag,
+    milestones,
+    visible_text_facts,
+    point_coords,
+    aux_part,
+    visible_goal,
+):
+    """Build bridge_chain and goal_closure from proof DAG milestones.
+
+    Unlike the heuristic skeleton builder, this trusts the proof DAG as ground truth
+    and only does translation/compression, not re-verification.
+    """
+    if not milestones:
+        return None
+
+    visible_points = extract_visible_point_names(point_coords)
+    aux_points = [p.lower() for p in extract_aux_new_points(aux_part or "")]
+    known_points = visible_points + aux_points
+
+    visible_premise_summaries = [
+        fact.get("relation", "")
+        for fact in (visible_text_facts or [])
+        if isinstance(fact, dict) and fact.get("relation")
+    ]
+    aux_direct_relations = [
+        normalize_relation_surface(r).strip()
+        for r in build_aux_direct_consequences(aux_part)
+        if isinstance(r, str) and r.strip()
+    ][:4]
+
+    normalized_goal_finish = normalize_relation_surface(
+        build_canonical_goal_finish_relation(visible_goal)
+    ).strip()
+
+    # Separate milestones into bridge (intermediate) and goal (final).
+    goal_milestone = milestones[-1] if milestones else None
+    bridge_milestones = milestones[:-1] if len(milestones) > 1 else []
+
+    # Build bridge_chain entries.
+    bridge_chain = []
+    for m in bridge_milestones:
+        step = m.step
+        claim = step.natural_language
+        if not claim:
+            continue
+        rule_text = humanize_rule(step.rule_id)
+        num_preds = expected_numerical_predicates(step.rule_id)
+        num_basis = []
+        if num_preds and dag.numerical_facts:
+            for dep_id in step.deps:
+                nf = dag.numerical_facts_by_id.get(dep_id)
+                if nf and nf.predicate in num_preds:
+                    num_basis.append(nf.raw_line)
+
+        # Best-effort support resolution: find refs in visible_facts/aux_immediate_effects
+        # that share points with this step's deps. This is bookkeeping only, not verification.
+        supports = _resolve_milestone_supports(
+            step, dag, visible_premise_summaries, aux_direct_relations, bridge_chain, known_points
+        )
+
+        bridge_chain.append({
+            "claim": claim,
+            "rule": rule_text,
+            "proof_step_id": step.step_id,
+            "numerical_check_basis": num_basis,
+            "supports": supports,
+            "why_next": f"this follows {rule_text}",
+        })
+
+    # Build goal_closure.
+    goal_closure = []
+    if goal_milestone:
+        step = goal_milestone.step
+        claim = step.natural_language
+        if not claim:
+            claim = normalized_goal_finish
+        rule_text = humanize_rule(step.rule_id)
+        num_preds = expected_numerical_predicates(step.rule_id) if step.rule_id.upper() != "AR" else set()
+        num_basis = []
+        if num_preds and dag.numerical_facts:
+            for dep_id in step.deps:
+                nf = dag.numerical_facts_by_id.get(dep_id)
+                if nf and nf.predicate in num_preds:
+                    num_basis.append(nf.raw_line)
+
+        supports = _resolve_milestone_supports(
+            step, dag, visible_premise_summaries, aux_direct_relations, bridge_chain, known_points
+        )
+
+        goal_closure.append({
+            "claim": claim,
+            "rule": rule_text,
+            "proof_step_id": step.step_id,
+            "numerical_check_basis": num_basis,
+            "supports": supports,
+            "why_next": "this is the target relation.",
+        })
+
+    return {
+        "bridge_chain": bridge_chain,
+        "goal_closure": goal_closure,
+    }
+
+
+def _resolve_milestone_supports(step, dag, visible_premise_summaries, aux_direct_relations, prior_bridge_chain, known_points):
+    """Best-effort support resolution for a milestone step.
+
+    Looks at the step's deps in the DAG and maps them to:
+    - visible_facts[i] if a dep is a premise
+    - aux_immediate_effects[i] if a dep matches an aux direct relation
+    - bridge_chain[i] if a dep matches a prior bridge milestone
+    """
+    supports = []
+    step_deps = set(step.deps or [])
+
+    # Check if any dep is a premise (step ID not in the proof DAG = it's a premise or numerical_check).
+    premise_dep_ids = [d for d in step_deps if d not in dag.steps_by_id]
+
+    # For premise deps, try to match against visible_facts.
+    if premise_dep_ids and visible_premise_summaries:
+        for i, relation in enumerate(visible_premise_summaries):
+            if relation and len(supports) < 2:
+                relation_points = extract_point_mentions(relation, known_points)
+                step_points = set(a.lower() for a in step.args if len(a) <= 2)
+                if relation_points & step_points:
+                    supports.append(f"visible_facts[{i}]")
+
+    # For deps that match aux direct relations.
+    for dep_id in step_deps:
+        dep_step = dag.get(dep_id)
+        if dep_step is None:
+            continue
+        dep_nl = dep_step.natural_language
+        for i, aux_rel in enumerate(aux_direct_relations):
+            if dep_nl and aux_rel and (
+                dep_nl.lower() == aux_rel.lower()
+                or relations_semantically_match(dep_nl, aux_rel, known_points)
+            ):
+                ref = f"aux_immediate_effects[{i}]"
+                if ref not in supports:
+                    supports.append(ref)
+                break
+
+    # For deps that match prior bridge_chain entries.
+    for dep_id in step_deps:
+        dep_step = dag.get(dep_id)
+        if dep_step is None:
+            continue
+        for i, bridge_entry in enumerate(prior_bridge_chain):
+            if bridge_entry.get("proof_step_id") == dep_id:
+                ref = f"bridge_chain[{i}]"
+                if ref not in supports:
+                    supports.append(ref)
+                break
+
+    return supports[:4]
+
+
+def build_proof_dag_writer_body(plan):
+    """Generate scripted writer body using proof DAG milestones with theorem names.
+
+    Replaces the old build_scripted_dossier_writer_body for DAG-based dossiers.
+    """
+    if not isinstance(plan, dict):
+        return ""
+
+    sentences = []
+
+    # Obstacle / motivation.
+    obstacle = (plan.get("goal_obstacle") or plan.get("goal_bottleneck") or "").strip().rstrip(".")
+    if obstacle:
+        sentences.append(f"{obstacle}.")
+
+    # Construction.
+    construction = (plan.get("construction") or "").strip().rstrip(".")
+    if construction:
+        sentences.append(f"{construction.capitalize()}.")
+
+    # Aux immediate effects (skip if they literally repeat the construction text).
+    aux_effects = [
+        r.strip().rstrip(".")
+        for r in (plan.get("aux_immediate_effects") or [])
+        if isinstance(r, str) and r.strip()
+    ]
+    construction_lower = construction.lower()
+    novel_aux_effects = [
+        eff for eff in aux_effects
+        if eff.lower() not in construction_lower
+    ]
+    if novel_aux_effects:
+        if len(novel_aux_effects) == 1:
+            sentences.append(f"This immediately gives {novel_aux_effects[0]}.")
+        else:
+            joined = " and ".join(novel_aux_effects[:2])
+            sentences.append(f"This immediately gives {joined}.")
+
+    # Bridge chain — each step cites its rule.
+    bridge_chain = plan.get("bridge_chain", []) if isinstance(plan.get("bridge_chain"), list) else []
+    for step_idx, step in enumerate(bridge_chain):
+        claim = (step.get("claim") or "").strip().rstrip(".")
+        rule = (step.get("rule") or "").strip()
+        if not claim:
+            continue
+        connector = "Then" if step_idx % 2 == 0 else "Next"
+        if rule:
+            sentences.append(f"{connector}, {rule}, {claim}.")
+        else:
+            sentences.append(f"{connector}, {claim}.")
+
+    # Goal closure.
+    goal_closure = plan.get("goal_closure", []) if isinstance(plan.get("goal_closure"), list) else []
+    for step in goal_closure:
+        claim = (step.get("claim") or "").strip().rstrip(".")
+        rule = (step.get("rule") or "").strip()
+        if not claim:
+            continue
+        if rule:
+            sentences.append(f"Finally, {rule}, {claim}.")
+        else:
+            sentences.append(f"Finally, {claim}.")
+
+    return " ".join(sentences)
+
+
 def build_scripted_dossier_writer_body(plan):
     if not isinstance(plan, dict):
         return ""
@@ -9324,6 +9563,170 @@ def run_writer_stage(
     }
 
 
+def generate_proof_dag_thinking(
+    record,
+    image_path: Path,
+    aux_part,
+    sanitized_rest,
+    model_name,
+    max_retries,
+    verbose,
+    plan_mode=None,
+    fallback_model_names=None,
+    source_audit=None,
+):
+    """Generate thinking using proof DAG milestones directly.
+
+    This replaces the heuristic-verification path with a simpler flow:
+    1. Parse proof DAG and walk milestones
+    2. Build visible-only fields (scripted)
+    3. Merge DAG skeleton for bridge_chain / goal_closure
+    4. Generate writer body (scripted, citing theorem names)
+    5. Validate final thinking
+    """
+    point_coords = get_point_coords(record)
+    visible_goal = extract_problem_goal(record)
+    visible_text_facts = build_visible_text_facts(record)
+
+    # Step 1: Parse proof DAG.
+    llm_output = record.get("llm_output_renamed", "")
+    dag = parse_proof_dag(llm_output)
+    if not dag.steps_by_id:
+        return {
+            "success": False,
+            "thinking": None,
+            "plan_prompt": None,
+            "write_prompt": None,
+            "plan_output": None,
+            "plan_parsed": None,
+            "attempts_used": 0,
+            "elapsed_seconds": 0.0,
+            "error": "proof_dag_unparseable",
+            "write_output": None,
+            "generation_style": "dossier_v1",
+        }
+
+    milestones = walk_milestones(dag, max_steps=6)
+
+    # Step 2: Build visible-only fields.
+    visible_premise_summaries = [
+        fact.get("relation", "")
+        for fact in visible_text_facts
+        if isinstance(fact, dict) and fact.get("relation")
+    ]
+    visible_points = extract_visible_point_names(point_coords)
+    coordinate_candidates = build_hidden_coordinate_candidates(
+        point_coords,
+        max_items=RELAXED_COORDINATE_CANDIDATE_MAX_ITEMS,
+        relax_type_limits=True,
+    )
+    image_scan = [
+        build_canonical_coordinate_relation(c)
+        for c in coordinate_candidates[:4]
+        if isinstance(c, dict) and c.get("relation_type")
+    ]
+    image_scan = [r for r in image_scan if r][:3]
+
+    visible_facts = merge_dossier_visible_relations(
+        [],
+        visible_premise_summaries,
+        max_items=8,
+    )
+
+    aux_direct_relations = [
+        normalize_relation_surface(r).strip()
+        for r in build_aux_direct_consequences(aux_part)
+        if isinstance(r, str) and r.strip()
+    ][:4]
+
+    # Step 3: Build DAG skeleton.
+    skeleton = build_proof_dag_skeleton(
+        record, dag, milestones, visible_text_facts, point_coords,
+        aux_part=aux_part, visible_goal=visible_goal,
+    )
+    if skeleton is None:
+        return {
+            "success": False,
+            "thinking": None,
+            "plan_prompt": None,
+            "write_prompt": None,
+            "plan_output": None,
+            "plan_parsed": None,
+            "attempts_used": 0,
+            "elapsed_seconds": 0.0,
+            "error": "proof_dag_skeleton_empty",
+            "write_output": None,
+            "generation_style": "dossier_v1",
+        }
+
+    # Assemble full dossier.
+    dossier = {
+        "visible_facts": visible_facts,
+        "image_scan": image_scan,
+        "coordinate_checks": [],
+        "goal_obstacle": build_canonical_goal_bottleneck(visible_goal),
+        "aux_motivation": build_safe_dossier_aux_motivation(aux_part or "", visible_goal),
+        "construction": build_canonical_construction(aux_part or ""),
+        "aux_immediate_effects": aux_direct_relations,
+        "bridge_chain": skeleton["bridge_chain"],
+        "goal_closure": skeleton["goal_closure"],
+    }
+
+    # Step 4: Generate writer body.
+    body = build_proof_dag_writer_body(dossier)
+    if not body:
+        return {
+            "success": False,
+            "thinking": None,
+            "plan_prompt": None,
+            "write_prompt": None,
+            "plan_output": json.dumps(dossier, ensure_ascii=False, indent=2) if verbose else None,
+            "plan_parsed": dossier,
+            "attempts_used": 0,
+            "elapsed_seconds": 0.0,
+            "error": "proof_dag_writer_body_empty",
+            "write_output": None,
+            "generation_style": "dossier_v1",
+        }
+
+    # Step 5: Validate.
+    assembled_thinking = f"<thinking>{body.strip()}</thinking>"
+    is_valid, message = validate_thinking_response(
+        assembled_thinking,
+        point_coords=point_coords,
+        require_coord_tags=False,
+        max_total_len=compute_thinking_total_budget(dossier),
+    )
+    if not is_valid:
+        return {
+            "success": False,
+            "thinking": assembled_thinking,
+            "plan_prompt": None,
+            "write_prompt": None,
+            "plan_output": json.dumps(dossier, ensure_ascii=False, indent=2) if verbose else None,
+            "plan_parsed": dossier,
+            "attempts_used": 1,
+            "elapsed_seconds": 0.0,
+            "error": f"thinking_validation_failed: {message}",
+            "write_output": body,
+            "generation_style": "dossier_v1",
+        }
+
+    return {
+        "success": True,
+        "thinking": assembled_thinking,
+        "plan_prompt": None,
+        "write_prompt": None,
+        "plan_output": json.dumps(dossier, ensure_ascii=False, indent=2) if verbose else None,
+        "plan_parsed": dossier,
+        "attempts_used": 1,
+        "elapsed_seconds": 0.0,
+        "error": None,
+        "write_output": body,
+        "generation_style": "dossier_v1",
+    }
+
+
 def generate_dossier_thinking(
     record,
     image_path: Path,
@@ -10437,18 +10840,39 @@ def process_and_generate_sft(
             }
 
         if generation_style == "dossier_v1":
-            generation = generate_dossier_thinking(
+            generation = generate_proof_dag_thinking(
                 record,
                 image_path=image_path,
                 aux_part=record["_aux_part"],
                 sanitized_rest=record["_sanitized_rest"],
                 model_name=model_name,
-                fallback_model_names=fallback_model_names,
                 max_retries=max_retries,
                 verbose=verbose,
                 plan_mode=plan_mode,
+                fallback_model_names=fallback_model_names,
                 source_audit=source_audit,
             )
+            _PROOF_DAG_RECOVERABLE_ERRORS = {
+                "proof_dag_unparseable",
+                "proof_dag_skeleton_empty",
+                "proof_dag_writer_body_empty",
+            }
+            if not generation.get("success") and (
+                generation.get("error") in _PROOF_DAG_RECOVERABLE_ERRORS
+                or (generation.get("error") or "").startswith("thinking_validation_failed:")
+            ):
+                generation = generate_dossier_thinking(
+                    record,
+                    image_path=image_path,
+                    aux_part=record["_aux_part"],
+                    sanitized_rest=record["_sanitized_rest"],
+                    model_name=model_name,
+                    fallback_model_names=fallback_model_names,
+                    max_retries=max_retries,
+                    verbose=verbose,
+                    plan_mode=plan_mode,
+                    source_audit=source_audit,
+                )
         else:
             generation = generate_thinking(
                 record,

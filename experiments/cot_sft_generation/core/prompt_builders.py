@@ -39,6 +39,7 @@ def build_writer_visible_dossier(dossier):
     if not isinstance(dossier, dict):
         return dossier
     cleaned = json.loads(json.dumps(dossier, ensure_ascii=False))
+    private_step_keys = {"supports", "proof_step_id", "numerical_check_basis"}
     for field_name in ["bridge_chain", "goal_closure"]:
         steps = cleaned.get(field_name)
         if not isinstance(steps, list):
@@ -48,7 +49,7 @@ def build_writer_visible_dossier(dossier):
             if not isinstance(step, dict):
                 visible_steps.append(step)
                 continue
-            visible_step = {key: value for key, value in step.items() if key != "supports"}
+            visible_step = {key: value for key, value in step.items() if key not in private_step_keys}
             visible_steps.append(visible_step)
         cleaned[field_name] = visible_steps
     bridge_steps = cleaned.get("bridge_steps")
@@ -500,6 +501,7 @@ def build_dossier_write_prompt(record, dossier, aux_part, coordinate_derivation_
         "- Keep the prose compact: prefer 6-9 sentences, no bullet lists or numbered lists, and stay comfortably below the body-length cap.\n"
         "- Use one short sentence for the obstacle/helper setup, then move directly through the construction, bridge chain, and final closure without repeating the same support twice.\n"
         "- Treat support refs as private bookkeeping. Do not quote schema keys or bracketed refs such as visible_facts[1], aux_immediate_effects[0], bridge_chain[2], or goal_closure[0]; restate the underlying geometry relation instead.\n"
+        "- When the dossier provides a `rule` field for a step (e.g., 'by the inscribed angle theorem', 'by AA similarity', 'by SAS similarity', 'by Thales\\' theorem'), reuse that phrase verbatim to introduce the claim. Do not write rule IDs like r03, r34, or AR.\n"
         "- Do not mention hidden proofs, hidden hints, a coordinate table, or external supervision.\n"
         "- Do not use LaTeX, $...$, backticks, or XML tags.\n"
         "- Make the auxiliary effects, bridge chain, and goal closure explicit.\n"

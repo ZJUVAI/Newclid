@@ -86,6 +86,38 @@ class CotSftPromptBuildersTest(unittest.TestCase):
         self.assertNotIn("_private", payload)
         self.assertIn('"exact_aux": "<aux>x00 h : midp h b c</aux>"', payload)
 
+    def test_build_writer_visible_dossier_strips_proof_dag_private_fields(self):
+        from experiments.cot_sft_generation.core.prompt_builders import build_writer_visible_dossier
+
+        dossier = {
+            "visible_facts": ["ab equals cd"],
+            "bridge_chain": [
+                {
+                    "claim": "triangles abc and def are similar",
+                    "rule": "by AA similarity",
+                    "supports": ["visible_facts[0]"],
+                    "proof_step_id": "012",
+                    "numerical_check_basis": ["sameclock a b c d e f"],
+                }
+            ],
+            "goal_closure": [
+                {
+                    "claim": "angle abc equals angle def",
+                    "rule": "by the side-ratio property of similar triangles",
+                    "supports": ["bridge_chain[0]"],
+                    "proof_step_id": "020",
+                    "numerical_check_basis": [],
+                }
+            ],
+        }
+        cleaned = build_writer_visible_dossier(dossier)
+        for step in cleaned["bridge_chain"] + cleaned["goal_closure"]:
+            self.assertNotIn("supports", step)
+            self.assertNotIn("proof_step_id", step)
+            self.assertNotIn("numerical_check_basis", step)
+            self.assertIn("claim", step)
+            self.assertIn("rule", step)
+
     def test_build_plan_prompt_includes_new_evidence_sections(self):
         prompt = build_plan_prompt(
             self.record,
