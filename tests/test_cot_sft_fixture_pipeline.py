@@ -1,4 +1,6 @@
 import json
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -14,6 +16,7 @@ from experiments.cot_sft_generation.generate_cot_sft import (
     extract_aux_and_rest,
     find_unsupported_bridge_relation_segments,
     generate_dossier_thinking,
+    generate_proof_dag_thinking,
     high_level_step_lacks_symbolic_directional_coverage,
     low_level_equality_claim_lacks_symbolic_support,
     process_and_generate_sft,
@@ -1826,6 +1829,38 @@ class CotSftFixturePipelineTest(unittest.TestCase):
         writer_mock.assert_called_once()
         self.assertIn("Finally, because ah equals dh, ad equals bc.", result["thinking"])
 
+    def test_generate_proof_dag_thinking_plan_only_returns_dossier_only(self):
+        record = self._load_quality_review_record(1)
+        aux_part, sanitized_rest = extract_aux_and_rest(record["llm_output_renamed"])
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            image_path = Path(temp_dir) / "fixture.png"
+            image_path.write_bytes(b"fixture-image")
+
+            with patch(
+                "experiments.cot_sft_generation.generate_cot_sft.build_proof_dag_writer_body",
+                side_effect=AssertionError("writer path should not run during proof-dag plan-only generation"),
+            ):
+                result = generate_proof_dag_thinking(
+                    record=record,
+                    image_path=image_path,
+                    aux_part=aux_part,
+                    sanitized_rest=sanitized_rest,
+                    model_name="fixture-model",
+                    max_retries=1,
+                    verbose=True,
+                    plan_mode="plan_only",
+                )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["generation_style"], "dossier_v1")
+        self.assertIsNone(result["thinking"])
+        self.assertIsNone(result["write_output"])
+        dossier = result["plan_parsed"]
+        self.assertIsInstance(dossier, dict)
+        self.assertTrue(dossier["bridge_chain"])
+        self.assertTrue(dossier["goal_closure"])
+
     def test_generate_dossier_thinking_falls_back_to_scripted_eqratio_writer_after_writer_failure(self):
         record = self._load_quality_review_record(0)
         aux_part, sanitized_rest = self._extract_aux_and_rest(record)
@@ -2342,6 +2377,79 @@ class CotSftFixturePipelineTest(unittest.TestCase):
             self.assertEqual(item_records[0]["generation_style"], "dossier_v1")
             self.assertIn("bridge_chain", item_records[0]["plan_parsed"])
 
+    def test_process_and_generate_sft_plan_only_proof_dag_emits_no_dataset_records(self):
+        record = dict(self._load_quality_review_record(1))
+        record["image_path"] = "fixture.png"
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_dir_path = Path(temp_dir)
+            input_path = temp_dir_path / "input.jsonl"
+            output_path = temp_dir_path / "out.jsonl"
+            run_dir = temp_dir_path / "artifacts"
+
+            input_path.write_text(json.dumps(record, ensure_ascii=False) + "\n", encoding="utf-8")
+            (temp_dir_path / "fixture.png").write_bytes(b"fixture-image")
+
+            run_metadata = build_run_config(
+                args_dict={
+                    "input": str(input_path),
+                    "output": str(output_path),
+                    "num_samples": 1,
+                    "num_workers": 1,
+                    "model_name": "fixture-model",
+                    "max_retries": 1,
+                    "sequential": True,
+                    "verbose": True,
+                    "generation_style": "dossier_v1",
+                    "plan_only": True,
+                },
+                output_jsonl=str(output_path),
+                run_dir=str(run_dir),
+                model_name="fixture-model",
+                script_path="experiments/cot_sft_generation/generate_cot_sft.py",
+                cwd=str(temp_dir_path),
+                repo_root=str(Path.cwd()),
+                default_input_jsonl=str(input_path),
+                api_base_url="https://example.invalid/v1",
+                api_timeout_seconds=180,
+                api_call_retries=3,
+                api_retry_backoff_seconds=3,
+            )
+
+            with patch(
+                "experiments.cot_sft_generation.generate_cot_sft.build_proof_dag_writer_body",
+                side_effect=AssertionError("writer path should not run during proof-dag plan-only pipeline execution"),
+            ):
+                result = process_and_generate_sft(
+                    input_jsonl=str(input_path),
+                    output_jsonl=str(output_path),
+                    sample_size=1,
+                    num_workers=1,
+                    model_name="fixture-model",
+                    verbose=True,
+                    random_sample=False,
+                    process_all=False,
+                    max_retries=1,
+                    plan_mode="plan_only",
+                    generation_style="dossier_v1",
+                    run_metadata=run_metadata,
+                    run_dir=run_dir,
+                )
+
+            self.assertEqual(result["summary"]["surface_pass_items"], 1)
+            self.assertEqual(result["summary"]["generation_style"], "dossier_v1")
+            self.assertEqual(output_path.read_text(encoding="utf-8"), "")
+
+            item_records = [
+                json.loads(line)
+                for line in (run_dir / "item_records.jsonl").read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            self.assertEqual(len(item_records), 1)
+            self.assertIn("bridge_chain", item_records[0]["plan_parsed"])
+            self.assertIsNone(item_records[0]["thinking"])
+            self.assertIsNone(item_records[0]["write_output"])
+
     def test_process_and_generate_sft_accepts_partial_dossier_critic_revision(self):
         record = {
             "nl_problem": "Observe the diagram and justify the target relation.",
@@ -2584,6 +2692,51 @@ class CotSftFixturePipelineTest(unittest.TestCase):
 
             self.assertEqual(result["summary"]["surface_pass_items"], 1)
             self.assertEqual(result["summary"]["generation_style"], "model_evidence_legacy")
+
+    def test_generate_cot_sft_cli_plan_only_proof_dag_emits_empty_output_jsonl(self):
+        record = dict(self._load_quality_review_record(1))
+        record["image_path"] = "fixture.png"
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_dir_path = Path(temp_dir)
+            input_path = temp_dir_path / "input.jsonl"
+            output_path = temp_dir_path / "out.jsonl"
+
+            input_path.write_text(json.dumps(record, ensure_ascii=False) + "\n", encoding="utf-8")
+            (temp_dir_path / "fixture.png").write_bytes(b"fixture-image")
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "experiments/cot_sft_generation/generate_cot_sft.py",
+                    "--input",
+                    str(input_path),
+                    "--output",
+                    str(output_path),
+                    "--num-samples",
+                    "1",
+                    "--num-workers",
+                    "1",
+                    "--model-name",
+                    "fixture-model",
+                    "--max-retries",
+                    "1",
+                    "--sequential",
+                    "--generation-style",
+                    "dossier_v1",
+                    "--plan-only",
+                ],
+                cwd=str(Path.cwd()),
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(
+                completed.returncode,
+                0,
+                msg=f"stdout:\n{completed.stdout}\n\nstderr:\n{completed.stderr}",
+            )
+            self.assertEqual(output_path.read_text(encoding="utf-8"), "")
 
 
 if __name__ == "__main__":

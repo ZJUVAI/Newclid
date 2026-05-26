@@ -9672,6 +9672,21 @@ def generate_proof_dag_thinking(
         "goal_closure": skeleton["goal_closure"],
     }
 
+    if plan_mode == "plan_only":
+        return {
+            "success": True,
+            "thinking": None,
+            "plan_prompt": None,
+            "write_prompt": None,
+            "plan_output": json.dumps(dossier, ensure_ascii=False, indent=2) if verbose else None,
+            "plan_parsed": dossier,
+            "attempts_used": 0,
+            "elapsed_seconds": 0.0,
+            "error": None,
+            "write_output": None,
+            "generation_style": "dossier_v1",
+        }
+
     # Step 4: Generate writer body.
     body = build_proof_dag_writer_body(dossier)
     if not body:
