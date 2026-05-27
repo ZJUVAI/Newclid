@@ -31,6 +31,14 @@ def _load_record(index: int):
     raise IndexError(index)
 
 
+def _windows_by_role(slots: dict) -> dict[str, dict]:
+    return {
+        str(window.get("role") or ""): window
+        for window in (slots.get("evidence_windows") or [])
+        if isinstance(window, dict)
+    }
+
+
 class CotSftInsightPipelineTest(unittest.TestCase):
     def test_extract_insight_slots_from_real_benchmark_record(self):
         record = _load_record(1)
@@ -48,6 +56,45 @@ class CotSftInsightPipelineTest(unittest.TestCase):
         self.assertEqual(slots["goal_gap_type"], "angle_transfer")
         self.assertIn("concyclic", slots["required_aux_effect"])
         self.assertTrue(slots["evidence_windows"])
+
+    def test_required_aux_effect_window_stays_aligned_with_slot_effect(self):
+        record = _load_record(0)
+        aux_part, _ = extract_aux_and_rest(record["llm_output_renamed"])
+        visible_goal = record["llm_input_renamed"].split("?", 1)[1].replace("</problem>", "").strip()
+        slots = extract_insight_slots(parse_proof_dag(record["llm_output_renamed"]), visible_goal, aux_part)
+
+        required_window = _windows_by_role(slots)["required_aux_effect"]
+
+        self.assertEqual(slots["required_aux_effect"], "h is the midpoint of ad")
+        self.assertEqual(required_window["relation"], slots["required_aux_effect"])
+        self.assertEqual(required_window["predicate"], "midp")
+        self.assertEqual(required_window["step_id"], "008")
+
+    def test_bridge_checkpoint_uses_reconnected_old_figure_points(self):
+        record = _load_record(1)
+        aux_part, _ = extract_aux_and_rest(record["llm_output_renamed"])
+        visible_goal = record["llm_input_renamed"].split("?", 1)[1].replace("</problem>", "").strip()
+        slots = extract_insight_slots(parse_proof_dag(record["llm_output_renamed"]), visible_goal, aux_part)
+        windows = _windows_by_role(slots)
+
+        self.assertEqual(slots["required_aux_effect"], "a, c, d, f are concyclic")
+        self.assertEqual(windows["required_aux_effect"]["relation"], slots["required_aux_effect"])
+        self.assertEqual(slots["first_bridge_checkpoint"], "b, e, f are collinear")
+        self.assertEqual(windows["first_bridge_checkpoint"]["relation"], "b, e, f are collinear")
+        self.assertNotEqual(slots["pre_goal_checkpoint"], slots["first_bridge_checkpoint"])
+        self.assertIn("ratio", slots["pre_goal_checkpoint"])
+
+    def test_parallel_aux_keeps_distinct_pre_goal_checkpoint(self):
+        record = _load_record(2)
+        aux_part, _ = extract_aux_and_rest(record["llm_output_renamed"])
+        visible_goal = record["llm_input_renamed"].split("?", 1)[1].replace("</problem>", "").strip()
+        slots = extract_insight_slots(parse_proof_dag(record["llm_output_renamed"]), visible_goal, aux_part)
+        windows = _windows_by_role(slots)
+
+        self.assertEqual(windows["required_aux_effect"]["relation"], slots["required_aux_effect"])
+        self.assertIn("similar", slots["first_bridge_checkpoint"])
+        self.assertIn("ratio", slots["pre_goal_checkpoint"])
+        self.assertNotEqual(slots["pre_goal_checkpoint"], slots["first_bridge_checkpoint"])
 
     def test_validate_insight_plan_response_accepts_scripted_plan(self):
         record = _load_record(1)
