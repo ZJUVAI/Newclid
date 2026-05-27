@@ -89,6 +89,8 @@ class CotSftReviewArtifactsTest(unittest.TestCase):
             "aux_type": "single_point",
             "surface_pass": True,
             "success": True,
+            "exported_to_dataset": True,
+            "dataset_filter_reason": None,
             "attempts_used": 2,
             "source_audit": {"has_issue": False},
             "generation_audit": {"has_issue": False},
@@ -114,6 +116,9 @@ class CotSftReviewArtifactsTest(unittest.TestCase):
 
         self.assertEqual(summary["surface_pass_items"], 1)
         self.assertEqual(summary["surface_pass_rate"], 1.0)
+        self.assertEqual(summary["exported_items"], 1)
+        self.assertEqual(summary["filtered_generation_audit_items"], 0)
+        self.assertEqual(summary["exported_rate"], 1.0)
         self.assertEqual(summary["artifact_schema_version"], ARTIFACT_SCHEMA_VERSION)
         self.assertEqual(summary["generation_style"], "dossier_v1")
         self.assertEqual(summary["semantic_review_status"], "not_reviewed")
@@ -122,6 +127,55 @@ class CotSftReviewArtifactsTest(unittest.TestCase):
         self.assertEqual(summary["avg_attempts_used"], 2.0)
         self.assertEqual(semantic_record["review_checklist_version"], SEMANTIC_REVIEW_CHECKLIST_VERSION)
         self.assertEqual(semantic_record["issue_codes"], [])
+
+    def test_build_run_summary_counts_generation_audit_filtered_exports(self):
+        item_records = [
+            {
+                "sample_order": 0,
+                "input_index": 1,
+                "surface_pass": True,
+                "success": True,
+                "exported_to_dataset": False,
+                "dataset_filter_reason": "generation_audit_hard_issue",
+                "attempts_used": 1,
+                "source_audit": {"has_issue": False},
+                "generation_audit": {"has_issue": True},
+            },
+            {
+                "sample_order": 1,
+                "input_index": 2,
+                "surface_pass": False,
+                "success": False,
+                "exported_to_dataset": False,
+                "dataset_filter_reason": "generation_failed",
+                "attempts_used": 2,
+                "source_audit": {"has_issue": False},
+                "generation_audit": {"has_issue": False},
+            },
+        ]
+        semantic_records = [build_semantic_audit_stub(item) for item in item_records]
+
+        summary = build_run_summary(
+            input_jsonl="input.jsonl",
+            total_candidates_with_aux=2,
+            sampled_items=2,
+            item_records=item_records,
+            semantic_audit_records=semantic_records,
+            source_audit_issue_items=0,
+            generation_audit_issue_items=1,
+            num_workers=1,
+            max_retries_per_stage=3,
+            model_name="model",
+            generation_style="insight_v1",
+            output_jsonl="out.jsonl",
+            artifacts_dir="artifacts",
+            runtime_seconds=1.0,
+        )
+
+        self.assertEqual(summary["surface_pass_items"], 1)
+        self.assertEqual(summary["exported_items"], 0)
+        self.assertEqual(summary["filtered_generation_audit_items"], 1)
+        self.assertEqual(summary["exported_rate"], 0.0)
 
     def test_validate_semantic_audit_alignment_rejects_misaligned_rows(self):
         item_audits = [{"sample_order": 0, "input_index": 1, "goal_type": "eqangle", "aux_type": "single_point", "surface_pass": True}]

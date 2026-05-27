@@ -24,6 +24,12 @@ python experiments/cot_sft_generation/generate_cot_sft.py \
   --generation-style insight_v1
 ```
 
+当前 `insight_v1` 已按 fail-closed 运行：
+
+- `insight_v1` 失败时不再自动降级到 `dossier_v1`
+- planner 仍保留 scripted plan fallback
+- writer 不再使用 scripted body fallback；writer 校验失败即该样本失败
+
 ## 核心对象
 
 ### `InsightSlots`
@@ -52,7 +58,6 @@ python experiments/cot_sft_generation/generate_cot_sft.py \
 - `goal_gap_text`
 - `required_aux_effect`
 - `aux_construction`
-- `aux_immediate_effects`
 - `aux_selection_reason`
 - `stage_order` 可选
 - `bonus_post_aux_tail` 可选
@@ -79,6 +84,7 @@ python experiments/cot_sft_generation/generate_cot_sft.py \
 - `InsightSlots`
 
 planner 不再看完整 proof，也不负责输出 full closure chain。
+`<aux>` 的 direct consequences 仍可由脚本本地临时现算，但不再作为 planner / writer 合同字段。
 
 ### 3. writer 只看批准后的 `InsightPlan`
 
@@ -95,6 +101,7 @@ writer 的职责被收窄为：
 
 - `goal_gap_type` 和 goal family 冲突
 - `required_aux_effect` 脱离 slots
+- `required_aux_effect` 与 `<aux>` 的 direct consequence 不对齐
 - `aux_selection_reason` 发明新的 hidden relation
 - multi-point aux 缺少 `stage_order`
 - writer 退化成 proof retelling / theorem list / hidden marker leak
@@ -105,8 +112,20 @@ writer 的职责被收窄为：
 
 - `insight_slots`
 - `insight_plan_parsed`
+- `exported_to_dataset`
+- `dataset_filter_reason`
 
 最终导出的训练样本不新增这些隐藏字段。
+
+这里要区分两层状态：
+
+- `surface_pass/success=true` 只表示生成链路本身成功
+- `exported_to_dataset=true` 才表示该样本真的进入最终训练 jsonl
+
+当前只有 `insight_v1` 会额外应用 generation-audit 导出门禁：
+
+- 硬拦截：`no_proof_echo`、`visible_only_boundary`
+- 只记告警不拦导出：`goal_gap_specificity`、`aux_selection_grounded`、`multi_point_staging`
 
 ## 当前评测重点
 

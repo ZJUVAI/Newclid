@@ -182,6 +182,8 @@ def build_missing_image_item_record(
         "generation_audit": {"issues": [], "has_issue": False},
         "surface_pass": False,
         "success": False,
+        "exported_to_dataset": False,
+        "dataset_filter_reason": "generation_failed",
         "attempts_used": 0,
         "elapsed_seconds": None,
         "error": error,
@@ -202,6 +204,8 @@ def build_item_record(
     generation_audit: Dict[str, Any],
     generation: Dict[str, Any],
     generation_style: str | None = None,
+    exported_to_dataset: bool = False,
+    dataset_filter_reason: Optional[str] = None,
 ) -> Dict[str, Any]:
     surface_pass = bool(generation.get("success"))
     return {
@@ -227,6 +231,8 @@ def build_item_record(
         "thinking": generation.get("thinking"),
         "surface_pass": surface_pass,
         "success": surface_pass,
+        "exported_to_dataset": exported_to_dataset,
+        "dataset_filter_reason": dataset_filter_reason,
         "attempts_used": generation.get("attempts_used"),
         "elapsed_seconds": generation.get("elapsed_seconds"),
         "error": generation.get("error"),
@@ -290,6 +296,19 @@ def build_run_summary(
         1 for item in item_records if item.get("surface_pass", item.get("success", False))
     )
     surface_fail_items = sampled_items - surface_pass_items
+    exported_items = sum(
+        1
+        for item in item_records
+        if item.get(
+            "exported_to_dataset",
+            item.get("surface_pass", item.get("success", False)),
+        )
+    )
+    filtered_generation_audit_items = sum(
+        1
+        for item in item_records
+        if item.get("dataset_filter_reason") == "generation_audit_hard_issue"
+    )
 
     reviewed_items = sum(1 for item in semantic_audit_records if item.get("semantic_pass") is not None)
     semantic_pass_items = sum(1 for item in semantic_audit_records if item.get("semantic_pass") is True)
@@ -316,6 +335,9 @@ def build_run_summary(
         "surface_pass_items": surface_pass_items,
         "surface_fail_items": surface_fail_items,
         "surface_pass_rate": _safe_rate(surface_pass_items, sampled_items),
+        "exported_items": exported_items,
+        "filtered_generation_audit_items": filtered_generation_audit_items,
+        "exported_rate": _safe_rate(exported_items, sampled_items),
         "semantic_reviewed_items": reviewed_items,
         "semantic_pass_items": semantic_pass_items,
         "semantic_fail_items": semantic_fail_items,

@@ -122,7 +122,6 @@ try:
         build_insight_write_prompt,
         build_insight_writer_retry_feedback,
         build_scripted_insight_plan,
-        build_scripted_insight_writer_body,
         validate_insight_plan_response,
         validate_insight_writer_body,
     )
@@ -222,7 +221,6 @@ except ImportError:  # pragma: no cover - script execution path
         build_insight_write_prompt,
         build_insight_writer_retry_feedback,
         build_scripted_insight_plan,
-        build_scripted_insight_writer_body,
         validate_insight_plan_response,
         validate_insight_writer_body,
     )
@@ -243,6 +241,10 @@ logger = logging.getLogger(__name__)
 
 
 RELAXED_COORDINATE_CANDIDATE_MAX_ITEMS = 256
+INSIGHT_V1_HARD_GENERATION_AUDIT_ISSUES = {
+    "no_proof_echo",
+    "visible_only_boundary",
+}
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -9755,15 +9757,6 @@ def generate_insight_thinking(
         max_retries=max_retries,
         validator_fn=validate_insight_writer_body,
         retry_feedback_builder=build_insight_writer_retry_feedback,
-        failure_recovery_fn=lambda failed_write_result: (
-            {
-                "success": True,
-                "output": build_scripted_insight_writer_body(plan_result["parsed"]),
-                "attempts_used": failed_write_result["attempts_used"],
-                "elapsed_seconds": failed_write_result["elapsed_seconds"],
-                "error": None,
-            }
-        ),
     )
 
     assembled_thinking = None
@@ -9807,6 +9800,28 @@ def generate_insight_thinking(
         "write_output": write_result["output"],
         "generation_style": "insight_v1",
     }
+
+
+def _insight_v1_has_hard_generation_audit_issue(
+    generation_style,
+    generation_audit,
+):
+    if generation_style != "insight_v1":
+        return False
+    issues = generation_audit.get("issues") or []
+    return any(issue in INSIGHT_V1_HARD_GENERATION_AUDIT_ISSUES for issue in issues)
+
+
+def _resolve_dataset_export_decision(
+    generation_style,
+    generation,
+    generation_audit,
+):
+    if not generation.get("success") or not generation.get("thinking"):
+        return False, "generation_failed"
+    if _insight_v1_has_hard_generation_audit_issue(generation_style, generation_audit):
+        return False, "generation_audit_hard_issue"
+    return True, None
 
 
 def generate_proof_dag_thinking(
@@ -11113,23 +11128,6 @@ def process_and_generate_sft(
                 fallback_model_names=fallback_model_names,
                 source_audit=source_audit,
             )
-            if not generation.get("success"):
-                logger.warning(
-                    "[insight_v1] Falling back to dossier_v1 after insight generation failure: %s",
-                    generation.get("error"),
-                )
-                generation = generate_dossier_thinking(
-                    record,
-                    image_path=image_path,
-                    aux_part=record["_aux_part"],
-                    sanitized_rest=record["_sanitized_rest"],
-                    model_name=model_name,
-                    fallback_model_names=fallback_model_names,
-                    max_retries=max_retries,
-                    verbose=verbose,
-                    plan_mode=plan_mode,
-                    source_audit=source_audit,
-                )
         elif generation_style == "dossier_v1":
             generation = generate_proof_dag_thinking(
                 record,
@@ -11200,8 +11198,14 @@ def process_and_generate_sft(
             aux_part,
             coordinate_candidates=coordinate_candidates,
         )
+        resolved_generation_style = generation.get("generation_style") or generation_style
+        exported_to_dataset, dataset_filter_reason = _resolve_dataset_export_decision(
+            resolved_generation_style,
+            generation,
+            generation_audit,
+        )
 
-        if generation["success"] and thinking:
+        if exported_to_dataset:
             result_data = build_dataset_output_record(
                 sample_order=sample_order,
                 instruction=build_instruction_text(),
@@ -11224,7 +11228,9 @@ def process_and_generate_sft(
             source_audit=source_audit,
             generation_audit=generation_audit,
             generation=generation,
-            generation_style=generation.get("generation_style") or generation_style,
+            generation_style=resolved_generation_style,
+            exported_to_dataset=exported_to_dataset,
+            dataset_filter_reason=dataset_filter_reason,
         )
         return {"result_data": result_data, "item_record": item_record}
 

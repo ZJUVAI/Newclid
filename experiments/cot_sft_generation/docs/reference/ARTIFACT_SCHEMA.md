@@ -99,9 +99,19 @@
 | `thinking` | `str \| null` | 最终 thinking |
 | `surface_pass` | `bool` | 是否通过脚本终检 |
 | `success` | `bool` | 兼容字段，等同 `surface_pass` |
+| `exported_to_dataset` | `bool` | 是否最终写入训练 jsonl |
+| `dataset_filter_reason` | `str \| null` | 未导出原因；当前为 `generation_failed` 或 `generation_audit_hard_issue` |
 | `attempts_used` | `int \| null` | 本条样本实际重试次数 |
 | `elapsed_seconds` | `float \| null` | 本条样本耗时 |
 | `error` | `str \| null` | 失败原因 |
+
+说明：
+
+- `surface_pass=true` 不等于一定导出。
+- 当前只有 `insight_v1` 会被 generation-audit 的硬问题拦导出，硬问题范围为：
+  - `no_proof_echo`
+  - `visible_only_boundary`
+- `goal_gap_specificity`、`aux_selection_grounded`、`multi_point_staging` 仍只记录在 artifacts，不阻止导出。
 
 ## 6. `item_audits.jsonl`
 
@@ -162,6 +172,9 @@
 | `surface_pass_items` | `int` | surface 通过数 |
 | `surface_fail_items` | `int` | surface 失败数 |
 | `surface_pass_rate` | `float \| null` | surface 通过率 |
+| `exported_items` | `int` | 最终写入训练 jsonl 的样本数 |
+| `filtered_generation_audit_items` | `int` | 因 generation-audit 硬问题被挡住导出的样本数 |
+| `exported_rate` | `float \| null` | 最终导出率 |
 | `semantic_reviewed_items` | `int` | 已做语义审读的样本数 |
 | `semantic_pass_items` | `int` | 语义通过数 |
 | `semantic_fail_items` | `int` | 语义失败数 |
