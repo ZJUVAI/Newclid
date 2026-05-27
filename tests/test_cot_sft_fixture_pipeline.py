@@ -2348,6 +2348,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
                     random_sample=False,
                     process_all=False,
                     max_retries=1,
+                    generation_style="dossier_v1",
                     run_metadata=run_metadata,
                     run_dir=run_dir,
                 )
@@ -2521,6 +2522,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
                     random_sample=False,
                     process_all=False,
                     max_retries=1,
+                    generation_style="dossier_v1",
                     run_metadata=run_metadata,
                     run_dir=run_dir,
                 )
@@ -2605,6 +2607,7 @@ class CotSftFixturePipelineTest(unittest.TestCase):
                     random_sample=False,
                     process_all=False,
                     max_retries=1,
+                    generation_style="dossier_v1",
                     run_metadata=run_metadata,
                     run_dir=run_dir,
                 )

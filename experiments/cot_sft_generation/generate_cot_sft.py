@@ -23,6 +23,7 @@ import time
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
+from functools import partial
 from pathlib import Path
 
 try:
@@ -114,6 +115,17 @@ try:
         join_natural_list,
         render_coordinate_derivation_snippet,
     )
+    from .core.insight_extractor import extract_insight_slots
+    from .core.insight_pipeline import (
+        build_insight_plan_prompt,
+        build_insight_plan_retry_feedback,
+        build_insight_write_prompt,
+        build_insight_writer_retry_feedback,
+        build_scripted_insight_plan,
+        build_scripted_insight_writer_body,
+        validate_insight_plan_response,
+        validate_insight_writer_body,
+    )
 except ImportError:  # pragma: no cover - script execution path
     from audits import (
         audit_generation_quality,
@@ -202,6 +214,17 @@ except ImportError:  # pragma: no cover - script execution path
         build_writer_handoff,
         join_natural_list,
         render_coordinate_derivation_snippet,
+    )
+    from core.insight_extractor import extract_insight_slots  # type: ignore[no-redef]
+    from core.insight_pipeline import (  # type: ignore[no-redef]
+        build_insight_plan_prompt,
+        build_insight_plan_retry_feedback,
+        build_insight_write_prompt,
+        build_insight_writer_retry_feedback,
+        build_scripted_insight_plan,
+        build_scripted_insight_writer_body,
+        validate_insight_plan_response,
+        validate_insight_writer_body,
     )
 
 try:
@@ -9563,6 +9586,229 @@ def run_writer_stage(
     }
 
 
+def generate_insight_thinking(
+    record,
+    image_path: Path,
+    aux_part,
+    sanitized_rest,
+    model_name,
+    max_retries,
+    verbose,
+    plan_mode=None,
+    fallback_model_names=None,
+    source_audit=None,
+):
+    del sanitized_rest, source_audit
+    point_coords = get_point_coords(record)
+    visible_goal = extract_problem_goal(record)
+    visible_text_facts = build_visible_text_facts(record)
+    coordinate_candidates = build_hidden_coordinate_candidates(
+        point_coords,
+        max_items=RELAXED_COORDINATE_CANDIDATE_MAX_ITEMS,
+        relax_type_limits=True,
+    )
+    aux_points = {point.lower() for point in extract_aux_new_points(aux_part)}
+    image_scan_candidates = []
+    for candidate in coordinate_candidates:
+        relation = build_canonical_coordinate_relation(candidate)
+        if relation and not extract_point_mentions(relation, list(aux_points)) and relation not in image_scan_candidates:
+            image_scan_candidates.append(relation)
+        if len(image_scan_candidates) >= 4:
+            break
+
+    dag = parse_proof_dag(record.get("llm_output_renamed", ""))
+    insight_slots = extract_insight_slots(dag, visible_goal=visible_goal, aux_part=aux_part)
+    if not insight_slots:
+        return {
+            "success": False,
+            "thinking": None,
+            "plan_prompt": None,
+            "write_prompt": None,
+            "plan_output": None,
+            "plan_parsed": None,
+            "insight_slots": None,
+            "insight_plan_parsed": None,
+            "attempts_used": 0,
+            "elapsed_seconds": 0.0,
+            "error": "insight_slots_unavailable",
+            "write_output": None,
+            "generation_style": "insight_v1",
+        }
+
+    visible_fact_relations = [
+        fact.get("relation", "")
+        for fact in visible_text_facts
+        if isinstance(fact, dict) and fact.get("relation")
+    ]
+    plan_prompt = build_insight_plan_prompt(
+        record,
+        aux_part=aux_part,
+        visible_fact_relations=visible_fact_relations,
+        image_scan_candidates=image_scan_candidates,
+        insight_slots=insight_slots,
+    )
+    plan_messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "image_url", "image_url": {"url": _encode_image_base64(image_path)}},
+                {"type": "text", "text": plan_prompt},
+            ],
+        }
+    ]
+    plan_result = run_plan_stage(
+        "insight_plan",
+        plan_messages,
+        model_name=model_name,
+        fallback_model_names=fallback_model_names,
+        point_coords=point_coords,
+        visible_goal=visible_goal,
+        aux_part=aux_part,
+        coordinate_candidates=None,
+        sanitized_rest=None,
+        visible_premise_summaries=visible_fact_relations,
+        visible_text_facts=visible_text_facts,
+        max_retries=max_retries,
+        validator_fn=partial(validate_insight_plan_response, insight_slots=insight_slots),
+        retry_feedback_builder=build_insight_plan_retry_feedback,
+    )
+    if not plan_result["success"]:
+        scripted_plan = build_scripted_insight_plan(
+            record,
+            aux_part=aux_part,
+            insight_slots=insight_slots,
+            visible_text_facts=visible_text_facts,
+            image_scan_candidates=image_scan_candidates,
+        )
+        ok, message, cleaned_scripted_plan = validate_insight_plan_response(
+            scripted_plan,
+            point_coords=point_coords,
+            visible_goal=visible_goal,
+            aux_part=aux_part,
+            visible_text_facts=visible_text_facts,
+            insight_slots=insight_slots,
+        )
+        if not ok:
+            return {
+                "success": False,
+                "thinking": plan_result["output"],
+                "plan_prompt": plan_prompt if verbose else None,
+                "write_prompt": None,
+                "plan_output": plan_result["output"] if verbose else None,
+                "plan_parsed": None,
+                "insight_slots": insight_slots,
+                "insight_plan_parsed": None,
+                "attempts_used": plan_result["attempts_used"],
+                "elapsed_seconds": plan_result["elapsed_seconds"],
+                "error": f"{plan_result['error']}; scripted insight fallback invalid: {message}",
+                "write_output": None,
+                "generation_style": "insight_v1",
+            }
+        logger.warning(
+            "[insight_plan] Falling back to scripted insight plan after planner failure: %s",
+            plan_result["error"],
+        )
+        plan_result = {
+            "success": True,
+            "output": json.dumps(cleaned_scripted_plan, ensure_ascii=False, indent=2),
+            "parsed": cleaned_scripted_plan,
+            "attempts_used": plan_result["attempts_used"],
+            "elapsed_seconds": plan_result["elapsed_seconds"],
+            "error": None,
+        }
+
+    if plan_mode == "plan_only":
+        return {
+            "success": True,
+            "thinking": None,
+            "plan_prompt": plan_prompt if verbose else None,
+            "write_prompt": None,
+            "plan_output": json.dumps(plan_result["parsed"], ensure_ascii=False, indent=2) if verbose else None,
+            "plan_parsed": plan_result["parsed"],
+            "insight_slots": insight_slots,
+            "insight_plan_parsed": plan_result["parsed"],
+            "attempts_used": plan_result["attempts_used"],
+            "elapsed_seconds": plan_result["elapsed_seconds"],
+            "error": None,
+            "write_output": None,
+            "generation_style": "insight_v1",
+        }
+
+    write_prompt = build_insight_write_prompt(record, plan_result["parsed"])
+    write_messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "image_url", "image_url": {"url": _encode_image_base64(image_path)}},
+                {"type": "text", "text": write_prompt},
+            ],
+        }
+    ]
+    write_result = run_writer_stage(
+        "insight_write",
+        write_messages,
+        model_name=model_name,
+        fallback_model_names=fallback_model_names,
+        visible_goal=visible_goal,
+        injected_prefix="",
+        plan=plan_result["parsed"],
+        max_retries=max_retries,
+        validator_fn=validate_insight_writer_body,
+        retry_feedback_builder=build_insight_writer_retry_feedback,
+        failure_recovery_fn=lambda failed_write_result: (
+            {
+                "success": True,
+                "output": build_scripted_insight_writer_body(plan_result["parsed"]),
+                "attempts_used": failed_write_result["attempts_used"],
+                "elapsed_seconds": failed_write_result["elapsed_seconds"],
+                "error": None,
+            }
+        ),
+    )
+
+    assembled_thinking = None
+    if write_result["output"]:
+        assembled_thinking = f"<thinking>{write_result['output'].strip()}</thinking>"
+        is_valid, message = validate_thinking_response(
+            assembled_thinking,
+            point_coords=point_coords,
+            require_coord_tags=False,
+            max_total_len=compute_thinking_total_budget(plan_result["parsed"]),
+        )
+        if not is_valid:
+            return {
+                "success": False,
+                "thinking": assembled_thinking,
+                "plan_prompt": plan_prompt if verbose else None,
+                "write_prompt": write_prompt if verbose else None,
+                "plan_output": json.dumps(plan_result["parsed"], ensure_ascii=False, indent=2) if verbose else None,
+                "plan_parsed": plan_result["parsed"],
+                "insight_slots": insight_slots,
+                "insight_plan_parsed": plan_result["parsed"],
+                "attempts_used": plan_result["attempts_used"] + write_result["attempts_used"],
+                "elapsed_seconds": (plan_result["elapsed_seconds"] or 0.0) + (write_result["elapsed_seconds"] or 0.0),
+                "error": f"Final assembly validation failed: {message}",
+                "write_output": write_result["output"],
+                "generation_style": "insight_v1",
+            }
+
+    return {
+        "success": write_result["success"],
+        "thinking": assembled_thinking,
+        "plan_prompt": plan_prompt if verbose else None,
+        "write_prompt": write_prompt if verbose else None,
+        "plan_output": json.dumps(plan_result["parsed"], ensure_ascii=False, indent=2) if verbose else None,
+        "plan_parsed": plan_result["parsed"],
+        "insight_slots": insight_slots,
+        "insight_plan_parsed": plan_result["parsed"],
+        "elapsed_seconds": (plan_result["elapsed_seconds"] or 0.0) + (write_result["elapsed_seconds"] or 0.0),
+        "attempts_used": plan_result["attempts_used"] + write_result["attempts_used"],
+        "error": write_result["error"],
+        "write_output": write_result["output"],
+        "generation_style": "insight_v1",
+    }
+
+
 def generate_proof_dag_thinking(
     record,
     image_path: Path,
@@ -10762,7 +11008,7 @@ def process_and_generate_sft(
     process_all,
     max_retries,
     plan_mode=None,
-    generation_style="dossier_v1",
+    generation_style="insight_v1",
     planner_style="default",
     run_metadata=None,
     run_dir=None,
@@ -10854,7 +11100,37 @@ def process_and_generate_sft(
                 ),
             }
 
-        if generation_style == "dossier_v1":
+        if generation_style == "insight_v1":
+            generation = generate_insight_thinking(
+                record,
+                image_path=image_path,
+                aux_part=record["_aux_part"],
+                sanitized_rest=record["_sanitized_rest"],
+                model_name=model_name,
+                max_retries=max_retries,
+                verbose=verbose,
+                plan_mode=plan_mode,
+                fallback_model_names=fallback_model_names,
+                source_audit=source_audit,
+            )
+            if not generation.get("success"):
+                logger.warning(
+                    "[insight_v1] Falling back to dossier_v1 after insight generation failure: %s",
+                    generation.get("error"),
+                )
+                generation = generate_dossier_thinking(
+                    record,
+                    image_path=image_path,
+                    aux_part=record["_aux_part"],
+                    sanitized_rest=record["_sanitized_rest"],
+                    model_name=model_name,
+                    fallback_model_names=fallback_model_names,
+                    max_retries=max_retries,
+                    verbose=verbose,
+                    plan_mode=plan_mode,
+                    source_audit=source_audit,
+                )
+        elif generation_style == "dossier_v1":
             generation = generate_proof_dag_thinking(
                 record,
                 image_path=image_path,
@@ -10948,7 +11224,7 @@ def process_and_generate_sft(
             source_audit=source_audit,
             generation_audit=generation_audit,
             generation=generation,
-            generation_style=generation_style,
+            generation_style=generation.get("generation_style") or generation_style,
         )
         return {"result_data": result_data, "item_record": item_record}
 
@@ -11089,9 +11365,9 @@ def parse_args():
     parser.add_argument(
         "--generation-style",
         type=str,
-        default="dossier_v1",
-        choices=["dossier_v1", "model_evidence_legacy"],
-        help="Generation pipeline style. Default: dossier_v1.",
+        default="insight_v1",
+        choices=["insight_v1", "dossier_v1", "model_evidence_legacy"],
+        help="Generation pipeline style. Default: insight_v1.",
     )
     parser.add_argument(
         "--plan-only",

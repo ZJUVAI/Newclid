@@ -11,7 +11,8 @@ import json
 def build_instruction_text():
     return (
         "Given the geometry image and the formal problem text, write a forward-thinking "
-        "trace that motivates the auxiliary construction and carries the route to the goal."
+        "trace that explains the visible gap, motivates the auxiliary construction, "
+        "and briefly carries the route to the goal."
     )
 
 
