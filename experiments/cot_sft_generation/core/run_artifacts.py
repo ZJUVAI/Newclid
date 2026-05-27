@@ -18,6 +18,10 @@ from typing import Any, Dict, Iterable, Optional
 
 ARTIFACT_SCHEMA_VERSION = "cot_sft_artifacts_v1"
 SEMANTIC_REVIEW_CHECKLIST_VERSION = "cot_sft_semantic_review_v1"
+INSIGHT_V1_HARD_GENERATION_AUDIT_ISSUES = {
+    "no_proof_echo",
+    "visible_only_boundary",
+}
 SEMANTIC_REVIEW_ISSUE_CODE_DESCRIPTIONS = {
     "not_visible_only": "The thinking reads like hidden-proof supervision rather than visible-input reasoning.",
     "full_figure_coverage_missing": "The text stays on a narrow anchor frame and misses needed visible substructures.",
@@ -190,6 +194,75 @@ def build_missing_image_item_record(
     }
 
 
+def build_generation_failure_item_record(
+    sample_order: int,
+    input_index: int,
+    image_path: str,
+    error: str,
+    source_audit: Optional[Dict[str, Any]] = None,
+    generation_style: str | None = None,
+    goal_type: str | None = None,
+    aux_type: str | None = None,
+    public_problem: str | None = None,
+    aux_part: str | None = None,
+    hidden_rest_sanitized: str | None = None,
+    point_coords_grid: Optional[Dict[str, Any]] = None,
+    attempts_used: int = 0,
+    elapsed_seconds: Optional[float] = None,
+) -> Dict[str, Any]:
+    return {
+        "sample_order": sample_order,
+        "input_index": input_index,
+        "image_path": image_path,
+        "generation_style": generation_style,
+        "public_problem": public_problem,
+        "aux": aux_part,
+        "goal_type": goal_type,
+        "aux_type": aux_type,
+        "hidden_rest_sanitized": hidden_rest_sanitized,
+        "point_coords_grid": point_coords_grid or {},
+        "source_audit": source_audit or {"issues": [], "has_issue": False},
+        "generation_audit": {"issues": [], "has_issue": False},
+        "plan_prompt": None,
+        "write_prompt": None,
+        "plan_output": None,
+        "plan_parsed": None,
+        "insight_slots": None,
+        "insight_plan_parsed": None,
+        "write_output": None,
+        "thinking": None,
+        "surface_pass": False,
+        "success": False,
+        "exported_to_dataset": False,
+        "dataset_filter_reason": "generation_failed",
+        "attempts_used": attempts_used,
+        "elapsed_seconds": elapsed_seconds,
+        "error": error,
+    }
+
+
+def _insight_v1_has_hard_generation_audit_issue(
+    generation_style: Optional[str],
+    generation_audit: Dict[str, Any],
+) -> bool:
+    if generation_style != "insight_v1":
+        return False
+    issues = generation_audit.get("issues") or []
+    return any(issue in INSIGHT_V1_HARD_GENERATION_AUDIT_ISSUES for issue in issues)
+
+
+def resolve_dataset_export_decision(
+    generation_style: Optional[str],
+    generation: Dict[str, Any],
+    generation_audit: Dict[str, Any],
+) -> tuple[bool, Optional[str]]:
+    if not generation.get("success") or not generation.get("thinking"):
+        return False, "generation_failed"
+    if _insight_v1_has_hard_generation_audit_issue(generation_style, generation_audit):
+        return False, "generation_audit_hard_issue"
+    return True, None
+
+
 def build_item_record(
     sample_order: int,
     input_index: int,
@@ -250,6 +323,11 @@ def build_item_audit_record(item_record: Dict[str, Any]) -> Dict[str, Any]:
         "generation_audit": item_record.get("generation_audit", {}),
         "surface_pass": item_record.get("surface_pass", item_record.get("success", False)),
         "success": item_record.get("success", False),
+        "exported_to_dataset": item_record.get(
+            "exported_to_dataset",
+            item_record.get("surface_pass", item_record.get("success", False)),
+        ),
+        "dataset_filter_reason": item_record.get("dataset_filter_reason"),
     }
 
 

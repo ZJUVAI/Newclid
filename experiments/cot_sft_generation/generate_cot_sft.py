@@ -51,12 +51,14 @@ try:
         build_input_file_metadata,
         build_dataset_output_record,
         build_item_audit_record,
+        build_generation_failure_item_record,
         build_item_record,
         build_missing_image_item_record,
         build_run_config,
         build_run_summary,
         build_sampled_input_record,
         build_semantic_audit_stub,
+        resolve_dataset_export_decision,
     )
     from .geometry_text import (
         PROBLEM_BODY_RE,
@@ -150,12 +152,14 @@ except ImportError:  # pragma: no cover - script execution path
         build_input_file_metadata,
         build_dataset_output_record,
         build_item_audit_record,
+        build_generation_failure_item_record,
         build_item_record,
         build_missing_image_item_record,
         build_run_config,
         build_run_summary,
         build_sampled_input_record,
         build_semantic_audit_stub,
+        resolve_dataset_export_decision,
     )
     from geometry_text import (
         PROBLEM_BODY_RE,
@@ -241,10 +245,6 @@ logger = logging.getLogger(__name__)
 
 
 RELAXED_COORDINATE_CANDIDATE_MAX_ITEMS = 256
-INSIGHT_V1_HARD_GENERATION_AUDIT_ISSUES = {
-    "no_proof_echo",
-    "visible_only_boundary",
-}
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -9802,28 +9802,6 @@ def generate_insight_thinking(
     }
 
 
-def _insight_v1_has_hard_generation_audit_issue(
-    generation_style,
-    generation_audit,
-):
-    if generation_style != "insight_v1":
-        return False
-    issues = generation_audit.get("issues") or []
-    return any(issue in INSIGHT_V1_HARD_GENERATION_AUDIT_ISSUES for issue in issues)
-
-
-def _resolve_dataset_export_decision(
-    generation_style,
-    generation,
-    generation_audit,
-):
-    if not generation.get("success") or not generation.get("thinking"):
-        return False, "generation_failed"
-    if _insight_v1_has_hard_generation_audit_issue(generation_style, generation_audit):
-        return False, "generation_audit_hard_issue"
-    return True, None
-
-
 def generate_proof_dag_thinking(
     record,
     image_path: Path,
@@ -11089,157 +11067,211 @@ def process_and_generate_sft(
     def process_item(idx_record):
         sample_order, record = idx_record
         image_path = resolve_image_path(record.get("image_path", ""), input_path)
-        visible_goal = extract_problem_goal(record)
-        proof_guidance = build_hidden_proof_guidance(
-            record["_sanitized_rest"],
-            record["_aux_part"],
-            visible_goal,
-        )
-        source_audit = audit_source_record(
-            record,
-            image_path=image_path,
-            aux_part=record["_aux_part"],
-            visible_goal=visible_goal,
-            proof_guidance=proof_guidance,
-        )
-        if not image_path.exists():
-            return {
-                "result_data": None,
-                "item_record": build_missing_image_item_record(
-                    sample_order=sample_order,
-                    input_index=record["_source_index"],
-                    image_path=str(image_path),
-                    source_audit=source_audit,
-                    error=f"Image not found: {image_path}",
-                    generation_style=generation_style,
-                ),
-            }
+        source_audit = {"issues": [], "has_issue": False}
+        goal_type = None
+        aux_type = None
+        public_problem = None
+        try:
+            visible_goal = extract_problem_goal(record)
+            public_problem = build_public_problem_text(record)
+            goal_type = parse_goal_expression(visible_goal).get("predicate") or None
+            aux_part = record["_aux_part"]
+            aux_new_points = extract_aux_new_points(aux_part)
+            if len(aux_new_points) == 1:
+                aux_type = "single_point"
+            elif len(aux_new_points) > 1:
+                aux_type = "multi_point"
 
-        if generation_style == "insight_v1":
-            generation = generate_insight_thinking(
+            proof_guidance = build_hidden_proof_guidance(
+                record["_sanitized_rest"],
+                aux_part,
+                visible_goal,
+            )
+            source_audit = audit_source_record(
                 record,
                 image_path=image_path,
-                aux_part=record["_aux_part"],
-                sanitized_rest=record["_sanitized_rest"],
-                model_name=model_name,
-                max_retries=max_retries,
-                verbose=verbose,
-                plan_mode=plan_mode,
-                fallback_model_names=fallback_model_names,
-                source_audit=source_audit,
+                aux_part=aux_part,
+                visible_goal=visible_goal,
+                proof_guidance=proof_guidance,
             )
-        elif generation_style == "dossier_v1":
-            generation = generate_proof_dag_thinking(
-                record,
-                image_path=image_path,
-                aux_part=record["_aux_part"],
-                sanitized_rest=record["_sanitized_rest"],
-                model_name=model_name,
-                max_retries=max_retries,
-                verbose=verbose,
-                plan_mode=plan_mode,
-                fallback_model_names=fallback_model_names,
-                source_audit=source_audit,
-            )
-            _PROOF_DAG_RECOVERABLE_ERRORS = {
-                "proof_dag_unparseable",
-                "proof_dag_skeleton_empty",
-                "proof_dag_writer_body_empty",
-            }
-            if not generation.get("success") and (
-                generation.get("error") in _PROOF_DAG_RECOVERABLE_ERRORS
-                or (generation.get("error") or "").startswith("thinking_validation_failed:")
-            ):
-                generation = generate_dossier_thinking(
+            if not image_path.exists():
+                return {
+                    "result_data": None,
+                    "item_record": build_missing_image_item_record(
+                        sample_order=sample_order,
+                        input_index=record["_source_index"],
+                        image_path=str(image_path),
+                        source_audit=source_audit,
+                        error=f"Image not found: {image_path}",
+                        generation_style=generation_style,
+                    ),
+                }
+
+            if generation_style == "insight_v1":
+                generation = generate_insight_thinking(
                     record,
                     image_path=image_path,
-                    aux_part=record["_aux_part"],
+                    aux_part=aux_part,
+                    sanitized_rest=record["_sanitized_rest"],
+                    model_name=model_name,
+                    max_retries=max_retries,
+                    verbose=verbose,
+                    plan_mode=plan_mode,
+                    fallback_model_names=fallback_model_names,
+                    source_audit=source_audit,
+                )
+            elif generation_style == "dossier_v1":
+                generation = generate_proof_dag_thinking(
+                    record,
+                    image_path=image_path,
+                    aux_part=aux_part,
+                    sanitized_rest=record["_sanitized_rest"],
+                    model_name=model_name,
+                    max_retries=max_retries,
+                    verbose=verbose,
+                    plan_mode=plan_mode,
+                    fallback_model_names=fallback_model_names,
+                    source_audit=source_audit,
+                )
+                _PROOF_DAG_RECOVERABLE_ERRORS = {
+                    "proof_dag_unparseable",
+                    "proof_dag_skeleton_empty",
+                    "proof_dag_writer_body_empty",
+                }
+                if not generation.get("success") and (
+                    generation.get("error") in _PROOF_DAG_RECOVERABLE_ERRORS
+                    or (generation.get("error") or "").startswith("thinking_validation_failed:")
+                ):
+                    generation = generate_dossier_thinking(
+                        record,
+                        image_path=image_path,
+                        aux_part=aux_part,
+                        sanitized_rest=record["_sanitized_rest"],
+                        model_name=model_name,
+                        fallback_model_names=fallback_model_names,
+                        max_retries=max_retries,
+                        verbose=verbose,
+                        plan_mode=plan_mode,
+                        source_audit=source_audit,
+                    )
+            else:
+                generation = generate_thinking(
+                    record,
+                    image_path=image_path,
+                    aux_part=aux_part,
                     sanitized_rest=record["_sanitized_rest"],
                     model_name=model_name,
                     fallback_model_names=fallback_model_names,
                     max_retries=max_retries,
                     verbose=verbose,
                     plan_mode=plan_mode,
-                    source_audit=source_audit,
+                    planner_style=planner_style,
                 )
-        else:
-            generation = generate_thinking(
+            thinking = generation["thinking"]
+            result_data = None
+            coordinate_candidates = build_hidden_coordinate_candidates(
+                get_point_coords(record),
+                max_items=RELAXED_COORDINATE_CANDIDATE_MAX_ITEMS,
+                relax_type_limits=True,
+            )
+            generation_audit = audit_generation_quality(
                 record,
-                image_path=image_path,
-                aux_part=record["_aux_part"],
-                sanitized_rest=record["_sanitized_rest"],
-                model_name=model_name,
-                fallback_model_names=fallback_model_names,
-                max_retries=max_retries,
-                verbose=verbose,
-                plan_mode=plan_mode,
-                planner_style=planner_style,
+                generation,
+                aux_part,
+                coordinate_candidates=coordinate_candidates,
             )
-        public_problem = build_public_problem_text(record)
-        aux_part = record["_aux_part"]
-        goal_type = parse_goal_expression(visible_goal).get("predicate") or None
-        aux_new_points = extract_aux_new_points(aux_part)
-        if len(aux_new_points) == 1:
-            aux_type = "single_point"
-        elif len(aux_new_points) > 1:
-            aux_type = "multi_point"
-        else:
-            aux_type = None
-        thinking = generation["thinking"]
-        result_data = None
-        coordinate_candidates = build_hidden_coordinate_candidates(
-            get_point_coords(record),
-            max_items=RELAXED_COORDINATE_CANDIDATE_MAX_ITEMS,
-            relax_type_limits=True,
-        )
-        generation_audit = audit_generation_quality(
-            record,
-            generation,
-            aux_part,
-            coordinate_candidates=coordinate_candidates,
-        )
-        resolved_generation_style = generation.get("generation_style") or generation_style
-        exported_to_dataset, dataset_filter_reason = _resolve_dataset_export_decision(
-            resolved_generation_style,
-            generation,
-            generation_audit,
-        )
+            resolved_generation_style = generation.get("generation_style") or generation_style
+            exported_to_dataset, dataset_filter_reason = resolve_dataset_export_decision(
+                resolved_generation_style,
+                generation,
+                generation_audit,
+            )
 
-        if exported_to_dataset:
-            result_data = build_dataset_output_record(
+            if exported_to_dataset:
+                result_data = build_dataset_output_record(
+                    sample_order=sample_order,
+                    instruction=build_instruction_text(),
+                    public_problem=public_problem,
+                    thinking=thinking,
+                    aux_part=aux_part,
+                    image_path=record.get("image_path", ""),
+                )
+
+            item_record = build_item_record(
                 sample_order=sample_order,
-                instruction=build_instruction_text(),
+                input_index=record["_source_index"],
+                image_path=str(image_path),
                 public_problem=public_problem,
-                thinking=thinking,
                 aux_part=aux_part,
-                image_path=record.get("image_path", ""),
+                goal_type=goal_type,
+                aux_type=aux_type,
+                hidden_rest_sanitized=record["_sanitized_rest"],
+                point_coords_grid=record.get("point_coords_grid", {}),
+                source_audit=source_audit,
+                generation_audit=generation_audit,
+                generation=generation,
+                generation_style=resolved_generation_style,
+                exported_to_dataset=exported_to_dataset,
+                dataset_filter_reason=dataset_filter_reason,
             )
-
-        item_record = build_item_record(
-            sample_order=sample_order,
-            input_index=record["_source_index"],
-            image_path=str(image_path),
-            public_problem=public_problem,
-            aux_part=aux_part,
-            goal_type=goal_type,
-            aux_type=aux_type,
-            hidden_rest_sanitized=record["_sanitized_rest"],
-            point_coords_grid=record.get("point_coords_grid", {}),
-            source_audit=source_audit,
-            generation_audit=generation_audit,
-            generation=generation,
-            generation_style=resolved_generation_style,
-            exported_to_dataset=exported_to_dataset,
-            dataset_filter_reason=dataset_filter_reason,
-        )
-        return {"result_data": result_data, "item_record": item_record}
+            return {"result_data": result_data, "item_record": item_record}
+        except Exception as exc:
+            logger.exception(
+                "Unexpected item-level failure during CoT generation: sample_order=%s input_index=%s image_path=%s generation_style=%s",
+                sample_order,
+                record.get("_source_index"),
+                image_path,
+                generation_style,
+            )
+            return {
+                "result_data": None,
+                "item_record": build_generation_failure_item_record(
+                    sample_order=sample_order,
+                    input_index=record["_source_index"],
+                    image_path=str(image_path),
+                    error=f"unexpected_exception: {type(exc).__name__}: {exc}",
+                    source_audit=source_audit,
+                    generation_style=generation_style,
+                    goal_type=goal_type,
+                    aux_type=aux_type,
+                    public_problem=public_problem,
+                    aux_part=record.get("_aux_part"),
+                    hidden_rest_sanitized=record.get("_sanitized_rest"),
+                    point_coords_grid=record.get("point_coords_grid", {}),
+                ),
+            }
 
     sft_dataset = []
     item_records = []
     with ThreadPoolExecutor(max_workers=num_workers) as executor:
         futures = {executor.submit(process_item, (i, rec)): i for i, rec in enumerate(selected)}
         for future in as_completed(futures):
-            result = future.result()
+            sample_order = futures[future]
+            record = selected[sample_order]
+            try:
+                result = future.result()
+            except Exception as exc:
+                image_path = resolve_image_path(record.get("image_path", ""), input_path)
+                logger.exception(
+                    "Worker future escaped item-level failure handling: sample_order=%s input_index=%s image_path=%s generation_style=%s",
+                    sample_order,
+                    record.get("_source_index"),
+                    image_path,
+                    generation_style,
+                )
+                result = {
+                    "result_data": None,
+                    "item_record": build_generation_failure_item_record(
+                        sample_order=sample_order,
+                        input_index=record["_source_index"],
+                        image_path=str(image_path),
+                        error=f"worker_future_exception: {type(exc).__name__}: {exc}",
+                        generation_style=generation_style,
+                        aux_part=record.get("_aux_part"),
+                        hidden_rest_sanitized=record.get("_sanitized_rest"),
+                        point_coords_grid=record.get("point_coords_grid", {}),
+                    ),
+                }
             item_records.append(result["item_record"])
             if result["result_data"] is not None:
                 sft_dataset.append(result["result_data"])

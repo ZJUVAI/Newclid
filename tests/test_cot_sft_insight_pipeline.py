@@ -484,6 +484,104 @@ class CotSftInsightPipelineTest(unittest.TestCase):
             self.assertTrue(item_records[0]["exported_to_dataset"])
             self.assertIsNone(item_records[0]["dataset_filter_reason"])
 
+    def test_process_and_generate_sft_continues_after_unexpected_item_exception(self):
+        failing_record = dict(_load_record(0))
+        succeeding_record = dict(_load_record(1))
+        failing_record["image_path"] = "fixture.png"
+        succeeding_record["image_path"] = "fixture.png"
+        successful_generation = {
+            "success": True,
+            "thinking": "<thinking>From the visible figure, one stable fact remains usable. The real gap is that the target still needs one local helper effect around the goal-side objects. So the helper should first create one explicit relation that reconnects the old figure before the last transfer. Construct point h so the needed helper relation is available. That helper keeps the route visible-only and short.</thinking>",
+            "plan_prompt": None,
+            "write_prompt": None,
+            "plan_output": None,
+            "plan_parsed": {"generation_style": "insight_v1"},
+            "insight_slots": {"goal_gap_type": "angle_transfer"},
+            "insight_plan_parsed": {"generation_style": "insight_v1"},
+            "attempts_used": 1,
+            "elapsed_seconds": 0.0,
+            "error": None,
+            "write_output": "body",
+            "generation_style": "insight_v1",
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_dir_path = Path(temp_dir)
+            input_path = temp_dir_path / "input.jsonl"
+            output_path = temp_dir_path / "out.jsonl"
+            run_dir = temp_dir_path / "artifacts"
+            input_path.write_text(
+                "\n".join(
+                    [
+                        json.dumps(failing_record, ensure_ascii=False),
+                        json.dumps(succeeding_record, ensure_ascii=False),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (temp_dir_path / "fixture.png").write_bytes(b"fixture-image")
+
+            def fake_generate_insight_thinking(record, **kwargs):
+                del kwargs
+                if record["_source_index"] == 0:
+                    raise RuntimeError("boom")
+                return successful_generation
+
+            with patch(
+                "experiments.cot_sft_generation.generate_cot_sft.generate_insight_thinking",
+                side_effect=fake_generate_insight_thinking,
+            ), patch(
+                "experiments.cot_sft_generation.generate_cot_sft.audit_generation_quality",
+                return_value={"issues": [], "has_issue": False},
+            ):
+                result = process_and_generate_sft(
+                    input_jsonl=str(input_path),
+                    output_jsonl=str(output_path),
+                    sample_size=2,
+                    num_workers=2,
+                    model_name="fixture-model",
+                    verbose=True,
+                    random_sample=False,
+                    process_all=False,
+                    max_retries=1,
+                    generation_style="insight_v1",
+                    run_dir=run_dir,
+                )
+
+            output_records = [
+                json.loads(line)
+                for line in output_path.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            item_records = [
+                json.loads(line)
+                for line in (run_dir / "item_records.jsonl").read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            item_audits = [
+                json.loads(line)
+                for line in (run_dir / "item_audits.jsonl").read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            summary = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
+
+            self.assertEqual(len(output_records), 1)
+            self.assertEqual(len(item_records), 2)
+            self.assertEqual(len(item_audits), 2)
+            self.assertEqual(summary["sampled_items"], 2)
+            self.assertEqual(summary["surface_fail_items"], 1)
+            self.assertEqual(summary["exported_items"], 1)
+            self.assertEqual(result["summary"]["exported_items"], 1)
+
+            failed_item = item_records[0]
+            succeeded_item = item_records[1]
+            self.assertFalse(failed_item["surface_pass"])
+            self.assertFalse(failed_item["exported_to_dataset"])
+            self.assertEqual(failed_item["dataset_filter_reason"], "generation_failed")
+            self.assertIn("unexpected_exception: RuntimeError: boom", failed_item["error"])
+            self.assertTrue(succeeded_item["exported_to_dataset"])
+
 
 if __name__ == "__main__":
     unittest.main()
