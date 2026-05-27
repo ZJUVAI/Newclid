@@ -175,6 +175,20 @@ def build_semantic_summary_fields(
     }
 
 
+def resolve_item_export_status(item_audit: Dict[str, Any]) -> tuple[bool, Any]:
+    if "exported_to_dataset" in item_audit:
+        return bool(item_audit.get("exported_to_dataset")), item_audit.get("dataset_filter_reason")
+    return bool(item_audit.get("surface_pass", item_audit.get("success", False))), None
+
+
+def build_review_recommendation(surface_pass: bool, exported_to_dataset: bool) -> str:
+    if not surface_pass:
+        return "fix_surface_first"
+    if not exported_to_dataset:
+        return "skip_dataset_filtered"
+    return "review_now"
+
+
 def build_pending_review_queue(
     item_audits: List[Dict[str, Any]],
     semantic_audits: List[Dict[str, Any]],
@@ -187,7 +201,8 @@ def build_pending_review_queue(
         if semantic_audit.get("semantic_pass") is not None:
             continue
         surface_pass = item_audit.get("surface_pass", item_audit.get("success", False))
-        if surface_pass_only and not surface_pass:
+        exported_to_dataset, dataset_filter_reason = resolve_item_export_status(item_audit)
+        if surface_pass_only and not exported_to_dataset:
             continue
         queue.append(
             {
@@ -196,7 +211,9 @@ def build_pending_review_queue(
                 "goal_type": semantic_audit.get("goal_type"),
                 "aux_type": semantic_audit.get("aux_type"),
                 "surface_pass": surface_pass,
-                "review_recommendation": "review_now" if surface_pass else "fix_surface_first",
+                "exported_to_dataset": exported_to_dataset,
+                "dataset_filter_reason": dataset_filter_reason,
+                "review_recommendation": build_review_recommendation(surface_pass, exported_to_dataset),
                 "source_audit_issues": (item_audit.get("source_audit") or {}).get("issues", []),
                 "generation_audit_issues": (item_audit.get("generation_audit") or {}).get("issues", []),
             }
@@ -247,7 +264,8 @@ def build_pending_review_payloads(
         if semantic_audit.get("semantic_pass") is not None:
             continue
         surface_pass = item_audit.get("surface_pass", item_audit.get("success", False))
-        if surface_pass_only and not surface_pass:
+        exported_to_dataset, dataset_filter_reason = resolve_item_export_status(item_audit)
+        if surface_pass_only and not exported_to_dataset:
             continue
         payloads.append(
             {
@@ -256,7 +274,9 @@ def build_pending_review_payloads(
                 "goal_type": item_record.get("goal_type"),
                 "aux_type": item_record.get("aux_type"),
                 "surface_pass": surface_pass,
-                "review_recommendation": "review_now" if surface_pass else "fix_surface_first",
+                "exported_to_dataset": exported_to_dataset,
+                "dataset_filter_reason": dataset_filter_reason,
+                "review_recommendation": build_review_recommendation(surface_pass, exported_to_dataset),
                 "context": {
                     "generation_style": item_record.get("generation_style"),
                     "image_path": item_record.get("image_path", ""),

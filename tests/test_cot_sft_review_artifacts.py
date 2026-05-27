@@ -356,6 +356,78 @@ class CotSftReviewArtifactsTest(unittest.TestCase):
         self.assertEqual(queue[0]["review_recommendation"], "review_now")
         self.assertEqual(queue[0]["generation_audit_issues"], ["generic_bridge_phrase:0"])
 
+    def test_build_pending_review_queue_skips_dataset_filtered_items_for_surface_pass_only(self):
+        item_audits = [
+            {
+                "sample_order": 0,
+                "input_index": 1,
+                "goal_type": "eqangle",
+                "aux_type": "single_point",
+                "surface_pass": True,
+                "exported_to_dataset": False,
+                "dataset_filter_reason": "generation_audit_hard_issue",
+                "source_audit": {"issues": []},
+                "generation_audit": {"issues": ["no_proof_echo"]},
+            }
+        ]
+        semantic_audits = [
+            {
+                "sample_order": 0,
+                "input_index": 1,
+                "goal_type": "eqangle",
+                "aux_type": "single_point",
+                "surface_pass": True,
+                "semantic_pass": None,
+                "review_checklist_version": SEMANTIC_REVIEW_CHECKLIST_VERSION,
+                "issue_codes": [],
+                "issues": [],
+            }
+        ]
+
+        self.assertEqual(
+            build_pending_review_queue(item_audits, semantic_audits, surface_pass_only=True),
+            [],
+        )
+
+        queue = build_pending_review_queue(item_audits, semantic_audits, surface_pass_only=False)
+        self.assertEqual(len(queue), 1)
+        self.assertEqual(queue[0]["review_recommendation"], "skip_dataset_filtered")
+        self.assertFalse(queue[0]["exported_to_dataset"])
+        self.assertEqual(queue[0]["dataset_filter_reason"], "generation_audit_hard_issue")
+
+    def test_build_pending_review_queue_falls_back_to_surface_pass_for_legacy_item_audits(self):
+        item_audits = [
+            {
+                "sample_order": 0,
+                "input_index": 1,
+                "goal_type": "eqangle",
+                "aux_type": "single_point",
+                "surface_pass": True,
+                "source_audit": {"issues": []},
+                "generation_audit": {"issues": []},
+            }
+        ]
+        semantic_audits = [
+            {
+                "sample_order": 0,
+                "input_index": 1,
+                "goal_type": "eqangle",
+                "aux_type": "single_point",
+                "surface_pass": True,
+                "semantic_pass": None,
+                "review_checklist_version": SEMANTIC_REVIEW_CHECKLIST_VERSION,
+                "issue_codes": [],
+                "issues": [],
+            }
+        ]
+
+        queue = build_pending_review_queue(item_audits, semantic_audits, surface_pass_only=True)
+
+        self.assertEqual(len(queue), 1)
+        self.assertTrue(queue[0]["exported_to_dataset"])
+        self.assertIsNone(queue[0]["dataset_filter_reason"])
+        self.assertEqual(queue[0]["review_recommendation"], "review_now")
+
     def test_build_pending_review_payloads_includes_context_and_stub(self):
         item_records = [
             {
@@ -416,6 +488,74 @@ class CotSftReviewArtifactsTest(unittest.TestCase):
             ["coordinate_cues_not_reused_in_body"],
         )
         self.assertIsNone(payloads[0]["review_stub"]["semantic_pass"])
+
+    def test_build_pending_review_payloads_skip_surface_pass_dataset_filtered_items(self):
+        item_records = [
+            {
+                "sample_order": 0,
+                "input_index": 1,
+                "goal_type": "eqangle",
+                "aux_type": "single_point",
+                "image_path": "img.png",
+                "public_problem": "<problem>...</problem>",
+                "aux": "<aux>...</aux>",
+                "thinking": "<thinking>...</thinking>",
+                "plan_parsed": {"anchor_points": ["a", "b", "c"]},
+                "write_output": "body",
+                "source_audit": {"issues": []},
+                "generation_audit": {"issues": ["no_proof_echo"]},
+                "attempts_used": 2,
+                "error": None,
+                "generation_style": "insight_v1",
+            }
+        ]
+        item_audits = [
+            {
+                "sample_order": 0,
+                "input_index": 1,
+                "goal_type": "eqangle",
+                "aux_type": "single_point",
+                "surface_pass": True,
+                "exported_to_dataset": False,
+                "dataset_filter_reason": "generation_audit_hard_issue",
+                "source_audit": {"issues": []},
+                "generation_audit": {"issues": ["no_proof_echo"]},
+            }
+        ]
+        semantic_audits = [
+            {
+                "sample_order": 0,
+                "input_index": 1,
+                "goal_type": "eqangle",
+                "aux_type": "single_point",
+                "surface_pass": True,
+                "semantic_pass": None,
+                "review_checklist_version": SEMANTIC_REVIEW_CHECKLIST_VERSION,
+                "issue_codes": [],
+                "issues": [],
+            }
+        ]
+
+        self.assertEqual(
+            build_pending_review_payloads(
+                item_records,
+                item_audits,
+                semantic_audits,
+                surface_pass_only=True,
+            ),
+            [],
+        )
+
+        payloads = build_pending_review_payloads(
+            item_records,
+            item_audits,
+            semantic_audits,
+            surface_pass_only=False,
+        )
+        self.assertEqual(len(payloads), 1)
+        self.assertEqual(payloads[0]["review_recommendation"], "skip_dataset_filtered")
+        self.assertFalse(payloads[0]["exported_to_dataset"])
+        self.assertEqual(payloads[0]["dataset_filter_reason"], "generation_audit_hard_issue")
 
     def test_validate_item_record_alignment_rejects_misaligned_rows(self):
         item_audits = [

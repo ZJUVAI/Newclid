@@ -4,9 +4,18 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from experiments.cot_sft_generation.core.insight_extractor import extract_insight_slots
+from experiments.cot_sft_generation.core.insight_pipeline import (
+    build_scripted_insight_plan,
+    build_scripted_insight_writer_body,
+)
+from experiments.cot_sft_generation.core.proof_dag import parse_proof_dag
 from experiments.cot_sft_generation.generate_cot_sft import process_and_generate_sft
+from experiments.cot_sft_generation.generate_cot_sft import build_visible_text_facts
 from experiments.cot_sft_generation.replay_artifact_checks import recheck_item_record, recheck_run_dir
 from experiments.cot_sft_generation.run_artifacts import build_run_config
+
+BENCHMARK_FILE = Path("experiments/cot_sft_generation/benchmarks/quality_review_v1/quality_review_v1_input.jsonl")
 
 
 PLAN_OUTPUT = {
@@ -60,6 +69,30 @@ WRITER_BODY = (
     "Because ah equals bh and ac equals bd, dh equals ch, and this transfers the helper equality to the d-side and c-side. "
     "Therefore ad equals bc."
 )
+
+
+def _load_record(index: int):
+    with open(BENCHMARK_FILE, "r", encoding="utf-8") as f:
+        for row_index, line in enumerate(f):
+            if row_index == index:
+                return json.loads(line)
+    raise IndexError(index)
+
+
+def _build_scripted_insight_fixture(index: int = 1):
+    record = dict(_load_record(index))
+    aux_part = record["llm_output_renamed"].split("</aux>", 1)[0] + "</aux>"
+    visible_goal = record["llm_input_renamed"].split("?", 1)[1].replace("</problem>", "").strip()
+    slots = extract_insight_slots(parse_proof_dag(record["llm_output_renamed"]), visible_goal, aux_part)
+    scripted_plan = build_scripted_insight_plan(
+        record,
+        aux_part=aux_part,
+        insight_slots=slots,
+        visible_text_facts=build_visible_text_facts(record),
+        image_scan_candidates=["points b, d, and e appear nearly collinear"],
+    )
+    writer_body = build_scripted_insight_writer_body(scripted_plan)
+    return record, scripted_plan, writer_body
 
 
 class CotSftReplayArtifactChecksTest(unittest.TestCase):
@@ -151,6 +184,92 @@ class CotSftReplayArtifactChecksTest(unittest.TestCase):
             run_recheck = recheck_run_dir(run_dir)
             self.assertEqual(run_recheck["summary"]["total_items"], 1)
             self.assertEqual(run_recheck["summary"]["current_all_checks_pass_items"], 1)
+
+    def test_recheck_item_record_keeps_insight_soft_audit_issue_exportable(self):
+        record, scripted_plan, writer_body = _build_scripted_insight_fixture(1)
+        record["image_path"] = "fixture.png"
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_dir_path = Path(temp_dir)
+            input_path = temp_dir_path / "input.jsonl"
+            output_path = temp_dir_path / "out.jsonl"
+            run_dir = temp_dir_path / "artifacts"
+
+            input_path.write_text(json.dumps(record, ensure_ascii=False) + "\n", encoding="utf-8")
+            (temp_dir_path / "fixture.png").write_bytes(b"fixture-image")
+
+            with patch(
+                "experiments.cot_sft_generation.generate_cot_sft.call_model",
+                side_effect=[json.dumps(scripted_plan, ensure_ascii=False), writer_body],
+            ):
+                process_and_generate_sft(
+                    input_jsonl=str(input_path),
+                    output_jsonl=str(output_path),
+                    sample_size=1,
+                    num_workers=1,
+                    model_name="fixture-model",
+                    verbose=True,
+                    random_sample=False,
+                    process_all=False,
+                    max_retries=1,
+                    generation_style="insight_v1",
+                    run_dir=run_dir,
+                )
+
+            item_record = json.loads((run_dir / "item_records.jsonl").read_text(encoding="utf-8").splitlines()[0])
+            with patch(
+                "experiments.cot_sft_generation.replay_artifact_checks.audit_generation_quality",
+                return_value={"issues": ["goal_gap_specificity"], "has_issue": True},
+            ):
+                replay_row = recheck_item_record(item_record)
+
+            self.assertTrue(replay_row["current_surface_pass"])
+            self.assertTrue(replay_row["current_exported_to_dataset"])
+            self.assertIsNone(replay_row["current_dataset_filter_reason"])
+            self.assertTrue(replay_row["current_all_checks_pass"])
+
+    def test_recheck_item_record_blocks_insight_hard_audit_issue_export(self):
+        record, scripted_plan, writer_body = _build_scripted_insight_fixture(1)
+        record["image_path"] = "fixture.png"
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_dir_path = Path(temp_dir)
+            input_path = temp_dir_path / "input.jsonl"
+            output_path = temp_dir_path / "out.jsonl"
+            run_dir = temp_dir_path / "artifacts"
+
+            input_path.write_text(json.dumps(record, ensure_ascii=False) + "\n", encoding="utf-8")
+            (temp_dir_path / "fixture.png").write_bytes(b"fixture-image")
+
+            with patch(
+                "experiments.cot_sft_generation.generate_cot_sft.call_model",
+                side_effect=[json.dumps(scripted_plan, ensure_ascii=False), writer_body],
+            ):
+                process_and_generate_sft(
+                    input_jsonl=str(input_path),
+                    output_jsonl=str(output_path),
+                    sample_size=1,
+                    num_workers=1,
+                    model_name="fixture-model",
+                    verbose=True,
+                    random_sample=False,
+                    process_all=False,
+                    max_retries=1,
+                    generation_style="insight_v1",
+                    run_dir=run_dir,
+                )
+
+            item_record = json.loads((run_dir / "item_records.jsonl").read_text(encoding="utf-8").splitlines()[0])
+            with patch(
+                "experiments.cot_sft_generation.replay_artifact_checks.audit_generation_quality",
+                return_value={"issues": ["no_proof_echo"], "has_issue": True},
+            ):
+                replay_row = recheck_item_record(item_record)
+
+            self.assertTrue(replay_row["current_surface_pass"])
+            self.assertFalse(replay_row["current_exported_to_dataset"])
+            self.assertEqual(replay_row["current_dataset_filter_reason"], "generation_audit_hard_issue")
+            self.assertFalse(replay_row["current_all_checks_pass"])
 
 
 if __name__ == "__main__":

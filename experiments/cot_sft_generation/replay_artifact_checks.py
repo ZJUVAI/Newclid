@@ -25,11 +25,18 @@ try:
         validate_thinking_response,
         validate_writer_body,
     )
+    from .run_artifacts import resolve_dataset_export_decision
     from .geometry_text import (
         build_hidden_coordinate_candidates,
         extract_problem_goal,
         parse_goal_expression,
     )
+    from .core.insight_extractor import extract_insight_slots
+    from .core.insight_pipeline import (
+        validate_insight_plan_response,
+        validate_insight_writer_body,
+    )
+    from .core.proof_dag import parse_proof_dag
 except ImportError:  # pragma: no cover - script execution path
     from audits import (
         audit_generation_quality,
@@ -47,11 +54,18 @@ except ImportError:  # pragma: no cover - script execution path
         validate_thinking_response,
         validate_writer_body,
     )
+    from run_artifacts import resolve_dataset_export_decision
     from geometry_text import (
         build_hidden_coordinate_candidates,
         extract_problem_goal,
         parse_goal_expression,
     )
+    from core.insight_extractor import extract_insight_slots  # type: ignore[no-redef]
+    from core.insight_pipeline import (  # type: ignore[no-redef]
+        validate_insight_plan_response,
+        validate_insight_writer_body,
+    )
+    from core.proof_dag import parse_proof_dag  # type: ignore[no-redef]
 
 
 def read_jsonl(path: Path) -> List[Dict[str, Any]]:
@@ -93,6 +107,7 @@ def recheck_item_record(item_record: Dict[str, Any]) -> Dict[str, Any]:
     record = reconstruct_source_record(item_record)
     aux_part = record["_aux_part"]
     sanitized_rest = record["_sanitized_rest"]
+    generation_style = item_record.get("generation_style")
     visible_goal = extract_problem_goal(record)
     point_coords = get_point_coords(record)
     point_names = sorted(point_coords)
@@ -112,29 +127,53 @@ def recheck_item_record(item_record: Dict[str, Any]) -> Dict[str, Any]:
 
     raw_plan = item_record.get("plan_output")
     if not raw_plan:
-        raw_plan = item_record.get("plan_parsed") or {}
-    plan_ok, plan_message, revalidated_plan = validate_plan_response(
-        raw_plan,
-        point_coords,
-        visible_goal=visible_goal,
-        aux_part=aux_part,
-        coordinate_candidates=coordinate_candidates,
-        sanitized_rest=sanitized_rest,
-        visible_premise_summaries=visible_premise_summaries,
-        visible_text_facts=visible_text_facts,
-    )
+        raw_plan = item_record.get("insight_plan_parsed") or item_record.get("plan_parsed") or {}
+    if generation_style == "insight_v1":
+        insight_slots = item_record.get("insight_slots")
+        if not isinstance(insight_slots, dict):
+            insight_slots = extract_insight_slots(
+                parse_proof_dag(record.get("llm_output_renamed", "") or ""),
+                visible_goal=visible_goal,
+                aux_part=aux_part,
+            )
+        plan_ok, plan_message, revalidated_plan = validate_insight_plan_response(
+            raw_plan,
+            point_coords,
+            visible_goal=visible_goal,
+            aux_part=aux_part,
+            visible_text_facts=visible_text_facts,
+            insight_slots=insight_slots,
+        )
+    else:
+        plan_ok, plan_message, revalidated_plan = validate_plan_response(
+            raw_plan,
+            point_coords,
+            visible_goal=visible_goal,
+            aux_part=aux_part,
+            coordinate_candidates=coordinate_candidates,
+            sanitized_rest=sanitized_rest,
+            visible_premise_summaries=visible_premise_summaries,
+            visible_text_facts=visible_text_facts,
+        )
 
-    plan_for_checks = revalidated_plan or item_record.get("plan_parsed") or {}
+    plan_for_checks = revalidated_plan or item_record.get("insight_plan_parsed") or item_record.get("plan_parsed") or {}
     write_output = item_record.get("write_output", "") or ""
     thinking = item_record.get("thinking", "") or ""
     writer_ok = False
     writer_message = "missing_write_output"
     if plan_ok and revalidated_plan and write_output:
-        writer_ok, writer_message = validate_writer_body(
-            write_output,
-            visible_goal=visible_goal,
-            plan=revalidated_plan,
-        )
+        if generation_style == "insight_v1":
+            writer_ok, writer_message = validate_insight_writer_body(
+                write_output,
+                visible_goal=visible_goal,
+                plan=revalidated_plan,
+            )
+        else:
+            writer_ok, writer_message = validate_writer_body(
+                write_output,
+                visible_goal=visible_goal,
+                plan=revalidated_plan,
+            )
     elif plan_ok and revalidated_plan:
         writer_message = "missing_write_output"
     else:
@@ -155,6 +194,7 @@ def recheck_item_record(item_record: Dict[str, Any]) -> Dict[str, Any]:
         "plan_parsed": plan_for_checks,
         "write_output": write_output,
         "thinking": thinking,
+        "generation_style": generation_style,
     }
     generation_audit = audit_generation_quality(
         record,
@@ -165,18 +205,22 @@ def recheck_item_record(item_record: Dict[str, Any]) -> Dict[str, Any]:
 
     prior_source_audit = item_record.get("source_audit", {}) or {}
     prior_generation_audit = item_record.get("generation_audit", {}) or {}
-    current_all_checks_pass = bool(
-        plan_ok
-        and writer_ok
-        and thinking_ok
-        and not generation_audit.get("has_issue")
+    current_surface_pass = bool(plan_ok and writer_ok and thinking_ok)
+    current_exported_to_dataset, current_dataset_filter_reason = resolve_dataset_export_decision(
+        generation_style,
+        generation,
+        generation_audit,
     )
+    current_all_checks_pass = bool(current_exported_to_dataset)
 
     return {
         "sample_order": item_record.get("sample_order"),
         "input_index": item_record.get("input_index"),
         "goal_type": parse_goal_expression(visible_goal).get("predicate") or None,
         "prior_surface_pass": bool(item_record.get("surface_pass", item_record.get("success", False))),
+        "prior_exported_to_dataset": bool(
+            item_record.get("exported_to_dataset", item_record.get("surface_pass", item_record.get("success", False)))
+        ),
         "revalidated_plan_ok": bool(plan_ok),
         "revalidated_plan_message": plan_message,
         "revalidated_plan": revalidated_plan,
@@ -188,6 +232,9 @@ def recheck_item_record(item_record: Dict[str, Any]) -> Dict[str, Any]:
         "current_generation_audit": generation_audit,
         "source_audit_changed": source_audit != prior_source_audit,
         "generation_audit_changed": generation_audit != prior_generation_audit,
+        "current_surface_pass": current_surface_pass,
+        "current_exported_to_dataset": current_exported_to_dataset,
+        "current_dataset_filter_reason": current_dataset_filter_reason,
         "current_all_checks_pass": current_all_checks_pass,
         "coordinate_candidate_count": len(coordinate_candidates),
         "visible_point_count": len(point_names),
