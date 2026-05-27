@@ -264,6 +264,8 @@ def build_pending_review_payloads(
                     "aux": item_record.get("aux", ""),
                     "thinking": item_record.get("thinking"),
                     "plan_parsed": item_record.get("plan_parsed"),
+                    "insight_slots": item_record.get("insight_slots"),
+                    "insight_plan_parsed": item_record.get("insight_plan_parsed"),
                     "write_output": item_record.get("write_output"),
                     "source_audit": item_record.get("source_audit", {}),
                     "generation_audit": item_record.get("generation_audit", {}),

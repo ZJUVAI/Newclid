@@ -993,7 +993,50 @@ def audit_generation_quality(
     ]
 
     if plan:
-        if plan.get("dossier_version") == "dossier_v1":
+        if plan.get("insight_version") == "insight_v1":
+            write_output = generation.get("write_output") or ""
+            goal_gap_type = str(plan.get("goal_gap_type") or "").strip()
+            goal_gap_text = str(plan.get("goal_gap_text") or "").strip()
+            aux_selection_reason = str(plan.get("aux_selection_reason") or "").strip()
+            slot_effect = str((plan.get("insight_slots") or {}).get("required_aux_effect") or "").strip()
+            aux_effect = str(plan.get("required_aux_effect") or "").strip()
+            if not goal_gap_text or len(goal_gap_text) < 24:
+                issues.append("goal_gap_specificity")
+            elif goal_gap_type and goal_gap_type.replace("_", " ") not in goal_gap_text.lower():
+                goal_gap_points = extract_point_mentions(goal_gap_text, visible_points)
+                if len(goal_gap_points) < 2:
+                    issues.append("goal_gap_specificity")
+            if slot_effect and aux_effect and not relations_semantically_match(
+                aux_effect,
+                slot_effect,
+                visible_points + list(extract_aux_point_scope(aux_part)),
+            ):
+                issues.append("aux_selection_grounded")
+            elif aux_selection_reason:
+                reference_points = extract_point_mentions(
+                    " ".join(
+                        [
+                            slot_effect,
+                            str((plan.get("insight_slots") or {}).get("first_bridge_checkpoint") or ""),
+                            str((plan.get("insight_slots") or {}).get("pre_goal_checkpoint") or ""),
+                        ]
+                    ),
+                    visible_points + list(extract_aux_point_scope(aux_part)),
+                )
+                if reference_points and not extract_point_mentions(aux_selection_reason, list(reference_points)):
+                    issues.append("aux_selection_grounded")
+            else:
+                issues.append("aux_selection_grounded")
+            if len(extract_aux_new_points(aux_part)) > 1 and not plan.get("stage_order"):
+                issues.append("multi_point_staging")
+            if write_output:
+                if re.search(r"(?:\[\d{3}\]|\bAR\b|\br\d+\b|\bproof\b)", write_output, re.IGNORECASE):
+                    issues.append("no_proof_echo")
+                if re.search(r"\b(?:hidden|milestone|evidence window|goal closure|bridge chain)\b", write_output, re.IGNORECASE):
+                    issues.append("visible_only_boundary")
+                if write_output.lower().count("because") > 2 or len(split_into_sentences(write_output)) > 7:
+                    issues.append("no_proof_echo")
+        elif plan.get("dossier_version") == "dossier_v1":
             coordinate_candidates = coordinate_candidates or []
             unmatched_relations = [
                 relation

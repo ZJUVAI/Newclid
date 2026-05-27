@@ -221,6 +221,8 @@ def build_item_record(
         "write_prompt": generation.get("write_prompt"),
         "plan_output": generation.get("plan_output"),
         "plan_parsed": generation.get("plan_parsed"),
+        "insight_slots": generation.get("insight_slots"),
+        "insight_plan_parsed": generation.get("insight_plan_parsed"),
         "write_output": generation.get("write_output"),
         "thinking": generation.get("thinking"),
         "surface_pass": surface_pass,
