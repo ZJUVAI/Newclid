@@ -57,7 +57,6 @@ class InsightPlan:
     goal_gap_text: str
     required_aux_effect: str
     aux_construction: str
-    aux_immediate_effects: list[str]
     aux_selection_reason: str
     stage_order: list[str] | None = None
     bonus_post_aux_tail: list[str] | None = None

@@ -251,19 +251,19 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
    - 先检查图片、题面、`<aux>`、proof、坐标字段是否缺失或明显冲突。
    - 发现异常先记录，不为了通过率强行硬写。
 
-2. `dossier plan`
-   - planner 只输出结构化 dossier，不直接写整段 `thinking`。
-   - 当前 dossier 主字段是：
+2. `insight plan`
+   - planner 只输出结构化 `InsightPlan`，不直接写整段 `thinking`。
+   - 当前主字段是：
      - `visible_facts`
      - `image_scan`
-     - `coordinate_checks`（可选）
-     - `goal_obstacle`
-     - `aux_motivation`
-     - `construction`
-     - `aux_immediate_effects`
-     - `bridge_chain`
-     - `goal_closure`
-   - planner 负责决定从哪里起手观察、aux 后果怎么回接旧图、最后怎样闭到 goal。
+     - `goal_gap_type`
+     - `goal_gap_text`
+     - `required_aux_effect`
+     - `aux_construction`
+     - `aux_selection_reason`
+     - `stage_order`（可选）
+     - `bonus_post_aux_tail`（可选）
+   - planner 负责决定从哪里起手观察、helper 需要先制造什么 effect、以及为什么这个 aux 合适。
 
 3. `plan critic`
    - planner 产出后，会再走一次 model critic。
@@ -273,10 +273,10 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
    - 当前实现把 `revised_dossier` 当成 patch，而不是要求 critic 重发完整 dossier：先和原 dossier merge，再重新做脚本校验。
 
 4. 脚本兜底与规范化
-   - 对 `image_scan` / `aux_immediate_effects` 做自然语言关系归一化，识别 `straight line`、`intersect at right angles`、`equidistant` 这类自然表述。
-   - 对 `supports` 兼容常见的 `0-based / 1-based` 混用。
-   - 当模型把 aux 构造写偏时，脚本会把 `construction` 对齐回 hidden `<aux>`，并优先保留直接由 aux 决定的 immediate consequences。
-   - 保留 dossier-first 字段，同时补兼容 alias，方便 artifacts / audits / replay 沿用原有分析工具。
+   - 对 `image_scan` / `required_aux_effect` 做自然语言归一化，识别 `straight line`、`intersect at right angles`、`equidistant` 这类自然表述。
+   - 当 validator 需要 direct consequences 时，脚本会从 `<aux>` 本地临时现算，但不再把它暴露成 planner / writer 字段。
+   - 当模型把 aux 构造写偏时，脚本会把 `aux_construction` 对齐回 hidden `<aux>`。
+   - `insight_plan_parsed` 会保存批准后的 `InsightPlan`，方便 artifacts / audits / replay 继续分析。
 
 5. `write`
    - writer 直接写完整 `thinking` 正文。

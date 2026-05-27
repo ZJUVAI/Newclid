@@ -41,7 +41,9 @@ except ImportError:  # pragma: no cover - script execution path
 
 
 _RULE_LEAK_RE = re.compile(r"(?:\[\d{3}\]|\bAR\b|\br\d+\b|\bproof\b|\bhidden\b)", re.IGNORECASE)
-_INTERNAL_REF_RE = re.compile(r"\b(?:visible_facts|image_scan|evidence_windows|slots|plan|bridge_chain)\[\d+\]")
+_INTERNAL_REF_RE = re.compile(
+    r"\b(?:visible_facts|image_scan|aux_immediate_effects|evidence_windows|slots|plan|bridge_chain)\[\d+\]"
+)
 
 
 def _extract_json_object(output_text: str):
@@ -110,11 +112,7 @@ def build_insight_plan_json_example():
             "goal_gap_text": "the visible givens still do not transfer the angle at the b-side onto the d-side and e-side in one local frame",
             "required_aux_effect": "a, c, d, f are concyclic",
             "aux_construction": "construct point f such that a, c, d, f are concyclic and b, d, f are collinear",
-            "aux_immediate_effects": [
-                "a, c, d, f are concyclic",
-                "b, d, f are collinear",
-            ],
-            "aux_selection_reason": "the cyclic condition creates the missing angle carrier, and the collinearity reconnects that carrier to the old b-d side before the goal closes",
+            "aux_selection_reason": "this helper is appropriate because the cyclic effect creates the missing angle carrier that the slot requires before the old b-d side can be reused",
             "stage_order": [
                 "first create the cyclic angle carrier through a, c, d, and f",
                 "then use the collinearity through b, d, and f to reconnect that carrier to the old figure",
@@ -158,9 +156,10 @@ def build_insight_plan_prompt(
         "- `goal_gap_type` must stay compatible with the visible goal family.\n"
         "- `required_aux_effect` must stay aligned with the slot-derived effect.\n"
         "- `aux_construction` must match the exact auxiliary construction already chosen in the teacher record.\n"
-        "- `aux_selection_reason` must reuse the slot information instead of inventing a different hidden relation.\n"
+        "- `aux_selection_reason` must explain only why this helper is appropriate; it must reuse the slot information instead of inventing a different hidden relation or expanding into a proof route.\n"
         "- If the auxiliary construction introduces multiple new points or multiple staged facts, include `stage_order`.\n"
         "- `bonus_post_aux_tail` is optional and may contain at most two short sentences.\n"
+        "- Do not list the construction's direct consequences one by one; keep them script-local.\n"
         "- Do not mention proof ids, rule names, hidden hints, or theorem catalogs.\n\n"
         "[Output Schema Example]\n"
         f"{build_insight_plan_json_example()}\n"
@@ -177,7 +176,6 @@ def build_insight_write_prompt(record, plan: dict):
         "goal_gap_text": plan.get("goal_gap_text", ""),
         "required_aux_effect": plan.get("required_aux_effect", ""),
         "aux_construction": plan.get("aux_construction", ""),
-        "aux_immediate_effects": plan.get("aux_immediate_effects", []),
         "aux_selection_reason": plan.get("aux_selection_reason", ""),
         "stage_order": plan.get("stage_order"),
         "bonus_post_aux_tail": plan.get("bonus_post_aux_tail"),
@@ -194,6 +192,7 @@ def build_insight_write_prompt(record, plan: dict):
         "- Output plain text only, without tags.\n"
         "- Focus on what is visible, what is missing, what effect the helper must create, and therefore which auxiliary construction to choose.\n"
         "- You may add at most one or two short follow-up sentences after the construction to say what the helper unlocks.\n"
+        "- Do not enumerate direct construction consequences unless one is exactly the required helper effect.\n"
         "- Do not retell the full proof. Do not list theorems. Do not mention proof ids or rule names.\n"
         "- Keep the tone impersonal and concise.\n"
     )
@@ -204,7 +203,7 @@ def build_insight_plan_retry_feedback(message: str, aux_part: str | None = None)
     return (
         "Revise the JSON so it stays insight-first and slot-grounded.\n"
         f"Validator feedback: {message}\n"
-        "Keep the same auxiliary construction and avoid turning the plan into a full proof."
+        "Keep the same auxiliary construction, keep required_aux_effect aligned with the slots, and do not turn bridge checkpoints into a full proof."
     )
 
 
@@ -249,13 +248,13 @@ def build_scripted_insight_plan(
     first_bridge = normalize_relation_surface(insight_slots.get("first_bridge_checkpoint", ""))
     pre_goal = normalize_relation_surface(insight_slots.get("pre_goal_checkpoint", ""))
     construction = build_canonical_construction(aux_part or "")
-    immediate_effects = [
+    direct_consequences = [
         normalize_relation_surface(item)
         for item in build_aux_direct_consequences(aux_part or "")
         if isinstance(item, str) and item.strip()
     ]
-    if not immediate_effects and required_aux_effect:
-        immediate_effects = [required_aux_effect]
+    if not required_aux_effect and direct_consequences:
+        required_aux_effect = direct_consequences[0]
 
     goal_gap_type = insight_slots.get("goal_gap_type") or "midpoint_parallel_trigger"
     goal_gap_text = (
@@ -280,7 +279,6 @@ def build_scripted_insight_plan(
         goal_gap_text=goal_gap_text,
         required_aux_effect=required_aux_effect,
         aux_construction=construction,
-        aux_immediate_effects=immediate_effects[:3],
         aux_selection_reason=aux_selection_reason,
         stage_order=stage_order,
         bonus_post_aux_tail=bonus_tail,
@@ -326,7 +324,6 @@ def validate_insight_plan_response(
         "goal_gap_text",
         "required_aux_effect",
         "aux_construction",
-        "aux_immediate_effects",
         "aux_selection_reason",
     ]
     missing = [key for key in required_keys if key not in plan]
@@ -402,6 +399,16 @@ def validate_insight_plan_response(
     slot_effect = normalize_relation_surface(insight_slots.get("required_aux_effect", ""))
     if slot_effect and not relations_semantically_match(required_aux_effect, slot_effect, visible_points + list(aux_points)):
         return False, "required_aux_effect must stay aligned with the slot-derived effect", None
+    expected_effects = [
+        normalize_relation_surface(item)
+        for item in build_aux_direct_consequences(aux_part or "")
+        if isinstance(item, str) and item.strip()
+    ]
+    if expected_effects and not any(
+        relations_semantically_match(required_aux_effect, candidate, visible_points + list(aux_points))
+        for candidate in expected_effects
+    ):
+        return False, "required_aux_effect must match a direct consequence of the construction", None
 
     ok, message, aux_construction = _clean_text(
         plan.get("aux_construction"),
@@ -416,25 +423,6 @@ def validate_insight_plan_response(
         for point_name in aux_points:
             if point_name not in aux_construction.lower():
                 return False, f"aux_construction must mention auxiliary point '{point_name}'", None
-
-    ok, message, aux_immediate_effects = _canonical_relation_list(
-        plan.get("aux_immediate_effects"),
-        min_items=1,
-        max_items=4,
-        field_name="aux_immediate_effects",
-    )
-    if not ok:
-        return False, message, None
-    expected_effects = [
-        normalize_relation_surface(item)
-        for item in build_aux_direct_consequences(aux_part or "")
-        if isinstance(item, str) and item.strip()
-    ]
-    if expected_effects and any(
-        not any(relations_semantically_match(item, candidate, visible_points + list(aux_points)) for candidate in expected_effects)
-        for item in aux_immediate_effects
-    ):
-        return False, "aux_immediate_effects must match direct consequences of the construction", None
 
     ok, message, aux_selection_reason = _clean_text(
         plan.get("aux_selection_reason"),
@@ -485,7 +473,6 @@ def validate_insight_plan_response(
         goal_gap_text=goal_gap_text,
         required_aux_effect=required_aux_effect,
         aux_construction=aux_construction,
-        aux_immediate_effects=aux_immediate_effects,
         aux_selection_reason=aux_selection_reason,
         stage_order=cleaned_stage_order,
         bonus_post_aux_tail=cleaned_bonus_tail,
@@ -511,14 +498,6 @@ def build_scripted_insight_writer_body(plan: dict):
     sentences.append(f"The real gap is that {plan.get('goal_gap_text', '')}")
     sentences.append(f"So the helper should first create {plan.get('required_aux_effect', '')}")
     sentences.append(f"{plan.get('aux_construction', '').capitalize()}.")
-
-    immediate_effects = plan.get("aux_immediate_effects") or []
-    if immediate_effects:
-        if len(immediate_effects) == 1:
-            sentences.append(f"This immediately gives {immediate_effects[0]}")
-        else:
-            joined = ", then ".join(immediate_effects[:2])
-            sentences.append(f"This immediately gives {joined}")
 
     reason = str(plan.get("aux_selection_reason") or "").strip()
     if reason:
