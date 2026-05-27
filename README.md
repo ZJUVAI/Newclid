@@ -18,6 +18,21 @@ GenesisGeo is a neuro-symbolic system that proves geometry theorems by combining
 - Enhanced DDARN engine with **120x** speedup over the original implementation
 - Neuro-symbolic prover fine-tuned from **Qwen3-VL-2B**
 
+## CoT SFT Mainline
+
+The auxiliary-construction CoT pipeline now defaults to `insight_v1`.
+
+- Mainline: `insight_v1`
+- Legacy / benchmark / fallback: `dossier_v1`
+- Older compatibility route: `model_evidence_legacy`
+
+The default `insight_v1` target is `insight -> aux`, not `aux -> full closure`.
+Entry docs:
+
+- [CURRENT_DESIGN.md](experiments/cot_sft_generation/docs/current/CURRENT_DESIGN.md)
+- [INSIGHT_V1_MAINLINE.md](experiments/cot_sft_generation/docs/current/INSIGHT_V1_MAINLINE.md)
+- [DOSSIER_V1_MAINLINE.md](experiments/cot_sft_generation/docs/current/DOSSIER_V1_MAINLINE.md)
+
 ## Results (GenesisGeo-2B)
 
 | Benchmark | Score |

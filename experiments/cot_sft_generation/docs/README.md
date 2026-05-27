@@ -15,8 +15,10 @@
 
 ### Current State
 
+- [current/INSIGHT_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/INSIGHT_V1_MAINLINE.md)
+  - the default mainline for `insight_v1`
 - [current/DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/DOSSIER_V1_MAINLINE.md)
-  - the next-session mainline for `dossier_v1`
+  - the legacy / benchmark / fallback track for `dossier_v1`
 - [current/CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/CURRENT_DESIGN.md)
   - what the code actually does today
 - [current/STATUS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/STATUS.md)
@@ -42,7 +44,7 @@
 
 1. [DOC_BOUNDARIES.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/DOC_BOUNDARIES.md)
 2. [immutable/DATA_QUALITY_REQUIREMENTS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/immutable/DATA_QUALITY_REQUIREMENTS.md)
-3. [current/DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/DOSSIER_V1_MAINLINE.md)
+3. [current/INSIGHT_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/INSIGHT_V1_MAINLINE.md)
 4. [benchmarks/quality_review_v1/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/quality_review_v1/README.md)
 
 ### Updating Implementation Or Schema

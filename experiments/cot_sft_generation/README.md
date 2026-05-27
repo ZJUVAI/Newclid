@@ -19,7 +19,8 @@
 - [docs/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/README.md)：新的文档总入口，先按用途看文档，不要直接在平铺文件里找。
 - [docs/DOC_BOUNDARIES.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/DOC_BOUNDARIES.md)：先看这个，分清楚 agent 能改什么、不能改什么。
 - [docs/immutable/DATA_QUALITY_REQUIREMENTS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/immutable/DATA_QUALITY_REQUIREMENTS.md)：不可改的数据质量要求镜像。
-- [docs/current/DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/DOSSIER_V1_MAINLINE.md)：如果后续会话要以 `dossier_v1` 作为唯一主线继续迭代，先读这份。
+- [docs/current/INSIGHT_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/INSIGHT_V1_MAINLINE.md)：默认主线，先看这份。
+- [docs/current/DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/DOSSIER_V1_MAINLINE.md)：legacy / benchmark / fallback 路线说明。
 - [benchmarks/quality_review_v1/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/quality_review_v1/README.md)：当前主线默认使用的 review-oriented benchmark。
 
 ## 目录结构
@@ -236,14 +237,15 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 
 ## 当前生成框架
 
-如果你接下来明确要以新链路为主线继续做迭代，请先读 [DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/DOSSIER_V1_MAINLINE.md)。下面这节描述的是当前实现本身，而不是“下个会话最该先做什么”。
+如果你接下来明确要以新链路为主线继续做迭代，请先读 [INSIGHT_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/INSIGHT_V1_MAINLINE.md)。下面这节描述的是当前实现本身，而不是“下个会话最该先做什么”。
 
-当前默认主链已经切到 `dossier_v1`，旧的 `model_evidence` 路线保留为显式 fallback：
+当前默认主链已经切到 `insight_v1`，`dossier_v1` 降级为 legacy / benchmark / fallback，旧的 `model_evidence` 路线继续保留为兼容 fallback：
 
-- 默认：`--generation-style dossier_v1`
+- 默认：`--generation-style insight_v1`
+- legacy / benchmark / fallback：`--generation-style dossier_v1`
 - 兼容 fallback：`--generation-style model_evidence_legacy`
 
-`dossier_v1` 的核心思想是：把 route 的主导权交给模型，但把真正 deterministic 的部分继续交给脚本兜底，例如 aux 构造语义对齐、自然语言关系归一化、support 引用解析、surface audit 和语义审读 artifacts。
+`insight_v1` 的核心思想是：把主学习目标收窄到 “观察缺口 -> 说明 helper effect -> 提出 aux”，而不是默认写完整 closure；`dossier_v1` 保留给对照和降级。
 
 1. `source audit`
    - 先检查图片、题面、`<aux>`、proof、坐标字段是否缺失或明显冲突。
