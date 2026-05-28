@@ -17,6 +17,7 @@ try:
         extract_point_mentions,
         extract_problem_goal,
         extract_visible_point_names,
+        infer_relation_type_from_text,
         normalize_relation_surface,
         parse_goal_expression,
         relation_keyword_present,
@@ -32,6 +33,7 @@ except ImportError:  # pragma: no cover - script execution path
         extract_point_mentions,
         extract_problem_goal,
         extract_visible_point_names,
+        infer_relation_type_from_text,
         normalize_relation_surface,
         parse_goal_expression,
         relation_keyword_present,
@@ -44,6 +46,7 @@ _RULE_LEAK_RE = re.compile(r"(?:\[\d{3}\]|\bAR\b|\br\d+\b|\bproof\b|\bhidden\b)"
 _INTERNAL_REF_RE = re.compile(
     r"\b(?:visible_facts|image_scan|aux_immediate_effects|evidence_windows|slots|plan|bridge_chain)\[\d+\]"
 )
+_AUX_POINT_TEXT_RE = re.compile(r"\bconstruct\s+point\s+([a-z]\w*)\b", re.IGNORECASE)
 
 
 def _extract_json_object(output_text: str):
@@ -63,6 +66,95 @@ def _extract_json_object(output_text: str):
             return json.loads(match.group(1))
         except json.JSONDecodeError:
             return None
+
+
+def _extract_aux_point_names_from_text(*texts: str) -> list[str]:
+    point_names = []
+    for text in texts:
+        if not isinstance(text, str) or not text.strip():
+            continue
+        point_names.extend(match.lower() for match in _AUX_POINT_TEXT_RE.findall(text))
+    return list(dict.fromkeys(point_names))
+
+
+def _normalize_geometry_math_text(text: str) -> str:
+    normalized = str(text or "")
+    normalized = re.sub(r"\\\((.*?)\\\)", r" \1 ", normalized)
+    normalized = normalized.replace("$", " ")
+    normalized = re.sub(r"\\overline\s*\{([^}]+)\}", r" \1 ", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"\\triangle\b", " triangle ", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"\\perp\b", " perpendicular ", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"\\parallel\b", " parallel ", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"[{}]", " ", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip().lower()
+    return normalized
+
+
+def _text_semantically_mentions_relation(text: str, relation: str, point_names: list[str]) -> bool:
+    normalized_text = normalize_relation_surface(text or "").lower()
+    normalized_relation = normalize_relation_surface(relation or "").lower()
+    math_text = _normalize_geometry_math_text(text or "")
+    math_relation = _normalize_geometry_math_text(relation or "")
+    if not normalized_text or not normalized_relation:
+        return False
+    if normalized_relation in normalized_text:
+        return True
+    if math_relation and math_relation in math_text:
+        return True
+    if relations_semantically_match(text, relation, point_names):
+        return True
+    for sentence in re.split(r"[.!?]+", text):
+        sentence = sentence.strip()
+        if not sentence:
+            continue
+        normalized_sentence = normalize_relation_surface(sentence).lower()
+        math_sentence = _normalize_geometry_math_text(sentence)
+        if normalized_relation in normalized_sentence:
+            return True
+        if math_relation and math_relation in math_sentence:
+            return True
+        if relations_semantically_match(sentence, relation, point_names):
+            return True
+        relation_type = infer_relation_type_from_text(relation)
+        if relation_type:
+            sentence_lower = sentence.lower()
+            relation_points = extract_point_mentions(relation, point_names)
+            sentence_points = extract_point_mentions(sentence, point_names)
+            if relation_points and relation_points.issubset(sentence_points):
+                keyword_variants = {
+                    "midpoint": ["midpoint", "equal parts", "divide", "divides", "split", "splits"],
+                    "parallel": ["parallel"],
+                    "perpendicular": ["perpendicular", "right angle", "right angles"],
+                    "cyclic": ["cyclic", "concyclic", "circle", "same circle", "circle through"],
+                    "collinear": ["collinear", "straight line", "line through"],
+                }
+                if any(
+                    keyword in sentence_lower
+                    for keyword in keyword_variants.get(relation_type, [])
+                ):
+                    return True
+        equality_match = re.fullmatch(r"([a-z]{2}) equals ([a-z]{2})", normalized_relation)
+        if equality_match:
+            seg_a, seg_b = equality_match.groups()
+            if f"{seg_a} = {seg_b}" in math_sentence or f"{seg_b} = {seg_a}" in math_sentence:
+                return True
+        perpendicular_match = re.fullmatch(r"line ([a-z]{2}) is perpendicular to line ([a-z]{2})", normalized_relation)
+        if perpendicular_match:
+            seg_a, seg_b = perpendicular_match.groups()
+            if (
+                f"{seg_a} perpendicular {seg_b}" in math_sentence
+                or f"{seg_b} perpendicular {seg_a}" in math_sentence
+            ):
+                return True
+        parallel_match = re.fullmatch(r"line ([a-z]{2}) is parallel to line ([a-z]{2})", normalized_relation)
+        if parallel_match:
+            seg_a, seg_b = parallel_match.groups()
+            if (
+                f"{seg_a} parallel {seg_b}" in math_sentence
+                or f"{seg_b} parallel {seg_a}" in math_sentence
+            ):
+                return True
+    return False
 
 
 def _clean_text(
@@ -135,6 +227,7 @@ def build_insight_plan_prompt(
 ):
     public_problem = build_public_problem_text(record)
     visible_goal = extract_problem_goal(record)
+    canonical_aux_construction = build_canonical_construction(aux_part or "")
     return (
         "You are planning an insight-first geometry CoT sample.\n\n"
         "[Visible Inputs]\n"
@@ -146,16 +239,18 @@ def build_insight_plan_prompt(
         f"{json.dumps(visible_fact_relations, ensure_ascii=False, indent=2)}\n\n"
         "[Visible Image Cues]\n"
         f"{json.dumps(image_scan_candidates, ensure_ascii=False, indent=2)}\n\n"
+        "[Approved Auxiliary Construction]\n"
+        "This is the canonical auxiliary construction already chosen in the teacher record. Keep the geometry consistent with it.\n"
+        f"{canonical_aux_construction}\n\n"
         "[Insight Slots]\n"
-        "These slots come from the hidden proof DAG. Reuse them, but do not quote proof ids, rule names, or hidden-route language.\n"
+        "These slots come from the hidden proof DAG. Reuse them as internal anchors, but do not quote proof ids, rule names, or hidden-route language.\n"
         f"{json.dumps(insight_slots, ensure_ascii=False, indent=2)}\n\n"
         "[Task]\n"
         "Return exactly one JSON object describing only the visible setup, the gap, the helper effect that is missing, and why the given auxiliary construction is the right move.\n\n"
         "[Critical Requirements]\n"
         "- Keep the plan insight-first. Do not write a full closure route.\n"
-        "- `goal_gap_type` must stay compatible with the visible goal family.\n"
         "- `required_aux_effect` must stay aligned with the slot-derived effect.\n"
-        "- `aux_construction` must match the exact auxiliary construction already chosen in the teacher record.\n"
+        "- `aux_construction` should describe the approved auxiliary construction naturally, without changing the geometry.\n"
         "- `aux_selection_reason` must explain only why this helper is appropriate; it must reuse the slot information instead of inventing a different hidden relation or expanding into a proof route.\n"
         "- If the auxiliary construction introduces multiple new points or multiple staged facts, include `stage_order`.\n"
         "- `bonus_post_aux_tail` is optional and may contain at most two short sentences.\n"
@@ -172,9 +267,8 @@ def build_insight_write_prompt(record, plan: dict):
     visible_plan = {
         "visible_facts": plan.get("visible_facts", []),
         "image_scan": plan.get("image_scan", []),
-        "goal_gap_type": plan.get("goal_gap_type", ""),
         "goal_gap_text": plan.get("goal_gap_text", ""),
-        "required_aux_effect": plan.get("required_aux_effect", ""),
+        "canonical_aux_construction": plan.get("canonical_aux_construction") or plan.get("aux_construction", ""),
         "aux_construction": plan.get("aux_construction", ""),
         "aux_selection_reason": plan.get("aux_selection_reason", ""),
         "stage_order": plan.get("stage_order"),
@@ -191,8 +285,9 @@ def build_insight_write_prompt(record, plan: dict):
         "[Writing Rules]\n"
         "- Output plain text only, without tags.\n"
         "- Focus on what is visible, what is missing, what effect the helper must create, and therefore which auxiliary construction to choose.\n"
+        "- You do not need to quote `required_aux_effect` verbatim; describing the approved helper relation or its immediate geometric payoff is enough.\n"
         "- You may add at most one or two short follow-up sentences after the construction to say what the helper unlocks.\n"
-        "- Do not enumerate direct construction consequences unless one is exactly the required helper effect.\n"
+        "- Do not enumerate direct construction consequences one by one.\n"
         "- Do not retell the full proof. Do not list theorems. Do not mention proof ids or rule names.\n"
         "- Keep the tone impersonal and concise.\n"
     )
@@ -373,14 +468,15 @@ def validate_insight_plan_response(
         if extract_point_mentions(item, list(aux_points)):
             return False, "image_scan must not mention auxiliary points before construction", None
 
-    goal_gap_type = str(plan.get("goal_gap_type") or "").strip()
-    if goal_gap_type not in INSIGHT_GAP_TYPES:
-        return False, "goal_gap_type is unsupported", None
-    if not _gap_type_matches_goal_family(goal_gap_type, visible_goal):
-        return False, "goal_gap_type conflicts with the visible goal family", None
     slot_gap_type = str(insight_slots.get("goal_gap_type") or "").strip()
+    goal_gap_type = str(plan.get("goal_gap_type") or "").strip() or slot_gap_type or "midpoint_parallel_trigger"
+    goal_gap_type_diagnostics = []
+    if goal_gap_type not in INSIGHT_GAP_TYPES:
+        goal_gap_type_diagnostics.append("unsupported")
+    elif not _gap_type_matches_goal_family(goal_gap_type, visible_goal):
+        goal_gap_type_diagnostics.append("goal_family_conflict")
     if slot_gap_type and goal_gap_type != slot_gap_type:
-        return False, "goal_gap_type must reuse the slot-derived gap type", None
+        goal_gap_type_diagnostics.append("slot_mismatch")
 
     ok, message, goal_gap_text = _clean_text(plan.get("goal_gap_text"), "goal_gap_text", min_chars=18, max_chars=320)
     if not ok:
@@ -423,6 +519,19 @@ def validate_insight_plan_response(
         for point_name in aux_points:
             if point_name not in aux_construction.lower():
                 return False, f"aux_construction must mention auxiliary point '{point_name}'", None
+    aux_point_scope = visible_points + list(aux_points)
+    aux_construction_matches_canonical = True
+    if canonical_construction:
+        aux_construction_matches_canonical = relations_semantically_match(
+            aux_construction,
+            canonical_construction,
+            aux_point_scope,
+        )
+        if not aux_construction_matches_canonical and expected_effects:
+            aux_construction_matches_canonical = all(
+                relations_semantically_match(aux_construction, candidate, aux_point_scope)
+                for candidate in expected_effects
+            )
 
     ok, message, aux_selection_reason = _clean_text(
         plan.get("aux_selection_reason"),
@@ -480,6 +589,12 @@ def validate_insight_plan_response(
     cleaned_plan["goal_family"] = parse_goal_expression(visible_goal or "").get("predicate") or ""
     cleaned_plan["insight_slots"] = insight_slots
     cleaned_plan["canonical_aux_construction"] = canonical_construction
+    cleaned_plan["canonical_aux_direct_consequences"] = expected_effects
+    cleaned_plan["aux_construction_matches_canonical"] = aux_construction_matches_canonical
+    if not aux_construction_matches_canonical:
+        cleaned_plan["aux_construction_audit_signal"] = "aux_construction_mismatch"
+    if goal_gap_type_diagnostics:
+        cleaned_plan["goal_gap_type_diagnostics"] = goal_gap_type_diagnostics
     return True, "Valid insight plan", cleaned_plan
 
 
@@ -537,13 +652,29 @@ def validate_insight_writer_body(output_text: str, visible_goal="", injected_pre
     if isinstance(plan, dict):
         required_effect = str(plan.get("required_aux_effect") or "").strip()
         construction = str(plan.get("aux_construction") or "").strip()
+        canonical_construction = str(plan.get("canonical_aux_construction") or construction).strip()
+        canonical_effects = [
+            str(item).strip()
+            for item in (plan.get("canonical_aux_direct_consequences") or [])
+            if isinstance(item, str) and item.strip()
+        ]
         if required_effect and not relation_keyword_present(required_effect):
             required_effect = ""
-        if required_effect and required_effect.lower() not in body.lower():
-            return False, "Writer body must mention the required helper effect"
-        for point_name in extract_aux_new_points(construction):
+        aux_point_names = _extract_aux_point_names_from_text(canonical_construction, construction)
+        plan_points = sorted(
+            set(aux_point_names)
+            | set(re.findall(r"\b[a-z]\b", " ".join([required_effect, construction, canonical_construction, str(plan.get("goal_gap_text") or "")]).lower()))
+        )
+        for point_name in aux_point_names:
             if point_name.lower() not in body.lower():
                 return False, f"Writer body must mention auxiliary point '{point_name.lower()}'"
+        helper_anchor_candidates = [candidate for candidate in [canonical_construction, required_effect] + canonical_effects if candidate]
+        helper_match = any(
+            _text_semantically_mentions_relation(body, candidate, plan_points)
+            for candidate in helper_anchor_candidates
+        )
+        if not helper_match:
+            return False, "Writer body must describe the approved helper relation or one immediate geometric effect of it"
         if str(plan.get("goal_gap_text") or "").strip():
             goal_points = sorted(
                 set(re.findall(r"\b[a-z]\w*\b", str(plan.get("goal_gap_text") or "").lower()))

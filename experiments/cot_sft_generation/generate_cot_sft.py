@@ -273,7 +273,6 @@ FORBIDDEN_THINKING_PATTERNS = [
     re.compile(r"hidden reference", re.IGNORECASE),
     re.compile(r"supervisor", re.IGNORECASE),
     re.compile(r"given aux", re.IGNORECASE),
-    re.compile(r"\\\([A-Za-z ,]+\\\)"),
     re.compile(r"\bthe construction of point\b", re.IGNORECASE),
     re.compile(r"\bthis point is crucial\b", re.IGNORECASE),
     re.compile(r"\bnecessary relationships\b", re.IGNORECASE),
@@ -293,7 +292,6 @@ FORBIDDEN_THINKING_PATTERNS = [
     re.compile(r"\bcenter of similarity\b", re.IGNORECASE),
     re.compile(r"\bsimilarity center\b", re.IGNORECASE),
     re.compile(r"\bmidpoint propert(?:y|ies)\b", re.IGNORECASE),
-    re.compile(r"\$[^$]+\$"),
     re.compile(r"`[^`]+`"),
 ]
 DOSSIER_WRITER_SEMANTIC_PENALTY_PATTERNS = [

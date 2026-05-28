@@ -6,7 +6,9 @@ from pathlib import Path
 from unittest.mock import patch
 
 from experiments.cot_sft_generation.core.insight_extractor import extract_insight_slots
+from experiments.cot_sft_generation.core.audits import audit_generation_quality
 from experiments.cot_sft_generation.core.insight_pipeline import (
+    build_insight_plan_prompt,
     build_insight_write_prompt,
     build_scripted_insight_plan,
     build_scripted_insight_writer_body,
@@ -19,6 +21,7 @@ from experiments.cot_sft_generation.generate_cot_sft import (
     extract_aux_and_rest,
     get_point_coords,
     process_and_generate_sft,
+    validate_thinking_response,
 )
 
 
@@ -204,6 +207,23 @@ class CotSftInsightPipelineTest(unittest.TestCase):
         self.assertEqual(cleaned["goal_gap_type"], slots["goal_gap_type"])
         self.assertNotIn("aux_immediate_effects", cleaned)
 
+    def test_build_insight_plan_prompt_includes_canonical_aux_construction(self):
+        record = _load_record(1)
+        aux_part, _ = extract_aux_and_rest(record["llm_output_renamed"])
+        visible_goal = record["llm_input_renamed"].split("?", 1)[1].replace("</problem>", "").strip()
+        slots = extract_insight_slots(parse_proof_dag(record["llm_output_renamed"]), visible_goal, aux_part)
+
+        prompt = build_insight_plan_prompt(
+            record,
+            aux_part=aux_part,
+            visible_fact_relations=[fact["relation"] for fact in build_visible_text_facts(record)],
+            image_scan_candidates=["points b, d, and e appear nearly collinear"],
+            insight_slots=slots,
+        )
+
+        self.assertIn("[Approved Auxiliary Construction]", prompt)
+        self.assertIn("construct point f such that a, c, d, f are concyclic and b, d, f are collinear", prompt)
+
     def test_validate_insight_plan_response_requires_stage_order_for_multi_point_aux(self):
         point_coords = {"a": (0, 0), "b": (4, 0), "c": (0, 4), "d": (4, 4)}
         insight_slots = {
@@ -284,6 +304,9 @@ class CotSftInsightPipelineTest(unittest.TestCase):
         )
 
         self.assertNotIn("aux_immediate_effects", prompt)
+        self.assertNotIn('"required_aux_effect"', prompt)
+        self.assertNotIn('"goal_gap_type"', prompt)
+        self.assertIn('"canonical_aux_construction"', prompt)
 
     def test_validate_insight_writer_body_rejects_proof_echo(self):
         plan = {
@@ -302,6 +325,153 @@ class CotSftInsightPipelineTest(unittest.TestCase):
 
         self.assertFalse(ok)
         self.assertIn("proof", message.lower())
+
+    def test_validate_insight_writer_body_accepts_semantic_helper_match_without_verbatim_required_effect(self):
+        plan = {
+            "required_aux_effect": "h is the midpoint of ad",
+            "aux_construction": "construct point h such that h is the midpoint of ad",
+            "canonical_aux_construction": "construct point h such that h is the midpoint of ad",
+            "canonical_aux_direct_consequences": ["h is the midpoint of ad"],
+            "goal_gap_text": "the visible givens still do not transfer the needed ratio from the a-side onto the d-side",
+        }
+        body = (
+            "The visible ratio information still does not connect the a-side to the d-side in one local frame. "
+            "Construct point h so that h divides segment ad into two equal parts, which creates the balanced helper relation this gap is missing before the ratio comparison comes back to a and d."
+        )
+
+        ok, message = validate_insight_writer_body(body, plan=plan)
+
+        self.assertTrue(ok, message)
+
+    def test_validate_insight_writer_body_accepts_equivalent_parallel_perpendicular_and_cyclic_effects(self):
+        cases = [
+            (
+                {
+                    "required_aux_effect": "line ab is parallel to line cd",
+                    "aux_construction": "construct point h such that line ab is parallel to line cd",
+                    "canonical_aux_construction": "construct point h such that line ab is parallel to line cd",
+                    "canonical_aux_direct_consequences": ["line ab is parallel to line cd"],
+                    "goal_gap_text": "the visible givens still do not connect the a-side and d-side angle frame",
+                },
+                "The angle frame still does not connect the a-side to the d-side. Construct point h so the two lines ab and cd stay parallel, and that local direction match is enough to reopen the angle transfer around a and d.",
+            ),
+            (
+                {
+                    "required_aux_effect": "line ab is perpendicular to line cd",
+                    "aux_construction": "construct point h such that line ab is perpendicular to line cd",
+                    "canonical_aux_construction": "construct point h such that line ab is perpendicular to line cd",
+                    "canonical_aux_direct_consequences": ["line ab is perpendicular to line cd"],
+                    "goal_gap_text": "the visible givens still do not lock one right-angle frame around a and d",
+                },
+                "The visible picture still lacks one stable right-angle frame around a and d. Construct point h so lines ab and cd intersect at right angles, and that perpendicular frame is the local relation needed before the route returns to the goal objects.",
+            ),
+            (
+                {
+                    "required_aux_effect": "a, c, d, f are concyclic",
+                    "aux_construction": "construct point f such that a, c, d, f are concyclic and b, e, f are collinear",
+                    "canonical_aux_construction": "construct point f such that a, c, d, f are concyclic and b, e, f are collinear",
+                    "canonical_aux_direct_consequences": ["a, c, d, f are concyclic", "b, e, f are collinear"],
+                    "goal_gap_text": "the visible givens still do not transfer the angle from the b-side onto the d-side",
+                },
+                "The visible givens still do not move the needed angle from the b-side onto the d-side. Construct point f on the circle through a, c, and d, and that cyclic angle carrier gives the figure one local frame that can be pushed back toward b and d.",
+            ),
+        ]
+
+        for plan, body in cases:
+            with self.subTest(required_aux_effect=plan["required_aux_effect"]):
+                ok, message = validate_insight_writer_body(body, plan=plan)
+                self.assertTrue(ok, message)
+
+    def test_validate_insight_writer_body_accepts_math_notation_for_helper_relation(self):
+        plan = {
+            "required_aux_effect": "ab equals cg",
+            "aux_construction": "construct point g such that ab equals cg and line bc is perpendicular to line cg",
+            "canonical_aux_construction": "construct point g such that ab equals cg and line bc is perpendicular to line cg",
+            "canonical_aux_direct_consequences": ["ab equals cg", "line bc is perpendicular to line cg"],
+            "goal_gap_text": "the visible givens still do not connect ab to cf inside one congruence frame",
+        }
+        body = (
+            "The visible facts still do not connect ab to cf inside one congruence frame. "
+            "Construct point \\( g \\) such that \\( ab = cg \\) and \\( bc \\perp cg \\). "
+            "That helper fixes the missing local congruence and right-angle frame before the argument returns to c, f, and g."
+        )
+
+        ok, message = validate_insight_writer_body(body, plan=plan)
+
+        self.assertTrue(ok, message)
+
+    def test_validate_insight_plan_response_allows_incompatible_goal_gap_type_with_diagnostic(self):
+        point_coords = {"a": (0, 0), "b": (4, 0), "c": (0, 4), "d": (4, 4), "h": (2, 2)}
+        insight_slots = {
+            "goal_family": "eqratio",
+            "goal_gap_type": "ratio_transfer",
+            "required_aux_effect": "h is the midpoint of ad",
+            "first_bridge_checkpoint": "ratio ad to hd equals ratio bc to ck",
+            "pre_goal_checkpoint": "ratio ad to hd equals ratio bc to ck",
+            "evidence_windows": [],
+        }
+        plan = {
+            "visible_facts": ["ab equals cd"],
+            "image_scan": ["line ab and line cd look parallel"],
+            "goal_gap_type": "angle_transfer",
+            "goal_gap_text": "the visible givens still do not transfer the needed ratio from the a-side onto the d-side",
+            "required_aux_effect": "h is the midpoint of ad",
+            "aux_construction": "construct point h such that h is the midpoint of ad",
+            "aux_selection_reason": "the midpoint at h is the first local helper relation before the ratio side can be revisited around a and d",
+        }
+
+        ok, message, cleaned = validate_insight_plan_response(
+            plan,
+            point_coords=point_coords,
+            visible_goal="eqratio a d a h b c c h",
+            aux_part="<aux> x00 h : midp h a d [001] ; </aux>",
+            visible_text_facts=[{"relation": "ab equals cd"}],
+            insight_slots=insight_slots,
+        )
+
+        self.assertTrue(ok, message)
+        self.assertIn("goal_family_conflict", cleaned["goal_gap_type_diagnostics"])
+        self.assertIn("slot_mismatch", cleaned["goal_gap_type_diagnostics"])
+
+    def test_validate_insight_plan_response_keeps_aux_mismatch_as_audit_signal(self):
+        point_coords = {"a": (0, 0), "b": (4, 0), "c": (0, 4), "d": (4, 4), "f": (2, 2)}
+        insight_slots = {
+            "goal_family": "eqangle",
+            "goal_gap_type": "angle_transfer",
+            "required_aux_effect": "a, c, d, f are concyclic",
+            "first_bridge_checkpoint": "b, e, f are collinear",
+            "pre_goal_checkpoint": "angle ab/bf equals angle cd/df",
+            "evidence_windows": [],
+        }
+        plan = {
+            "visible_facts": ["ab equals ac"],
+            "image_scan": ["points b, d, and e appear nearly collinear"],
+            "goal_gap_type": "angle_transfer",
+            "goal_gap_text": "the visible givens still do not transfer the angle at the b-side onto the d-side",
+            "required_aux_effect": "a, c, d, f are concyclic",
+            "aux_construction": "construct point f such that a, c, d, f are concyclic and b, d, f are collinear",
+            "aux_selection_reason": "the cyclic helper around a, c, d, and f is the missing local carrier before the d-side can reuse the old frame",
+        }
+
+        ok, message, cleaned = validate_insight_plan_response(
+            plan,
+            point_coords=point_coords,
+            visible_goal="eqangle a b b c c d d e",
+            aux_part="<aux> x00 f : cyclic a c d f [001] ; x00 f : coll b e f [002] ; </aux>",
+            visible_text_facts=[{"relation": "ab equals ac"}],
+            insight_slots=insight_slots,
+        )
+
+        self.assertTrue(ok, message)
+        self.assertFalse(cleaned["aux_construction_matches_canonical"])
+        self.assertEqual(cleaned["aux_construction_audit_signal"], "aux_construction_mismatch")
+
+        generation_audit = audit_generation_quality(
+            {"grid_coord": point_coords},
+            {"plan_parsed": cleaned, "write_output": "", "generation_style": "insight_v1"},
+            "<aux> x00 f : cyclic a c d f [001] ; x00 f : coll b e f [002] ; </aux>",
+        )
+        self.assertIn("aux_construction_mismatch", generation_audit["issues"])
 
     def test_build_scripted_insight_writer_body_drops_immediate_gives_sentence(self):
         plan = {
@@ -581,6 +751,33 @@ class CotSftInsightPipelineTest(unittest.TestCase):
             self.assertEqual(failed_item["dataset_filter_reason"], "generation_failed")
             self.assertIn("unexpected_exception: RuntimeError: boom", failed_item["error"])
             self.assertTrue(succeeded_item["exported_to_dataset"])
+
+    def test_validate_thinking_response_allows_plain_math_layout_but_still_rejects_hidden_markers(self):
+        good_thinking = (
+            "<thinking>"
+            "The visible figure still lacks one local equality frame around a, b, c, and d. "
+            "Writing \\(AB = CD\\) just restates the visible length balance, and \\triangle abd can now be compared with \\triangle cbd after the helper is chosen. "
+            "Construct point h so that \\overline{AH} = \\overline{HD}, because this midpoint relation is the local bridge the ratio argument was missing before the route returns to a and d."
+            "</thinking>"
+        )
+
+        ok, message = validate_thinking_response(
+            good_thinking,
+            {"a": (0, 0), "b": (4, 0), "c": (0, 4), "d": (4, 4), "h": (2, 2)},
+            require_coord_tags=False,
+            max_total_len=2600,
+        )
+        self.assertTrue(ok, message)
+
+        bad_thinking = good_thinking.replace("\\triangle abd", "<proof> \\triangle abd")
+        ok, message = validate_thinking_response(
+            bad_thinking,
+            {"a": (0, 0), "b": (4, 0), "c": (0, 4), "d": (4, 4), "h": (2, 2)},
+            require_coord_tags=False,
+            max_total_len=2600,
+        )
+        self.assertFalse(ok)
+        self.assertIn("Forbidden leakage pattern", message)
 
 
 if __name__ == "__main__":

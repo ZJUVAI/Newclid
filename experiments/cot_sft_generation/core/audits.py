@@ -1000,6 +1000,8 @@ def audit_generation_quality(
             aux_selection_reason = str(plan.get("aux_selection_reason") or "").strip()
             slot_effect = str((plan.get("insight_slots") or {}).get("required_aux_effect") or "").strip()
             aux_effect = str(plan.get("required_aux_effect") or "").strip()
+            if plan.get("aux_construction_matches_canonical") is False:
+                issues.append("aux_construction_mismatch")
             if not goal_gap_text or len(goal_gap_text) < 24:
                 issues.append("goal_gap_specificity")
             elif goal_gap_type and goal_gap_type.replace("_", " ") not in goal_gap_text.lower():
