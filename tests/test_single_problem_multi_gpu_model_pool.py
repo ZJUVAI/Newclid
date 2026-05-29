@@ -6,6 +6,7 @@ import types
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+import sys
 
 import scripts.evaluation as eval_runner_module
 from scripts.evaluation import (
@@ -316,6 +317,7 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
             eval_runner_module.create_agent(
                 agent_type="lm",
                 search_version="v2",
+                visual_render_mode="new",
                 model_pool="pool",
                 decoding_size=8,
                 beam_size=16,
@@ -335,6 +337,7 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
             eval_runner_module.create_agent(
                 agent_type="vlm",
                 search_version="v2",
+                visual_render_mode="new",
                 model_pool="pool",
                 decoding_size=8,
                 beam_size=16,
@@ -348,6 +351,54 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
             )
 
         self.assertEqual(mock_vlm_agent.call_args.kwargs["search_version"], "v2")
+
+    def test_main_defaults_visual_render_mode_to_new(self):
+        captured = {}
+
+        def _fake_solve(**kwargs):
+            captured.update(kwargs)
+
+        argv = [
+            "evaluation.py",
+            "--problems_path",
+            "benchmarks/dev_imo.txt",
+            "--model_path",
+            "/tmp/model",
+        ]
+
+        with patch.object(sys, "argv", argv):
+            with patch(
+                "scripts.evaluation.solve_problems_single_problem_multi_gpu",
+                side_effect=_fake_solve,
+            ):
+                eval_runner_module.main()
+
+        self.assertEqual(captured["visual_render_mode"], "new")
+
+    def test_main_passes_explicit_legacy_visual_render_mode(self):
+        captured = {}
+
+        def _fake_solve(**kwargs):
+            captured.update(kwargs)
+
+        argv = [
+            "evaluation.py",
+            "--problems_path",
+            "benchmarks/dev_imo.txt",
+            "--model_path",
+            "/tmp/model",
+            "--visual_render_mode",
+            "legacy",
+        ]
+
+        with patch.object(sys, "argv", argv):
+            with patch(
+                "scripts.evaluation.solve_problems_single_problem_multi_gpu",
+                side_effect=_fake_solve,
+            ):
+                eval_runner_module.main()
+
+        self.assertEqual(captured["visual_render_mode"], "legacy")
 
     def test_create_workers_wraps_visual_workers_with_trace_metadata(self):
         created: list[tuple[str, int, int]] = []

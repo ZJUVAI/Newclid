@@ -54,11 +54,53 @@ LIGHT_THEME = {
     ],
 }
 
+DARK_THEME = {
+    "background": "#000000",
+    "circle": "#00ffff",
+    "line": "#ffffff",
+    "point": "#ffffff",
+    "point_name": "#00ff00",
+    "perpendicular": "#ffff00",
+    "angle_default": "#000000",
+    "palette": [
+        "#e6194b",
+        "#3cb44b",
+        "#ffe119",
+        "#4363d8",
+        "#f58231",
+        "#911eb4",
+        "#46f0f0",
+        "#f032e6",
+        "#bcf60c",
+        "#fabebe",
+        "#008080",
+        "#e6beff",
+        "#9a6324",
+        "#fffac8",
+        "#800000",
+        "#aaffc3",
+        "#808000",
+        "#ffd8b1",
+        "#0000cd",
+        "#808080",
+        "#ffffff",
+    ],
+}
+
 PALETTE = LIGHT_THEME["palette"]
 
 
 def get_figure_theme(ax: "Axes") -> dict[str, Any]:
     return getattr(ax, "_newclid_theme", LIGHT_THEME)
+
+
+def apply_figure_theme(fig: "Figure", ax: "Axes", theme: dict[str, Any]) -> None:
+    fig.patch.set_facecolor(theme["background"])
+    ax._newclid_theme = theme  # type: ignore[attr-defined]
+    ax.set_facecolor(theme["background"])
+    ax.tick_params(colors=theme["background"])
+    for spine in ax.spines.values():
+        spine.set_color(theme["background"])
 
 
 def init_figure(theme: Optional[dict[str, Any]] = None) -> "Figure":
@@ -67,12 +109,7 @@ def init_figure(theme: Optional[dict[str, Any]] = None) -> "Figure":
     ax = fig.add_subplot(111)  # type: ignore
     figure_theme = theme or LIGHT_THEME
     fig.subplots_adjust(left=0, right=1, top=1, bottom=0, wspace=0, hspace=0)
-    fig.patch.set_facecolor(figure_theme["background"])
-    ax._newclid_theme = figure_theme  # type: ignore[attr-defined]
-    ax.set_facecolor(figure_theme["background"])
-    ax.tick_params(colors=figure_theme["background"])
-    for spine in ax.spines.values():
-        spine.set_color(figure_theme["background"])
+    apply_figure_theme(fig, ax, figure_theme)
     ax.set_aspect("equal", adjustable="datalim")
     return fig
 

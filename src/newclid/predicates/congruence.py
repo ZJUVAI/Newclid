@@ -6,7 +6,7 @@ from matplotlib.pylab import Generator
 
 from newclid.dependencies.symbols import Point
 from newclid.numerical import close_enough
-from newclid.numerical.draw_figure import PALETTE, draw_segment, draw_segment_num
+from newclid.numerical.draw_figure import draw_segment, draw_segment_num, get_figure_theme
 from newclid.predicates.predicate import Predicate
 from newclid.algebraic_reasoning.tables import Ratio_Chase
 from newclid.tools import reshape
@@ -186,10 +186,12 @@ class Cong(Predicate):
         root = find_root(current_segments[0])
         if root not in segment_colors:
             # Assign new color
-            setattr(ax, "cong_color", (getattr(ax, "cong_color", 0) + 1) % len(PALETTE))
+            palette = get_figure_theme(ax)["palette"]
+            setattr(ax, "cong_color", (getattr(ax, "cong_color", 0) + 1) % len(palette))
             color_index = getattr(ax, "cong_color")
             segment_colors[root] = color_index
         color_index = segment_colors[root]
+        palette = get_figure_theme(ax)["palette"]
 
         # Find all segments in the same equivalence class and draw marks
         root = find_root(current_segments[0])
@@ -238,13 +240,13 @@ class Cong(Predicate):
                 ax,
                 slash1_start,
                 slash1_end,
-                color=PALETTE[color_index % len(PALETTE)],
+                color=palette[color_index % len(palette)],
                 lw=1.2,
             )
             draw_segment_num(
                 ax,
                 slash2_start,
                 slash2_end,
-                color=PALETTE[color_index % len(PALETTE)],
+                color=palette[color_index % len(palette)],
                 lw=1.2,
             )
