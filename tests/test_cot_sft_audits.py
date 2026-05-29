@@ -389,6 +389,219 @@ class CotSftAuditsTest(unittest.TestCase):
         self.assertNotIn("non_anchor_coordinate_cues_unused", audit["issues"])
         self.assertNotIn("early_non_anchor_coordinate_cue_missing", audit["issues"])
 
+    def test_audit_generation_quality_adds_downstream_overclaim_for_remote_hidden_bridge_claim(self):
+        record = {
+            "point_coords_grid": {
+                "a": [0, 0],
+                "b": [2, 0],
+                "c": [1, 2],
+                "d": [4, 2],
+                "e": [5, 1],
+                "f": [3, 1],
+            }
+        }
+        generation = {
+            "plan_parsed": {
+                "insight_version": "insight_v1",
+                "goal_gap_type": "angle_transfer",
+                "goal_gap_text": "the visible givens still do not transfer the angle from b and c onto d and e in one local frame",
+                "required_aux_effect": "a, c, d, f are concyclic",
+                "aux_selection_reason": "the cyclic helper around a, c, d, and f is the first local frame before b, e, and f can be revisited near d and e",
+                "canonical_aux_direct_consequences": [
+                    "a, c, d, f are concyclic",
+                    "b, d, f are collinear",
+                ],
+                "insight_slots": {
+                    "required_aux_effect": "a, c, d, f are concyclic",
+                    "first_bridge_checkpoint": "b, e, f are collinear",
+                    "pre_goal_checkpoint": "angle ab/bf equals angle cd/ef",
+                },
+            },
+            "write_output": (
+                "The visible givens still do not transfer the angle from the b-side onto the d-side in one local frame. "
+                "Construct point f such that a, c, d, f are concyclic and b, d, f are collinear. "
+                "This cyclic step means the angle at e can now be transferred."
+            ),
+        }
+
+        audit = audit_generation_quality(
+            record,
+            generation,
+            "<aux>x00 f : cyclic a c d f [001] ; x00 f : coll b d f [002] ; </aux>",
+        )
+
+        self.assertIn("downstream_overclaim", audit["issues"])
+
+    def test_audit_generation_quality_does_not_flag_cautious_local_unlock_as_downstream_overclaim(self):
+        record = {
+            "point_coords_grid": {
+                "a": [0, 0],
+                "b": [2, 0],
+                "c": [1, 2],
+                "d": [4, 2],
+                "f": [3, 1],
+            }
+        }
+        generation = {
+            "plan_parsed": {
+                "insight_version": "insight_v1",
+                "goal_gap_type": "angle_transfer",
+                "goal_gap_text": "the visible givens still do not transfer the angle from b and c onto d and f in one local frame",
+                "required_aux_effect": "a, c, d, f are concyclic",
+                "aux_selection_reason": "the cyclic helper around a, c, d, and f is the first local frame before the old figure is revisited",
+                "canonical_aux_direct_consequences": [
+                    "a, c, d, f are concyclic",
+                ],
+                "insight_slots": {
+                    "required_aux_effect": "a, c, d, f are concyclic",
+                    "first_bridge_checkpoint": "b, e, f are collinear",
+                    "pre_goal_checkpoint": "angle ab/bf equals angle cd/ef",
+                },
+            },
+            "write_output": (
+                "The visible givens still do not transfer the angle from the b-side onto the d-side in one local frame. "
+                "Construct point f such that a, c, d, f are concyclic. "
+                "This creates one local angle carrier around a, c, d, and f and gives one local frame that can be reused later."
+            ),
+        }
+
+        audit = audit_generation_quality(
+            record,
+            generation,
+            "<aux>x00 f : cyclic a c d f [001] ; </aux>",
+        )
+
+        self.assertNotIn("downstream_overclaim", audit["issues"])
+
+    def test_audit_generation_quality_flags_remote_connection_claim_as_downstream_overclaim(self):
+        record = {
+            "point_coords_grid": {
+                "a": [0, 0],
+                "b": [2, 0],
+                "c": [1, 2],
+                "d": [4, 2],
+                "e": [5, 1],
+                "g": [6, 1],
+                "h": [3, 2],
+            }
+        }
+        generation = {
+            "plan_parsed": {
+                "insight_version": "insight_v1",
+                "goal_gap_type": "ratio_transfer",
+                "goal_gap_text": "the visible givens still do not transfer the ratio from a and d onto b and e in one local frame",
+                "required_aux_effect": "h is the midpoint of ad",
+                "aux_selection_reason": "the midpoint at h is the first local frame before the b, e, and g side can be revisited",
+                "canonical_aux_direct_consequences": [
+                    "h is the midpoint of ad",
+                ],
+                "insight_slots": {
+                    "required_aux_effect": "h is the midpoint of ad",
+                    "first_bridge_checkpoint": "ratio ad to ah equals ratio be to eg",
+                    "pre_goal_checkpoint": "ratio ae to ah equals ratio be to bg",
+                },
+            },
+            "write_output": (
+                "The visible givens still do not transfer the ratio from the a-side onto the b-side in one local frame. "
+                "Construct point h so that h is the midpoint of ad. "
+                "With h established, the ratio around ad and ah can now be linked to the segments be and eg."
+            ),
+        }
+
+        audit = audit_generation_quality(
+            record,
+            generation,
+            "<aux>x00 h : midp h a d [001] ; </aux>",
+        )
+
+        self.assertIn("downstream_overclaim", audit["issues"])
+
+    def test_audit_generation_quality_does_not_flag_downstream_claim_when_intermediate_relation_is_stated(self):
+        record = {
+            "point_coords_grid": {
+                "a": [0, 0],
+                "b": [2, 0],
+                "c": [1, 2],
+                "d": [4, 2],
+                "e": [5, 1],
+                "f": [3, 1],
+            }
+        }
+        generation = {
+            "plan_parsed": {
+                "insight_version": "insight_v1",
+                "goal_gap_type": "angle_transfer",
+                "goal_gap_text": "the visible givens still do not transfer the angle from b and c onto d and e in one local frame",
+                "required_aux_effect": "a, c, d, f are concyclic",
+                "aux_selection_reason": "the cyclic helper around a, c, d, and f is the first local frame before b, e, and f can be revisited near d and e",
+                "canonical_aux_direct_consequences": [
+                    "a, c, d, f are concyclic",
+                    "b, d, f are collinear",
+                ],
+                "insight_slots": {
+                    "required_aux_effect": "a, c, d, f are concyclic",
+                    "first_bridge_checkpoint": "b, e, f are collinear",
+                    "pre_goal_checkpoint": "angle ab/bf equals angle cd/ef",
+                },
+            },
+            "write_output": (
+                "The visible givens still do not transfer the angle from the b-side onto the d-side in one local frame. "
+                "Construct point f such that a, c, d, f are concyclic and b, d, f are collinear. "
+                "Because b, e, f are collinear, the angle at e can now be transferred."
+            ),
+        }
+
+        audit = audit_generation_quality(
+            record,
+            generation,
+            "<aux>x00 f : cyclic a c d f [001] ; x00 f : coll b d f [002] ; </aux>",
+        )
+
+        self.assertNotIn("downstream_overclaim", audit["issues"])
+
+    def test_audit_generation_quality_ignores_generic_wording_without_downstream_claim(self):
+        record = {
+            "point_coords_grid": {
+                "a": [0, 0],
+                "b": [2, 0],
+                "c": [1, 2],
+                "d": [4, 2],
+                "e": [5, 1],
+                "f": [3, 1],
+            }
+        }
+        generation = {
+            "plan_parsed": {
+                "insight_version": "insight_v1",
+                "goal_gap_type": "angle_transfer",
+                "goal_gap_text": "the visible givens still do not transfer the angle from b and c onto d and e in one local frame",
+                "required_aux_effect": "a, c, d, f are concyclic",
+                "aux_selection_reason": "the cyclic helper around a, c, d, and f is the first local frame before b, e, and f can be revisited near d and e",
+                "canonical_aux_direct_consequences": [
+                    "a, c, d, f are concyclic",
+                    "b, d, f are collinear",
+                ],
+                "insight_slots": {
+                    "required_aux_effect": "a, c, d, f are concyclic",
+                    "first_bridge_checkpoint": "b, e, f are collinear",
+                    "pre_goal_checkpoint": "angle ab/bf equals angle cd/ef",
+                },
+            },
+            "write_output": (
+                "The visible givens still do not transfer the angle from the b-side onto the d-side in one local frame. "
+                "Construct point f such that a, c, d, f are concyclic and b, d, f are collinear. "
+                "This keeps the helper local and leaves the later route short."
+            ),
+        }
+
+        audit = audit_generation_quality(
+            record,
+            generation,
+            "<aux>x00 f : cyclic a c d f [001] ; x00 f : coll b d f [002] ; </aux>",
+        )
+
+        self.assertNotIn("downstream_overclaim", audit["issues"])
+
     def test_audit_generation_quality_flags_shallow_coordinate_reuse(self):
         record = {
             "point_coords_grid": {

@@ -26,6 +26,7 @@ try:
         extract_point_mentions,
         extract_visible_point_names,
         infer_relation_type_from_text,
+        normalize_relation_surface,
         parse_aux_clauses,
         parse_goal_expression,
         relation_text_keywords,
@@ -44,6 +45,7 @@ except ImportError:  # pragma: no cover - script execution path
         extract_point_mentions,
         extract_visible_point_names,
         infer_relation_type_from_text,
+        normalize_relation_surface,
         parse_aux_clauses,
         parse_goal_expression,
         relation_text_keywords,
@@ -541,6 +543,219 @@ def split_into_sentences(text: str) -> list[str]:
     return [part.strip() for part in re.split(r"(?<=[.!?])\s+", text or "") if part.strip()]
 
 
+def _collect_relation_points(relations: Iterable[str], point_names: list[str]) -> set[str]:
+    points = set()
+    for relation in relations:
+        if not isinstance(relation, str) or not relation.strip():
+            continue
+        points.update(extract_point_mentions(relation, point_names))
+    return {point.lower() for point in points}
+
+
+def _sentence_has_downstream_completion_claim(sentence: str) -> bool:
+    lowered = normalize_relation_surface(sentence or "").lower()
+    if not lowered:
+        return False
+    if any(
+        phrase in lowered
+        for phrase in [
+            "can later be reused",
+            "can be reused later",
+            "can later be used",
+            "can be used later",
+            "reused later",
+            "used later",
+        ]
+    ):
+        return False
+    immediate_markers = [
+        "can now",
+        "now can",
+        "now transfers",
+        "now transfer",
+        "now compares",
+        "now compare",
+        "now connects",
+        "now connect",
+        "now reconnects",
+        "now reconnect",
+        "now resolves",
+        "now resolve",
+        "now closes",
+        "now close",
+        "now finishes",
+        "now finish",
+        "now matches",
+        "now match",
+        "already transfers",
+        "already compares",
+        "already connects",
+        "already resolves",
+        "already closes",
+    ]
+    if not any(marker in lowered for marker in immediate_markers):
+        return False
+    action_terms = [
+        "transfer",
+        "compare",
+        "connect",
+        "reconnect",
+        "link",
+        "resolve",
+        "close",
+        "finish",
+        "match",
+        "carry",
+        "reuse",
+        "use",
+    ]
+    if not any(term in lowered for term in action_terms):
+        return False
+    return any(
+        term in lowered
+        for term in [
+            "angle",
+            "ratio",
+            "goal",
+            "target",
+            "comparison",
+            "frame",
+            "side",
+        ]
+    )
+
+
+def _sentence_has_explicit_remote_relation_support(
+    sentence: str,
+    remote_points: set[str],
+    point_names: list[str],
+    candidate_relations: list[str],
+) -> bool:
+    if not remote_points:
+        return False
+    sentence_points = {
+        point.lower()
+        for point in extract_point_mentions(sentence, point_names)
+    }
+    if not sentence_points or not (remote_points & sentence_points):
+        return False
+    for relation in candidate_relations:
+        relation_points = {
+            point.lower()
+            for point in extract_point_mentions(relation, point_names)
+        }
+        if not relation_points or not (remote_points & relation_points):
+            continue
+        if relation_mentioned_in_text(sentence, relation):
+            return True
+    signatures = extract_relation_signatures(sentence)
+    signature_points = set()
+    for family, entries in signatures.items():
+        for entry in entries:
+            if family == "midpoint":
+                midpoint, endpoints = entry
+                signature_points.add(str(midpoint).lower())
+                signature_points.update(str(point).lower() for point in endpoints)
+                continue
+            for token in entry:
+                if isinstance(token, str) and len(token) > 1 and token.isalpha():
+                    signature_points.update(char.lower() for char in token)
+                elif isinstance(token, str):
+                    signature_points.add(token.lower())
+    if remote_points & signature_points:
+        return True
+    normalized = normalize_relation_surface(sentence).lower()
+    if len(sentence_points) < 3:
+        return False
+    return any(
+        marker in normalized
+        for marker in [
+            " are concyclic",
+            " are similar",
+            " are congruent",
+            " equals ratio ",
+            " equals angle ",
+        ]
+    )
+
+
+def detect_insight_v1_downstream_overclaim(
+    write_output: str,
+    plan: Dict[str, Any],
+    aux_part: str,
+    visible_points: list[str],
+) -> bool:
+    if not isinstance(plan, dict) or not write_output:
+        return False
+    insight_slots = plan.get("insight_slots") if isinstance(plan.get("insight_slots"), dict) else {}
+    direct_relations = [
+        normalize_relation_surface(relation).strip()
+        for relation in (
+            plan.get("canonical_aux_direct_consequences")
+            or build_aux_direct_consequences(aux_part)
+            or []
+        )
+        if isinstance(relation, str) and relation.strip()
+    ]
+    if not direct_relations:
+        return False
+    point_pool = sorted(
+        {
+            str(point).lower()
+            for point in (
+                list(visible_points)
+                + list(extract_aux_point_scope(aux_part))
+            )
+            if isinstance(point, str) and point.strip()
+        }
+    )
+    if not point_pool:
+        point_pool = sorted(
+            {
+                str(point).lower()
+                for point in re.findall(r"\b[a-z]\w*\b", " ".join(direct_relations + [write_output]))
+            }
+        )
+    direct_points = _collect_relation_points(direct_relations, point_pool)
+    candidate_relations = []
+    for relation in [
+        *direct_relations,
+        insight_slots.get("first_bridge_checkpoint"),
+        insight_slots.get("pre_goal_checkpoint"),
+    ]:
+        normalized = normalize_relation_surface(relation or "").strip()
+        if normalized and normalized not in candidate_relations:
+            candidate_relations.append(normalized)
+
+    prior_sentences: list[str] = []
+    for sentence in split_into_sentences(write_output):
+        if not _sentence_has_downstream_completion_claim(sentence):
+            prior_sentences.append(sentence)
+            continue
+        claim_points = {
+            point.lower()
+            for point in extract_point_mentions(sentence, point_pool)
+        }
+        remote_points = claim_points - direct_points
+        if not remote_points:
+            prior_sentences.append(sentence)
+            continue
+        support_sentences = prior_sentences + [sentence]
+        if any(
+            _sentence_has_explicit_remote_relation_support(
+                context_sentence,
+                remote_points,
+                point_pool,
+                candidate_relations,
+            )
+            for context_sentence in support_sentences
+        ):
+            prior_sentences.append(sentence)
+            continue
+        return True
+    return False
+
+
 def _normalize_relation_surface_for_mention_match(text: str) -> str:
     lowered = (text or "").lower()
     lowered = re.sub(r"\bequaling\b", "equals", lowered)
@@ -1036,6 +1251,13 @@ def audit_generation_quality(
                     issues.append("no_proof_echo")
                 if re.search(r"\b(?:hidden|milestone|evidence window|goal closure|bridge chain)\b", write_output, re.IGNORECASE):
                     issues.append("visible_only_boundary")
+                if detect_insight_v1_downstream_overclaim(
+                    write_output,
+                    plan,
+                    aux_part,
+                    visible_points,
+                ):
+                    issues.append("downstream_overclaim")
                 if write_output.lower().count("because") > 2 or len(split_into_sentences(write_output)) > 7:
                     issues.append("no_proof_echo")
         elif plan.get("dossier_version") == "dossier_v1":

@@ -308,6 +308,24 @@ class CotSftInsightPipelineTest(unittest.TestCase):
         self.assertNotIn('"goal_gap_type"', prompt)
         self.assertIn('"canonical_aux_construction"', prompt)
 
+    def test_build_insight_write_prompt_forbids_downstream_overclaim_examples(self):
+        prompt = build_insight_write_prompt(
+            _load_record(1),
+            {
+                "visible_facts": ["ab equals ac"],
+                "image_scan": ["points b, d, and f appear nearly collinear"],
+                "goal_gap_text": "the visible givens still do not transfer the angle at the b-side onto the d-side",
+                "aux_construction": "construct point f such that a, c, d, f are concyclic and b, d, f are collinear",
+                "aux_selection_reason": "the cyclic helper is the missing local frame before the old figure can be revisited",
+            },
+        )
+
+        self.assertIn("direct local effect", prompt)
+        self.assertIn("remote goal-side object", prompt)
+        self.assertIn("creates a cyclic angle carrier", prompt)
+        self.assertIn("gives one local frame that can be reused later", prompt)
+        self.assertIn("the angle at e can now be transferred", prompt)
+
     def test_validate_insight_writer_body_rejects_proof_echo(self):
         plan = {
             "required_aux_effect": "a, c, d, f are concyclic",

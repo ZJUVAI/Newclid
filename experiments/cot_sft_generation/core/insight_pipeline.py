@@ -285,11 +285,16 @@ def build_insight_write_prompt(record, plan: dict):
         "[Writing Rules]\n"
         "- Output plain text only, without tags.\n"
         "- Focus on what is visible, what is missing, what effect the helper must create, and therefore which auxiliary construction to choose.\n"
+        "- Keep the post-construction boundary explicit: the body may describe the visible gap, the approved auxiliary construction, the construction's direct local effect, and at most one cautious local unlock statement.\n"
+        "- Do not claim that a remote goal-side object is already connected, transferable, comparable, or resolved unless that supporting relation is explicitly stated in the body itself.\n"
         "- You do not need to quote `required_aux_effect` verbatim; describing the approved helper relation or its immediate geometric payoff is enough.\n"
         "- You may add at most one or two short follow-up sentences after the construction to say what the helper unlocks.\n"
         "- Do not enumerate direct construction consequences one by one.\n"
         "- Do not retell the full proof. Do not list theorems. Do not mention proof ids or rule names.\n"
         "- Keep the tone impersonal and concise.\n"
+        "- Allowed example: \"this creates a cyclic angle carrier around a, c, d, and f.\"\n"
+        "- Allowed example: \"this gives one local frame that can be reused later.\"\n"
+        "- Forbidden example: \"so the angle at e can now be transferred\" when e is only reachable through a later hidden bridge not stated in the body.\n"
     )
 
 
