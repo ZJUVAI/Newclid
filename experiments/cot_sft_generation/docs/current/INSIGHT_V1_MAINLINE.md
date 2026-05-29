@@ -1,8 +1,12 @@
 # Insight V1 Mainline
 
-## 目标
+## 当前阶段性目标
 
-`insight_v1` 的目标不是让学生学完整 hidden closure，而是让学生学会：
+`insight_v1` 这里描述的是当前默认主线的阶段性优化目标，不是最终数据质量目标本身。
+
+最终质量标准仍以 [DATA_QUALITY_REQUIREMENTS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/immutable/DATA_QUALITY_REQUIREMENTS.md) 为准，尤其其中第 5 点“需要包含从提出 aux 到解答出 goal 的完整逻辑”仍然是长期目标。
+
+当前 `insight_v1` 只是把默认训练重点阶段性收窄为：
 
 1. 从图和题面判断当前缺口
 2. 说清 helper 需要制造什么局部效果
@@ -13,7 +17,20 @@
 - `thinking`
 - `aux`
 
-但 `thinking` 的默认风格已经改成 insight-first，而不是 full-closure retelling。
+但 `thinking` 的默认风格已经改成 insight-first，而不是把 `post-aux full-closure retelling` 作为当前默认硬要求。
+
+这里的阶段性收窄只表示：
+
+- 当前默认不强求把 aux 之后一路收尾到 goal 的完整逻辑全写出来
+- 当前阶段性不以质量目标第 5 点作为默认 writer 合同
+
+这不表示：
+
+- 最终质量目标被重写
+- `pre-aux` reasoning 必须被压缩到极短
+- 最终 `thinking` 不应显式使用可见点坐标
+
+只要不泄露 hidden source，并且服务于 obstacle / helper / aux 判断，前段 visible-only reasoning 仍然可以更丰富，也允许显式使用 visible-point coordinates。
 
 ## 默认入口
 
@@ -88,12 +105,17 @@ planner 不再看完整 proof，也不负责输出 full closure chain。
 
 ### 3. writer 只看批准后的 `InsightPlan`
 
-writer 的职责被收窄为：
+当前实现里，writer 默认聚焦：
 
 - 说清 visible gap
 - 说清 helper 需要制造的 effect
 - 说明为什么这个 aux 合适
 - 如有必要，只补 1 到 2 句 very short post-aux tail
+
+这是一条默认收窄的实现主线，不是唯一合法内容边界。
+
+- 更丰富的 `pre-aux` visible-only reasoning 仍然允许
+- 显式 visible-point coordinates 仍然允许，只要它们服务于可见结构判断，且不把当前实现误写成已有完整的 writer-coordinate contract
 
 ## 校验边界
 
@@ -136,5 +158,7 @@ writer 的职责被收窄为：
 - `visible_only_boundary`
 - `multi_point_staging`
 - `no_proof_echo`
+
+这表示当前阶段性把“提出正确 aux 并说清其局部必要性”放在更前面，而不是表示最终质量目标已经放弃第 5 点。
 
 如果下一会话继续主线开发，优先改这条链，而不是继续扩大 `dossier_v1` 的 full-closure 逻辑。

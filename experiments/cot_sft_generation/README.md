@@ -20,7 +20,7 @@
 - [docs/DOC_BOUNDARIES.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/DOC_BOUNDARIES.md)：先看这个，分清楚 agent 能改什么、不能改什么。
 - [docs/immutable/DATA_QUALITY_REQUIREMENTS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/immutable/DATA_QUALITY_REQUIREMENTS.md)：不可改的数据质量要求镜像。
 - [docs/current/INSIGHT_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/INSIGHT_V1_MAINLINE.md)：默认主线，先看这份。
-- [docs/current/DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/DOSSIER_V1_MAINLINE.md)：legacy / benchmark / fallback 路线说明。
+- [docs/current/DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/DOSSIER_V1_MAINLINE.md)：legacy / benchmark 路线说明。
 - [benchmarks/quality_review_v1/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/quality_review_v1/README.md)：当前主线默认使用的 review-oriented benchmark。
 
 ## 目录结构
@@ -175,7 +175,7 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
    - 最低检查项：
      - 文本是否真的像从图和题面观察得到
      - 坐标/视觉 cue 是否真正进入推理链
-     - `aux_direct_relations -> bridge_steps -> goal_finish` 是否形成有效闭环
+     - 文本是否真的从 aux 的直接后果一路 bridge 到 goal-side finish
      - 每个 bridge relation 是否真的由前文 support 推出
      - 最后 2 到 4 步是否真实落到目标
 
@@ -239,58 +239,52 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 
 如果你接下来明确要以新链路为主线继续做迭代，请先读 [INSIGHT_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/INSIGHT_V1_MAINLINE.md)。下面这节描述的是当前实现本身，而不是“下个会话最该先做什么”。
 
-当前默认主链已经切到 `insight_v1`，`dossier_v1` 降级为 legacy / benchmark / fallback，旧的 `model_evidence` 路线继续保留为兼容 fallback：
+先区分两层文档角色：
+
+- `docs/immutable/` 代表最终质量标准，不随当前实验主线收窄而改变。
+- `docs/current/` 代表当前默认实现与阶段性策略，其中 `insight_v1` 是当前主线，`dossier_v1` 是 legacy / benchmark 路线。
+
+当前默认主链已经切到 `insight_v1`，旧路线保留为显式可选项：
 
 - 默认：`--generation-style insight_v1`
-- legacy / benchmark / fallback：`--generation-style dossier_v1`
+- legacy / benchmark：`--generation-style dossier_v1`
 - 兼容 fallback：`--generation-style model_evidence_legacy`
 
-`insight_v1` 的核心思想是：把主学习目标收窄到 “观察缺口 -> 说明 helper effect -> 提出 aux”，而不是默认写完整 closure；`dossier_v1` 保留给对照和降级。
+`insight_v1` 的核心思想是：阶段性把默认主线收窄到 “观察缺口 -> 说明 helper effect -> 提出 aux”，而不是默认要求完整 closure。这里的“收窄”只针对当前主线，不重写最终质量目标；[DATA_QUALITY_REQUIREMENTS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/immutable/DATA_QUALITY_REQUIREMENTS.md) 中第 5 点仍然是长期标准。
+
+同时要避免两个误读：
+
+- 这不是要求压缩所有前段 reasoning。只要不泄露 hidden source，`pre-aux` 的 visible-only reasoning 仍然可以更丰富。
+- 这也不是禁止显式使用 visible-point coordinates。当前实现允许并且在需要时可以鼓励把可见点坐标用于前段 visible-only reasoning，但不要把当前 `insight_v1` 描述成已经继承了 `dossier_v1` 那套完整的 writer-coordinate 字段合同。
 
 1. `source audit`
    - 先检查图片、题面、`<aux>`、proof、坐标字段是否缺失或明显冲突。
    - 发现异常先记录，不为了通过率强行硬写。
 
-2. `insight plan`
-   - planner 只输出结构化 `InsightPlan`，不直接写整段 `thinking`。
-   - 当前主字段是：
-     - `visible_facts`
-     - `image_scan`
-     - `goal_gap_type`
-     - `goal_gap_text`
-     - `required_aux_effect`
-     - `aux_construction`
-     - `aux_selection_reason`
-     - `stage_order`（可选）
-     - `bonus_post_aux_tail`（可选）
-   - planner 负责决定从哪里起手观察、helper 需要先制造什么 effect、以及为什么这个 aux 合适。
+2. `insight slots + plan`
+   - 脚本先从 proof DAG 提取 `InsightSlots`，再让 planner 产出结构化 `InsightPlan`。
+   - 当前默认 plan 只围绕 visible facts、image scan、goal gap、required helper effect、aux construction、aux selection reason，以及可选的 `stage_order` / `bonus_post_aux_tail`。
+   - planner 不负责输出 full closure chain；`post-aux` 的完整收尾也不是当前默认合同。
 
-3. `plan critic`
-   - planner 产出后，会再走一次 model critic。
-   - critic 可以：
-     - 直接 `approved: true`
-     - 或返回 `revised_dossier`
-   - 当前实现把 `revised_dossier` 当成 patch，而不是要求 critic 重发完整 dossier：先和原 dossier merge，再重新做脚本校验。
+3. 脚本兜底与规范化
+   - 对 `image_scan` / `required_aux_effect` 等字段做自然语言归一化。
+   - 当 validator 需要检查 `<aux>` 的直接后果时，脚本会本地临时现算，但不把这些内容扩展成当前默认 writer 合同。
+   - 如果 planner 失败，当前 `insight_v1` 允许回退到 scripted insight plan；如果 writer 校验失败，则该样本直接失败，不再自动降级到 `dossier_v1`。
+   - `insight_slots` 和 `insight_plan_parsed` 会保存到 artifacts，方便 replay 与审计。
 
-4. 脚本兜底与规范化
-   - 对 `image_scan` / `required_aux_effect` 做自然语言归一化，识别 `straight line`、`intersect at right angles`、`equidistant` 这类自然表述。
-   - 当 validator 需要 direct consequences 时，脚本会从 `<aux>` 本地临时现算，但不再把它暴露成 planner / writer 字段。
-   - 当模型把 aux 构造写偏时，脚本会把 `aux_construction` 对齐回 hidden `<aux>`。
-   - `insight_plan_parsed` 会保存批准后的 `InsightPlan`，方便 artifacts / audits / replay 继续分析。
+4. `write`
+   - writer 从批准后的 `InsightPlan` 写出完整 `thinking`。
+   - 当前默认重点是 visible gap、helper effect、aux selection reason，以及非常短的 post-aux local tail。
+   - richer `pre-aux` visible-only reasoning 仍然允许；显式坐标也允许，但只应服务于可见结构判断，且不能泄露 hidden 坐标来源。
 
-5. `write`
-   - writer 直接写完整 `thinking` 正文。
-   - writer 不再接 injected prefix continuation，而是从批准后的 dossier 写成完整 visible-only narrative。
-   - 如果用到显式坐标句，只能复用脚本批准的 plain-text snippet，且不能给 auxiliary 点分配坐标。
-
-6. 终检、artifact 与语义审读
+5. 终检、artifact 与语义审读
    - writer 正文通过脚本终检后，才会组装成最终 `<thinking>...</thinking>`。
    - 终检会检查：
      - 长度和格式
      - shorthand / 泄露
      - inline visible-point coordinates 是否与源数据一致
-     - dossier 的 `bridge_chain` / `goal_closure` 是否在正文中按顺序落实
-     - 收尾是否落到 goal-side points 和 goal relation family
+     - 当前 `InsightPlan` 是否与正文一致
+     - multi-point aux 的 staged strategy 是否在需要时被保留
    - run artifacts 里会显式记录：
      - `generation_style`
      - `surface_pass`
@@ -298,6 +292,8 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
      - `summary.json` 里的 `semantic_review_status` / `semantic_pass_rate`
 
 ## 最新实测（2026-05-20）
+
+下面这组数字是 `dossier_v1` legacy benchmark 的历史记录，不应当被误读为当前默认 `insight_v1` 合同本身：
 
 - 默认模型 `qwen/qwen2.5-vl-72b-instruct`
 - 基准：`benchmarks/stratified_v1_12sample_input.jsonl` 中分层抽样 `4` 条
@@ -337,23 +333,12 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
   - `midp` 必须明确 midpoint
   - `cyclic` 必须明确 circle / circumcircle / cyclic
   - `cong` 必须明确 equal / congruent / equidistant
-- `plan` 中的 `coordinate_relations` 必须列出 2-4 个具体关系检查，并明确点名对应 visible points；复杂题应尽量让这些坐标线索覆盖至少 4 个可见点，而不是只围着少量 anchor
-- 当图中存在 anchor 之外的可见点时，`plan` 中的 `coordinate_relations` 还应尽量覆盖其中至少 `2-3` 个非 anchor 点，避免把所有坐标判断都挤在同一个 anchor 局部
-- 如果只是 `anchor_points` 选得过满，脚本现在会优先自动回收会吞掉非 anchor coverage 的多余 anchor；但这不替代 planner 自己去覆盖更广的坐标区域
-- `plan` 中的 `visible_relations` 必须优先复用 visible formal premises 中已有的具体关系，而不是凭空发明高层结构
-- `plan` 中的 `coordinate_hints` 必须说出具体几何关系，不允许空泛描述
-- `plan` 中的 `figure_overview` / `visible_relations` / `bridge_steps` 必须覆盖锚点之外的可见点或子结构
-- writer 正文不能只在前缀里挂一个坐标 cue 就结束；当 plan 较丰富时，正文早段应显式复用这些非 anchor 的坐标线索，并把它们接到 helper / first bridge 上
-- `plan` 中的 `aux_direct_relations` 必须只写 aux 的直接后果，不能提前跳到旧图深处；复杂题可比简单题保留更多直接后果
-- `plan` 中的 `bridge_steps` 必须是结构化桥接步骤，每步至少说明：
-  - 这一步得到什么 `relation`
-  - 它依赖哪些已有关系 `depends_on`
-  - 它为下一跳或收尾解锁什么 `why_it_helps`
-  - `why_it_helps` 不能只写抽象作用，例如 “enabling angle transfers”；它应说明这一步为下一跳或收尾解锁了什么，但“下一跳的精确 relation”现在由脚本内部补成 `next_target_relation` 传给 writer
-  - `why_it_helps` 也不应偷偷引入未在 relation/depends_on/下一跳中出现的新高层路线，例如凭空说相似三角形、圆、平行四边形等
-- `plan` 中的 `bridge_steps.relation` 还应尽量贴近 hidden proof guidance 给出的真实 bridge / finish 关系，不能任意换成另一条高层路线
-- `plan` 中的 `goal_finish` 必须明确最后要落到哪个 goal-side angle / ratio / congruence 关系
+- 当前默认主线允许显式使用 visible-point coordinates，但这些坐标句必须服务于 visible-only reasoning，而不是装饰性标签或 hidden route 的替代品
+- 当前默认主线会检查 `goal_gap_text` / `required_aux_effect` / `aux_selection_reason` 是否保持 insight-first 且与批准后的 `InsightPlan` 对齐
+- 当前默认主线鼓励覆盖 anchor 之外的更多可见点与子结构，但不会把 README 写成 `dossier_v1` 那套字段级合同
 - 多点 aux 的 `construction` 必须显式写出 staged / combined strategy，否则会被拒绝
+
+如果需要 `dossier_v1` 的字段级校验口径，例如 `bridge_chain`、`goal_closure` 或更细的 coordinate contract，请直接看 [DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/DOSSIER_V1_MAINLINE.md)，不要把它当成当前默认 `insight_v1` 合同。
 
 ## 导出格式
 
