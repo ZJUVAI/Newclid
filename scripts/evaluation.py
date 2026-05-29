@@ -62,7 +62,6 @@ from newclid.profiling import (
 )
 from newclid.search_trace import TraceRun, timestamp_slug
 
-
 LOGLEVEL = os.environ.get("LOGLEVEL", "WARNING").upper()
 
 
@@ -289,7 +288,6 @@ def create_agent(
     *,
     agent_type: str,
     search_version: str,
-    eval_first_aux_only: bool,
     model_pool: ModelPool,
     decoding_size: int,
     beam_size: int,
@@ -300,6 +298,8 @@ def create_agent(
     prepare_request_workers: int,
     prepare_prefetch_limit: int,
     render_root: Path,
+    eval_first_aux_only: bool = False,
+    visual_render_mode: str = "new",
     trace_writer=None,
 ):
     if agent_type in {"lm", "qwen35_text", "qwen3_vl_text"}:
@@ -333,6 +333,7 @@ def create_agent(
             search_version=search_version,
             eval_first_aux_only=eval_first_aux_only,
             render_root=render_root,
+            visual_render_mode=visual_render_mode,
             trace_writer=trace_writer,
         )
     raise ValueError(f"Unsupported agent type: {agent_type}")
@@ -345,7 +346,6 @@ def solve_one_problem(
     model_pool: ModelPool,
     agent_type: str,
     search_version: str,
-    eval_first_aux_only: bool,
     decoding_size: int,
     beam_size: int,
     search_depth: int,
@@ -356,6 +356,8 @@ def solve_one_problem(
     prepare_request_workers: int,
     prepare_prefetch_limit: int,
     render_root: Path,
+    eval_first_aux_only: bool = False,
+    visual_render_mode: str = "new",
     trace_writer=None,
 ):
     start_perf = time.perf_counter()
@@ -372,6 +374,7 @@ def solve_one_problem(
         agent_type=agent_type,
         search_version=search_version,
         eval_first_aux_only=eval_first_aux_only,
+        visual_render_mode=visual_render_mode,
         model_pool=model_pool,
         decoding_size=decoding_size,
         beam_size=beam_size,
@@ -421,11 +424,12 @@ def solve_problems_single_problem_multi_gpu(
     timeout: int,
     agent_type: str,
     search_version: str,
-    eval_first_aux_only: bool,
     max_pending_ddar: int | None,
     prepare_request_workers: int | None,
     prepare_prefetch_limit: int | None,
     log_dir: str | None,
+    eval_first_aux_only: bool = False,
+    visual_render_mode: str = "new",
     render_root: str | None = None,
     ray_address: str = "local",
     enable_trace: bool = False,
@@ -550,6 +554,7 @@ def solve_problems_single_problem_multi_gpu(
                     "timeout": timeout,
                     "search_version": search_version,
                     "eval_first_aux_only": eval_first_aux_only,
+                    "visual_render_mode": visual_render_mode,
                     "max_pending_ddar": max_pending_ddar,
                     "num_gpus_for_eval": num_gpus_for_eval,
                     "prepare_request_workers": prepare_request_workers,
@@ -562,6 +567,7 @@ def solve_problems_single_problem_multi_gpu(
         print(f"Using agent: {agent_type}")
         print(f"Using search_version={search_version}")
         print(f"Using eval_first_aux_only={eval_first_aux_only}")
+        print(f"Using visual_render_mode={visual_render_mode}")
         print(f"Using {num_gpus_for_eval} GPU workers")
         print(f"Using gpu_batch_size={gpu_batch_size}")
         print(f"Using gpu_batch_timeout_ms={gpu_batch_timeout_ms}")
@@ -617,6 +623,7 @@ def solve_problems_single_problem_multi_gpu(
                             agent_type=agent_type,
                             search_version=search_version,
                             eval_first_aux_only=eval_first_aux_only,
+                            visual_render_mode=visual_render_mode,
                             decoding_size=decoding_size,
                             beam_size=beam_size,
                             search_depth=search_depth,
@@ -820,6 +827,13 @@ def main():
         help="Consume only the first non-empty ';'-separated aux segment during evaluation instead of the full multi-aux text.",
     )
     parser.add_argument(
+        "--visual_render_mode",
+        type=str,
+        default="new",
+        choices=["new", "legacy"],
+        help="Visual prompt rendering mode. 'new' matches current data generation; 'legacy' keeps the old svg->png->invert compatibility path.",
+    )
+    parser.add_argument(
         "--gpu_batch_size",
         type=int,
         default=2,
@@ -890,6 +904,7 @@ def main():
         agent_type=args.agent,
         search_version=args.search_version,
         eval_first_aux_only=args.eval_first_aux_only,
+        visual_render_mode=args.visual_render_mode,
         max_pending_ddar=args.max_pending_ddar,
         prepare_request_workers=args.prepare_request_workers,
         prepare_prefetch_limit=args.prepare_prefetch_limit,

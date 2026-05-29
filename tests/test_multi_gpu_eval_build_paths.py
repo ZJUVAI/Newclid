@@ -223,18 +223,25 @@ def test_visual_agent_v2_uses_root_query_and_preserves_aux_prefix_during_materia
     seed_state = agent.seed_state(base_proof, base_proof)
     root_query = agent.problem_to_dsl(problem, defs)
 
-    def _fake_draw_clause_figure(proof, problem, save_to, rng, draw_annotations=True):
-        del proof, problem, rng, draw_annotations
-        Path(save_to).write_text("<svg></svg>", encoding="utf-8")
+    def _fake_draw_clause_figure(
+        proof, problem, save_to, rng, draw_annotations=True, theme=None
+    ):
+        del proof, problem, save_to, rng, draw_annotations, theme
+        return object()
 
-    def _fake_svg2png(url, write_to, output_width):
-        del url, output_width
-        Image.new("RGB", (8, 8), color=(255, 255, 255)).save(write_to)
+    def _fake_save_figure_as_png(fig, png_path, img_pixels, direct_png, svg_path=None):
+        del fig, img_pixels, direct_png
+        Image.new("RGB", (8, 8), color=(255, 255, 255)).save(png_path)
+        if svg_path is not None:
+            Path(svg_path).write_text("<svg></svg>", encoding="utf-8")
 
     with patch(
         "newclid.agent.vlm.draw_clause_figure", side_effect=_fake_draw_clause_figure
     ):
-        with patch("newclid.agent.vlm.cairosvg.svg2png", side_effect=_fake_svg2png):
+        with patch(
+            "newclid.agent.vlm.save_figure_as_png",
+            side_effect=_fake_save_figure_as_png,
+        ):
             request = agent.prepare_request(
                 request_id="d0_proot",
                 state=seed_state,
@@ -270,7 +277,10 @@ def test_visual_agent_v2_uses_root_query_and_preserves_aux_prefix_during_materia
     with patch(
         "newclid.agent.vlm.draw_clause_figure", side_effect=_fake_draw_clause_figure
     ):
-        with patch("newclid.agent.vlm.cairosvg.svg2png", side_effect=_fake_svg2png):
+        with patch(
+            "newclid.agent.vlm.save_figure_as_png",
+            side_effect=_fake_save_figure_as_png,
+        ):
             next_request = agent.prepare_request(
                 request_id="d1_p0",
                 state=states[0],

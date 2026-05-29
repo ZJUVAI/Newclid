@@ -6,7 +6,7 @@ from matplotlib.pylab import Generator
 import numpy as np
 from newclid.dependencies.symbols import Point
 from newclid.numerical import close_enough
-from newclid.numerical.draw_figure import PALETTE, draw_segment, draw_segment_num
+from newclid.numerical.draw_figure import draw_segment, draw_segment_num, get_figure_theme
 from newclid.numerical.geometries import LineNum
 from newclid.predicates.congruence import Cong
 from newclid.predicates.predicate import Predicate
@@ -112,7 +112,8 @@ class Para(Predicate):
         rng: Generator,
         draw_annotations: bool = True,
     ):
-        setattr(ax, "para_color", (getattr(ax, "para_color", 0) + 1) % len(PALETTE))
+        palette = get_figure_theme(ax)["palette"]
+        setattr(ax, "para_color", (getattr(ax, "para_color", 0) + 1) % len(palette))
         points: tuple[Point, ...] = args
         seglen = 100
         for i in range(0, len(points), 2):
@@ -144,7 +145,7 @@ class Para(Predicate):
                 ax,
                 points[i].num + d + p,
                 points[i + 1].num + d - p,
-                color=PALETTE[ax.para_color],  # type: ignore
+                color=palette[ax.para_color],  # type: ignore
             )
 
 

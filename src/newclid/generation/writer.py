@@ -10,6 +10,7 @@ import os
 
 import ray
 import cairosvg
+from PIL import Image, ImageOps
 
 POINT_COORDS_GRID_SIZE = 256
 
@@ -66,6 +67,22 @@ def save_figure_as_png(
         edgecolor="none",
     )
     convert_svg_to_png(svg_path, png_path, width=img_pixels)
+
+
+def invert_image_file(image_path: str) -> None:
+    """Invert an image file in place while preserving alpha channels."""
+    with Image.open(image_path) as img:
+        if img.mode == "RGBA":
+            r, g, b, a = img.split()
+            inverted_rgb = ImageOps.invert(Image.merge("RGB", (r, g, b)))
+            r_inv, g_inv, b_inv = inverted_rgb.split()
+            img_out = Image.merge("RGBA", (r_inv, g_inv, b_inv, a))
+        elif img.mode == "LA":
+            lightness, alpha = img.split()
+            img_out = Image.merge("LA", (ImageOps.invert(lightness), alpha))
+        else:
+            img_out = ImageOps.invert(img.convert("RGB"))
+        img_out.save(image_path)
 
 
 def _clamp_grid_coord(value: int, grid_size: int) -> int:

@@ -6,9 +6,6 @@ from copy import deepcopy
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import cairosvg
-from PIL import Image, ImageOps
-
 from newclid.agent.base import BaseAgent
 from newclid.agent.runtime.search_runtime import (
     get_new_point_name,
@@ -17,7 +14,13 @@ from newclid.agent.runtime.search_runtime import (
     translate_dsl_to_construction,
     try_dsl_to_constructions,
 )
+from newclid.generation.writer import (
+    convert_svg_to_png,
+    invert_image_file,
+    save_figure_as_png,
+)
 from newclid.formulations.problem import ProblemJGEX
+from newclid.numerical.draw_figure import DARK_THEME
 from newclid.profiling import increment_profiling_count
 from newclid.numerical.draw_clause_figure import draw_clause_figure
 from newclid.proof import ProofState
@@ -26,7 +29,6 @@ from newclid.agent.runtime.search_runtime import BeamQueue, build_problem_proof
 
 if TYPE_CHECKING:
     from newclid.formulations.rule import Rule
-
 
 class VLMAgent(BaseAgent):
     def __init__(
@@ -45,7 +47,7 @@ class VLMAgent(BaseAgent):
         search_version: str = "v1",
         eval_first_aux_only: bool = False,
         render_root: str | Path = "temp/eval_rendered_images",
-        render_width: int = 1024,
+        visual_render_mode: str = "new",
         trace_writer=None,
     ):
         super().__init__(
@@ -65,10 +67,23 @@ class VLMAgent(BaseAgent):
         )
         if search_version not in {"v1", "v2"}:
             raise ValueError(f"Unsupported search_version: {search_version}")
+        if visual_render_mode == "new":
+            self.direct_png = True
+            self.img_pixels = 512
+            self.invert_image = False
+        elif visual_render_mode == "legacy":
+            self.direct_png = False
+            self.img_pixels = 1024
+            self.invert_image = True
+            self.figure_theme = DARK_THEME
+        else:
+            raise ValueError(f"Unsupported visual_render_mode: {visual_render_mode}")
+        if visual_render_mode == "new":
+            self.figure_theme = None
         self.search_version = search_version
         self.render_root = Path(render_root)
         self.render_root.mkdir(parents=True, exist_ok=True)
-        self.render_width = render_width
+        self.visual_render_mode = visual_render_mode
         self._proof_defs: dict[str, Any] | None = None
         self._root_problem_dsl: str | None = None
 
@@ -127,35 +142,34 @@ class VLMAgent(BaseAgent):
         png_path = self.render_root / f"{stem}.png"
 
         render_start = time.perf_counter()
-        draw_clause_figure(
-            current_proof,
-            problem,
-            str(svg_path),
-            current_proof.rng,
-            draw_annotations=True,
-        )
-        cairosvg.svg2png(
-            url=str(svg_path),
-            write_to=str(png_path),
-            output_width=self.render_width,
-        )
-
-        # The model is trained on inverted prompts, so keep the image
-        # post-processing cost separate from the raw rendering work.
-        with Image.open(png_path) as img:
-            if img.mode == "RGBA":
-                r, g, b, a = img.split()
-                rgb_img = Image.merge("RGB", (r, g, b))
-                inverted_rgb = ImageOps.invert(rgb_img)
-                r_inv, g_inv, b_inv = inverted_rgb.split()
-                img_out = Image.merge("RGBA", (r_inv, g_inv, b_inv, a))
-            elif img.mode == "LA":
-                lightness, alpha = img.split()
-                lightness_inv = ImageOps.invert(lightness)
-                img_out = Image.merge("LA", (lightness_inv, alpha))
-            else:
-                img_out = ImageOps.invert(img.convert("RGB"))
-            img_out.save(png_path)
+        if self.visual_render_mode == "new":
+            fig = draw_clause_figure(
+                current_proof,
+                problem,
+                None,
+                current_proof.rng,
+                draw_annotations=True,
+                theme=self.figure_theme,
+            )
+            save_figure_as_png(
+                fig,
+                png_path=str(png_path),
+                img_pixels=self.img_pixels,
+                direct_png=True,
+            )
+        else:
+            draw_clause_figure(
+                current_proof,
+                problem,
+                svg_path,
+                current_proof.rng,
+                draw_annotations=True,
+                theme=self.figure_theme,
+                save_with_legacy_style=True,
+            )
+            convert_svg_to_png(str(svg_path), str(png_path), width=self.img_pixels)
+            # Legacy checkpoints were trained on the older inverted prompts.
+            invert_image_file(str(png_path))
 
         return {
             "request_id": request_id,
