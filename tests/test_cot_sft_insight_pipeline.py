@@ -889,6 +889,68 @@ class CotSftInsightPipelineTest(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("Forbidden leakage pattern", message)
 
+    def test_validate_thinking_response_allows_relaxed_generic_insight_phrases(self):
+        phrase_sentences = {
+            "midpoint property": (
+                "That midpoint property description is only a high-level summary of the local balance around h before the ratio comparison returns to a and d."
+            ),
+            "facilitate": (
+                "This should facilitate one local comparison around h before the final transfer returns to a and d."
+            ),
+            "specific angle relationships": (
+                "Those specific angle relationships describe the local angle carrier around f before the last comparison returns to b and d."
+            ),
+        }
+
+        for phrase, sentence in phrase_sentences.items():
+            with self.subTest(phrase=phrase):
+                thinking = (
+                    "<thinking>"
+                    "The visible figure still lacks one local helper frame before the goal-side comparison can close. "
+                    "Construct point h so that ah equals dh and bh equals ch, which keeps the helper relation concrete and local. "
+                    f"{sentence} "
+                    "The argument stays on the visible objects and does not mention any hidden proof labels or internal milestones."
+                    "</thinking>"
+                )
+
+                ok, message = validate_thinking_response(
+                    thinking,
+                    {"a": (0, 0), "b": (4, 0), "c": (0, 4), "d": (4, 4), "h": (2, 2), "f": (1, 3)},
+                    require_coord_tags=False,
+                    max_total_len=2600,
+                )
+
+                self.assertTrue(ok, message)
+
+    def test_process_and_generate_sft_insight_v1_exports_relaxed_generic_phrase_body(self):
+        record, scripted_plan, writer_body = _build_scripted_insight_fixture(1)
+        record["image_path"] = "fixture.png"
+        relaxed_writer_body = " ".join(
+            [
+                writer_body,
+                "That midpoint property wording is only a high-level summary of the local balance around the helper before the route returns to the goal objects.",
+                "This should facilitate one local comparison before the route returns to the goal objects.",
+                "Those specific angle relationships simply name the local angle carrier before the final comparison returns to the goal objects.",
+            ]
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result, output_records, item_records = _run_insight_pipeline(
+                record,
+                Path(temp_dir),
+                call_model_side_effect=[
+                    json.dumps(scripted_plan, ensure_ascii=False),
+                    relaxed_writer_body,
+                ],
+                audit_result={"issues": [], "has_issue": False},
+            )
+
+        self.assertEqual(len(output_records), 1)
+        self.assertEqual(result["summary"]["surface_fail_items"], 0)
+        self.assertEqual(result["summary"]["exported_items"], 1)
+        self.assertTrue(item_records[0]["surface_pass"])
+        self.assertTrue(item_records[0]["exported_to_dataset"])
+
     def test_process_and_generate_sft_insight_v1_uses_unbounded_thinking_validation_budget(self):
         record, scripted_plan, writer_body = _build_scripted_insight_fixture(1)
         record["image_path"] = "fixture.png"

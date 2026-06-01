@@ -278,12 +278,10 @@ FORBIDDEN_THINKING_PATTERNS = [
     re.compile(r"\bnecessary relationships\b", re.IGNORECASE),
     re.compile(r"\bit becomes evident\b", re.IGNORECASE),
     re.compile(r"\bwill help us\b", re.IGNORECASE),
-    re.compile(r"\bspecific angle relationships\b", re.IGNORECASE),
     re.compile(r"\bnot directly evident\b", re.IGNORECASE),
     re.compile(r"\bdesired angle equality\b", re.IGNORECASE),
     re.compile(r"\bdesired ratio\b", re.IGNORECASE),
     re.compile(r"\bclear relationship\b", re.IGNORECASE),
-    re.compile(r"\bfacilitate\b", re.IGNORECASE),
     re.compile(r"\bessential for proving\b", re.IGNORECASE),
     re.compile(r"\bhelp establish\b", re.IGNORECASE),
     re.compile(r"\bcoordinate table\b", re.IGNORECASE),
@@ -291,7 +289,6 @@ FORBIDDEN_THINKING_PATTERNS = [
     re.compile(r"\bcenter of symmetry\b", re.IGNORECASE),
     re.compile(r"\bcenter of similarity\b", re.IGNORECASE),
     re.compile(r"\bsimilarity center\b", re.IGNORECASE),
-    re.compile(r"\bmidpoint propert(?:y|ies)\b", re.IGNORECASE),
     re.compile(r"`[^`]+`"),
 ]
 DOSSIER_WRITER_SEMANTIC_PENALTY_PATTERNS = [
