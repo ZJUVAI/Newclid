@@ -473,6 +473,55 @@ class CotSftAuditsTest(unittest.TestCase):
 
         self.assertNotIn("downstream_overclaim", audit["issues"])
 
+    def test_audit_generation_quality_allows_long_visible_only_insight_body(self):
+        record = {
+            "point_coords_grid": {
+                "a": [0, 0],
+                "b": [2, 0],
+                "c": [1, 2],
+                "d": [4, 2],
+                "f": [3, 1],
+            }
+        }
+        generation = {
+            "plan_parsed": {
+                "insight_version": "insight_v1",
+                "goal_gap_type": "angle_transfer",
+                "goal_gap_text": "the visible givens still do not transfer the angle from b and c onto d and f in one local frame",
+                "required_aux_effect": "a, c, d, f are concyclic",
+                "aux_selection_reason": "the cyclic helper around a, c, d, and f is the first local frame before b, d, and f can be reused near the d-side",
+                "canonical_aux_direct_consequences": [
+                    "a, c, d, f are concyclic",
+                    "b, d, f are collinear",
+                ],
+                "insight_slots": {
+                    "required_aux_effect": "a, c, d, f are concyclic",
+                    "first_bridge_checkpoint": "b, d, f are collinear",
+                    "pre_goal_checkpoint": "angle ab/bf equals angle cd/df",
+                },
+            },
+            "write_output": (
+                "The visible givens still do not move the needed angle from the b-side onto the d-side inside one local frame. "
+                "Point b and point d already define the old corridor, but nothing visible yet turns that corridor through a helper circle. "
+                "The scan also suggests that the line through b, d, and f can be reused once f is chosen. "
+                "Construct point f such that a, c, d, and f are concyclic and b, d, f are collinear. "
+                "That circle relation creates a fresh angle carrier around a, c, d, and f. "
+                "Because the helper stays local to a, c, d, and f, it adds the missing carrier without pretending the target is already solved. "
+                "Because b, d, and f remain on one line, the old side still touches the new carrier at the same visible track. "
+                "Because those two effects meet at f, the next comparison can stay short and local before the argument returns to b and d."
+            ),
+        }
+
+        audit = audit_generation_quality(
+            record,
+            generation,
+            "<aux>x00 f : cyclic a c d f [001] ; x00 f : coll b d f [002] ; </aux>",
+        )
+
+        self.assertNotIn("no_proof_echo", audit["issues"])
+        self.assertNotIn("visible_only_boundary", audit["issues"])
+        self.assertNotIn("downstream_overclaim", audit["issues"])
+
     def test_audit_generation_quality_flags_remote_connection_claim_as_downstream_overclaim(self):
         record = {
             "point_coords_grid": {

@@ -542,7 +542,7 @@ def validate_thinking_response(
     output_text: str,
     point_coords,
     require_coord_tags=False,
-    max_total_len=2200,
+    max_total_len: int | None = 2200,
     max_coord_tags=4,
 ):
     if not output_text or not output_text.strip():
@@ -556,7 +556,7 @@ def validate_thinking_response(
     thinking_text = match.group(1).strip()
     if len(thinking_text) < 80:
         return False, f"<thinking> content too short ({len(thinking_text)} chars, minimum 80)"
-    if len(thinking_text) > max_total_len:
+    if max_total_len is not None and len(thinking_text) > max_total_len:
         return False, f"<thinking> content too long ({len(thinking_text)} chars, maximum {max_total_len})"
 
     internal_ref_hit = find_internal_reasoning_ref(thinking_text)
@@ -9764,7 +9764,7 @@ def generate_insight_thinking(
             assembled_thinking,
             point_coords=point_coords,
             require_coord_tags=False,
-            max_total_len=compute_thinking_total_budget(plan_result["parsed"]),
+            max_total_len=None,
         )
         if not is_valid:
             return {

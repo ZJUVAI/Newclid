@@ -253,7 +253,7 @@ def build_insight_plan_prompt(
         "- `aux_construction` should describe the approved auxiliary construction naturally, without changing the geometry.\n"
         "- `aux_selection_reason` must explain only why this helper is appropriate; it must reuse the slot information instead of inventing a different hidden relation or expanding into a proof route.\n"
         "- If the auxiliary construction introduces multiple new points or multiple staged facts, include `stage_order`.\n"
-        "- `bonus_post_aux_tail` is optional and may contain at most two short sentences.\n"
+        "- `bonus_post_aux_tail` is optional; if you include it, keep it local to what the helper opens after construction.\n"
         "- Do not list the construction's direct consequences one by one; keep them script-local.\n"
         "- Do not mention proof ids, rule names, hidden hints, or theorem catalogs.\n\n"
         "[Output Schema Example]\n"
@@ -275,7 +275,7 @@ def build_insight_write_prompt(record, plan: dict):
         "bonus_post_aux_tail": plan.get("bonus_post_aux_tail"),
     }
     return (
-        "Write one short insight-first geometry thinking trace.\n\n"
+        "Write one insight-first geometry thinking trace.\n\n"
         "[Visible Problem]\n"
         f"{public_problem}\n\n"
         "[Visible Goal]\n"
@@ -285,13 +285,13 @@ def build_insight_write_prompt(record, plan: dict):
         "[Writing Rules]\n"
         "- Output plain text only, without tags.\n"
         "- Focus on what is visible, what is missing, what effect the helper must create, and therefore which auxiliary construction to choose.\n"
-        "- Keep the post-construction boundary explicit: the body may describe the visible gap, the approved auxiliary construction, the construction's direct local effect, and at most one cautious local unlock statement.\n"
+        "- Keep the post-construction boundary explicit: the body may describe the visible gap, the approved auxiliary construction, the construction's direct local effect, and cautious local unlock statements that stay near that helper effect.\n"
         "- Do not claim that a remote goal-side object is already connected, transferable, comparable, or resolved unless that supporting relation is explicitly stated in the body itself.\n"
         "- You do not need to quote `required_aux_effect` verbatim; describing the approved helper relation or its immediate geometric payoff is enough.\n"
-        "- You may add at most one or two short follow-up sentences after the construction to say what the helper unlocks.\n"
+        "- You may continue after the construction to explain what the helper unlocks locally, but do not turn that into a full hidden proof retelling.\n"
         "- Do not enumerate direct construction consequences one by one.\n"
         "- Do not retell the full proof. Do not list theorems. Do not mention proof ids or rule names.\n"
-        "- Keep the tone impersonal and concise.\n"
+        "- Keep the tone impersonal and visible-only.\n"
         "- Allowed example: \"this creates a cyclic angle carrier around a, c, d, and f.\"\n"
         "- Allowed example: \"this gives one local frame that can be reused later.\"\n"
         "- Forbidden example: \"so the angle at e can now be transferred\" when e is only reachable through a later hidden bridge not stated in the body.\n"
@@ -310,7 +310,7 @@ def build_insight_plan_retry_feedback(message: str, aux_part: str | None = None)
 def build_insight_writer_retry_feedback(message: str, plan: dict | None = None) -> str:
     del plan
     return (
-        "Rewrite the body so it stays short, visible-only, and insight-first.\n"
+        "Rewrite the body so it stays visible-only and insight-first.\n"
         f"Validator feedback: {message}\n"
         "Explain the gap and the helper choice, but do not retell the full hidden route."
     )
@@ -385,11 +385,11 @@ def build_scripted_insight_plan(
     ).to_dict()
 
 
-def _canonical_relation_list(values, min_items: int, max_items: int, field_name: str):
+def _canonical_relation_list(values, min_items: int, field_name: str):
     if not isinstance(values, list):
         return False, f"{field_name} must be a list", None
     cleaned = []
-    for idx, item in enumerate(values[:max_items]):
+    for idx, item in enumerate(values):
         ok, message, text = _clean_text(item, f"{field_name}[{idx}]", min_chars=4, max_chars=220)
         if not ok:
             return False, message, None
@@ -450,7 +450,6 @@ def validate_insight_plan_response(
     ok, message, cleaned_visible_facts = _canonical_relation_list(
         plan.get("visible_facts"),
         min_items=1,
-        max_items=6,
         field_name="visible_facts",
     )
     if not ok:
@@ -464,7 +463,6 @@ def validate_insight_plan_response(
     ok, message, cleaned_image_scan = _canonical_relation_list(
         plan.get("image_scan"),
         min_items=1,
-        max_items=4,
         field_name="image_scan",
     )
     if not ok:
@@ -560,7 +558,6 @@ def validate_insight_plan_response(
         ok, message, cleaned_stage_order = _canonical_relation_list(
             raw_stage_order,
             min_items=1,
-            max_items=3,
             field_name="stage_order",
         )
         if not ok:
@@ -574,7 +571,6 @@ def validate_insight_plan_response(
         ok, message, cleaned_bonus_tail = _canonical_relation_list(
             raw_bonus_tail,
             min_items=1,
-            max_items=2,
             field_name="bonus_post_aux_tail",
         )
         if not ok:
@@ -640,19 +636,8 @@ def validate_insight_writer_body(output_text: str, visible_goal="", injected_pre
         return False, "Writer body must not mention proof ids, rule names, or hidden proof language"
     if _INTERNAL_REF_RE.search(body):
         return False, "Writer body must not mention internal plan references"
-    if len(body) < 140:
-        return False, "Writer body is too short for an insight-first explanation"
-    if len(body) > 1200:
-        return False, "Writer body is too long and is drifting toward proof retelling"
     if re.search(r"\b(I|we|We|I'll|we'll)\b", body):
         return False, "Writer body must stay impersonal"
-    sentence_count = len([part for part in re.split(r"[.!?]+", body) if part.strip()])
-    if sentence_count > 7:
-        return False, "Writer body is too long and reads like a proof retelling"
-    if body.lower().count("because") > 2:
-        return False, "Writer body uses too many proof-style causal steps"
-    if body.lower().count("therefore") > 1 or body.lower().count("thus") > 1:
-        return False, "Writer body reads too much like a proof closure"
 
     if isinstance(plan, dict):
         required_effect = str(plan.get("required_aux_effect") or "").strip()

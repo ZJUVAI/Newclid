@@ -223,6 +223,72 @@ class CotSftInsightPipelineTest(unittest.TestCase):
 
         self.assertIn("[Approved Auxiliary Construction]", prompt)
         self.assertIn("construct point f such that a, c, d, f are concyclic and b, d, f are collinear", prompt)
+        self.assertNotIn("at most two short sentences", prompt)
+
+    def test_validate_insight_plan_response_accepts_lists_beyond_old_caps(self):
+        point_coords = {"a": (0, 0), "b": (4, 0), "c": (0, 4), "d": (4, 4)}
+        visible_text_facts = [
+            {"relation": "ab equals cd"},
+            {"relation": "ac equals bd"},
+            {"relation": "line ab is parallel to line cd"},
+            {"relation": "line ac is parallel to line bd"},
+            {"relation": "line ab is perpendicular to line ac"},
+            {"relation": "a, b, d are collinear"},
+            {"relation": "b, c, d are collinear"},
+        ]
+        insight_slots = {
+            "goal_family": "eqratio",
+            "goal_gap_type": "ratio_transfer",
+            "required_aux_effect": "h is the midpoint of ad",
+            "first_bridge_checkpoint": "k is the midpoint of bc",
+            "pre_goal_checkpoint": "ratio ad/hd equals ratio bc/ck",
+            "stage_order": [
+                "first create h on ad",
+                "then create k on bc",
+            ],
+            "evidence_windows": [],
+        }
+        plan = {
+            "visible_facts": [fact["relation"] for fact in visible_text_facts],
+            "image_scan": [
+                "line ab and line cd look parallel",
+                "segments ac and bd look equal",
+                "points a, b, and d appear nearly collinear",
+                "points b, c, and d appear nearly collinear",
+                "line ab and line ac look perpendicular",
+            ],
+            "goal_gap_type": "ratio_transfer",
+            "goal_gap_text": "the visible givens still do not transfer the needed ratio from a and d onto b and c inside one local frame",
+            "required_aux_effect": "h is the midpoint of ad",
+            "aux_construction": "construct point h such that h is the midpoint of ad, then construct point k such that k is the midpoint of bc",
+            "aux_selection_reason": "the midpoint at h sets the first ratio carrier on a and d, the midpoint at k reconnects b and c, and ratio ad/hd equals ratio bc/ck is the local checkpoint before the goal side is revisited",
+            "stage_order": [
+                "first mark h on segment ad",
+                "then lock the midpoint relation at h",
+                "next mark k on segment bc",
+                "finally align the second midpoint relation at k",
+            ],
+            "bonus_post_aux_tail": [
+                "That gives one balanced segment frame around a and d.",
+                "It also places b and c in a matching midpoint setup.",
+                "The later ratio comparison can now stay local instead of jumping across the whole figure.",
+            ],
+        }
+
+        ok, message, cleaned = validate_insight_plan_response(
+            plan,
+            point_coords=point_coords,
+            visible_goal="eqratio a d b c a c b d",
+            aux_part="<aux> x00 h : midp h a d [001] ; x00 k : midp k b c [002] ; </aux>",
+            visible_text_facts=visible_text_facts,
+            insight_slots=insight_slots,
+        )
+
+        self.assertTrue(ok, message)
+        self.assertEqual(len(cleaned["visible_facts"]), 7)
+        self.assertEqual(len(cleaned["image_scan"]), 5)
+        self.assertEqual(len(cleaned["stage_order"]), 4)
+        self.assertEqual(len(cleaned["bonus_post_aux_tail"]), 3)
 
     def test_validate_insight_plan_response_requires_stage_order_for_multi_point_aux(self):
         point_coords = {"a": (0, 0), "b": (4, 0), "c": (0, 4), "d": (4, 4)}
@@ -325,6 +391,9 @@ class CotSftInsightPipelineTest(unittest.TestCase):
         self.assertIn("creates a cyclic angle carrier", prompt)
         self.assertIn("gives one local frame that can be reused later", prompt)
         self.assertIn("the angle at e can now be transferred", prompt)
+        self.assertNotIn("one short insight-first", prompt.lower())
+        self.assertNotIn("at most one cautious local unlock statement", prompt)
+        self.assertNotIn("one or two short follow-up sentences", prompt)
 
     def test_validate_insight_writer_body_rejects_proof_echo(self):
         plan = {
@@ -412,6 +481,29 @@ class CotSftInsightPipelineTest(unittest.TestCase):
             "The visible facts still do not connect ab to cf inside one congruence frame. "
             "Construct point \\( g \\) such that \\( ab = cg \\) and \\( bc \\perp cg \\). "
             "That helper fixes the missing local congruence and right-angle frame before the argument returns to c, f, and g."
+        )
+
+        ok, message = validate_insight_writer_body(body, plan=plan)
+
+        self.assertTrue(ok, message)
+
+    def test_validate_insight_writer_body_accepts_long_visible_only_body(self):
+        plan = {
+            "required_aux_effect": "a, c, d, f are concyclic",
+            "aux_construction": "construct point f such that a, c, d, f are concyclic and b, d, f are collinear",
+            "canonical_aux_construction": "construct point f such that a, c, d, f are concyclic and b, d, f are collinear",
+            "canonical_aux_direct_consequences": ["a, c, d, f are concyclic", "b, d, f are collinear"],
+            "goal_gap_text": "the visible givens still do not transfer the angle from the b-side onto the d-side inside one local frame",
+        }
+        body = (
+            "The visible givens still do not move the needed angle from the b-side onto the d-side inside one local frame. "
+            "Point b and point d already define the old corridor, but nothing visible yet turns that corridor through a helper circle. "
+            "The scan also suggests that the line through b, d, and f can be reused once f is chosen. "
+            "Construct point f such that a, c, d, and f are concyclic and b, d, f are collinear. "
+            "That circle relation creates a fresh angle carrier around a, c, d, and f. "
+            "Because the helper stays local to a, c, d, and f, it adds the missing carrier without pretending the target is already solved. "
+            "Because b, d, and f remain on one line, the old side still touches the new carrier at the same visible track. "
+            "Because those two effects meet at f, the next comparison can stay short and local before the argument returns to b and d."
         )
 
         ok, message = validate_insight_writer_body(body, plan=plan)
@@ -796,6 +888,41 @@ class CotSftInsightPipelineTest(unittest.TestCase):
         )
         self.assertFalse(ok)
         self.assertIn("Forbidden leakage pattern", message)
+
+    def test_process_and_generate_sft_insight_v1_uses_unbounded_thinking_validation_budget(self):
+        record, scripted_plan, writer_body = _build_scripted_insight_fixture(1)
+        record["image_path"] = "fixture.png"
+        captured = {}
+
+        def fake_validate_thinking_response(
+            output_text,
+            point_coords,
+            require_coord_tags=False,
+            max_total_len=2200,
+            max_coord_tags=4,
+        ):
+            del output_text, point_coords, require_coord_tags, max_coord_tags
+            captured["max_total_len"] = max_total_len
+            return True, "ok"
+
+        with tempfile.TemporaryDirectory() as temp_dir, patch(
+            "experiments.cot_sft_generation.generate_cot_sft.validate_thinking_response",
+            side_effect=fake_validate_thinking_response,
+        ):
+            result, output_records, item_records = _run_insight_pipeline(
+                record,
+                Path(temp_dir),
+                call_model_side_effect=[
+                    json.dumps(scripted_plan, ensure_ascii=False),
+                    writer_body,
+                ],
+                audit_result={"issues": [], "has_issue": False},
+            )
+
+        self.assertEqual(captured["max_total_len"], None)
+        self.assertEqual(len(output_records), 1)
+        self.assertTrue(item_records[0]["surface_pass"])
+        self.assertEqual(result["summary"]["exported_items"], 1)
 
 
 if __name__ == "__main__":

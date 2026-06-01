@@ -182,11 +182,12 @@ def recheck_item_record(item_record: Dict[str, Any]) -> Dict[str, Any]:
     thinking_ok = False
     thinking_message = "missing_thinking"
     if thinking:
+        thinking_budget = None if generation_style == "insight_v1" else compute_thinking_total_budget(plan_for_checks)
         thinking_ok, thinking_message = validate_thinking_response(
             thinking,
             point_coords=point_coords,
             require_coord_tags=False,
-            max_total_len=compute_thinking_total_budget(plan_for_checks),
+            max_total_len=thinking_budget,
         )
 
     generation = {

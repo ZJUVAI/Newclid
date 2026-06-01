@@ -756,6 +756,44 @@ def detect_insight_v1_downstream_overclaim(
     return False
 
 
+def detect_insight_v1_proof_echo(write_output: str) -> bool:
+    if not write_output:
+        return False
+    if re.search(r"(?:\[\d{3}\]|\bAR\b|\br\d+\b|\bproof\b|\bqed\b|\blemma\b|\bclaim\s+\d+\b)", write_output, re.IGNORECASE):
+        return True
+
+    normalized = write_output.lower()
+    formal_closure_markers = [
+        "by theorem",
+        "by contradiction",
+        "by cases",
+        "it follows that",
+        "hence the proof",
+        "therefore the proof",
+        "this completes the proof",
+    ]
+    if any(marker in normalized for marker in formal_closure_markers):
+        return True
+
+    sentences = split_into_sentences(write_output)
+    sequential_closure_sentences = 0
+    for sentence in sentences:
+        lowered = sentence.lower()
+        if not re.search(r"\b(?:therefore|thus|hence|so now|so we get|it follows that)\b", lowered):
+            sequential_closure_sentences = 0
+            continue
+        if not re.search(r"\b(?:angle|ratio|triangle|congruent|similar|collinear|parallel|perpendicular|midpoint|cyclic|equal|equals)\b", lowered):
+            sequential_closure_sentences = 0
+            continue
+        if re.search(r"\b(?:visible|helper|local|construction|auxiliary|gap)\b", lowered):
+            sequential_closure_sentences = 0
+            continue
+        sequential_closure_sentences += 1
+        if sequential_closure_sentences >= 2:
+            return True
+    return False
+
+
 def _normalize_relation_surface_for_mention_match(text: str) -> str:
     lowered = (text or "").lower()
     lowered = re.sub(r"\bequaling\b", "equals", lowered)
@@ -1247,7 +1285,7 @@ def audit_generation_quality(
             if len(extract_aux_new_points(aux_part)) > 1 and not plan.get("stage_order"):
                 issues.append("multi_point_staging")
             if write_output:
-                if re.search(r"(?:\[\d{3}\]|\bAR\b|\br\d+\b|\bproof\b)", write_output, re.IGNORECASE):
+                if detect_insight_v1_proof_echo(write_output):
                     issues.append("no_proof_echo")
                 if re.search(r"\b(?:hidden|milestone|evidence window|goal closure|bridge chain)\b", write_output, re.IGNORECASE):
                     issues.append("visible_only_boundary")
@@ -1258,8 +1296,6 @@ def audit_generation_quality(
                     visible_points,
                 ):
                     issues.append("downstream_overclaim")
-                if write_output.lower().count("because") > 2 or len(split_into_sentences(write_output)) > 7:
-                    issues.append("no_proof_echo")
         elif plan.get("dossier_version") == "dossier_v1":
             coordinate_candidates = coordinate_candidates or []
             unmatched_relations = [
