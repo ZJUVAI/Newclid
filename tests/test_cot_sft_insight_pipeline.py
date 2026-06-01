@@ -394,6 +394,7 @@ class CotSftInsightPipelineTest(unittest.TestCase):
         self.assertNotIn("one short insight-first", prompt.lower())
         self.assertNotIn("at most one cautious local unlock statement", prompt)
         self.assertNotIn("one or two short follow-up sentences", prompt)
+        self.assertNotIn("Keep the tone impersonal", prompt)
 
     def test_validate_insight_writer_body_rejects_proof_echo(self):
         plan = {
@@ -424,6 +425,24 @@ class CotSftInsightPipelineTest(unittest.TestCase):
         body = (
             "The visible ratio information still does not connect the a-side to the d-side in one local frame. "
             "Construct point h so that h divides segment ad into two equal parts, which creates the balanced helper relation this gap is missing before the ratio comparison comes back to a and d."
+        )
+
+        ok, message = validate_insight_writer_body(body, plan=plan)
+
+        self.assertTrue(ok, message)
+
+    def test_validate_insight_writer_body_allows_first_person_visible_only_wording(self):
+        plan = {
+            "required_aux_effect": "a, c, d, f are concyclic",
+            "aux_construction": "construct point f such that a, c, d, f are concyclic and b, d, f are collinear",
+            "canonical_aux_construction": "construct point f such that a, c, d, f are concyclic and b, d, f are collinear",
+            "canonical_aux_direct_consequences": ["a, c, d, f are concyclic", "b, d, f are collinear"],
+            "goal_gap_text": "the visible givens still do not transfer the angle from the b-side onto the d-side",
+        }
+        body = (
+            "The visible givens still do not move the needed angle from the b-side onto the d-side. "
+            "Construct point f on the circle through a, c, and d. "
+            "With that local cyclic carrier in place, we can compare the nearby angle frame around b, d, and f without claiming the whole goal is already closed."
         )
 
         ok, message = validate_insight_writer_body(body, plan=plan)

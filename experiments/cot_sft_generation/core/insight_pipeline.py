@@ -291,7 +291,7 @@ def build_insight_write_prompt(record, plan: dict):
         "- You may continue after the construction to explain what the helper unlocks locally, but do not turn that into a full hidden proof retelling.\n"
         "- Do not enumerate direct construction consequences one by one.\n"
         "- Do not retell the full proof. Do not list theorems. Do not mention proof ids or rule names.\n"
-        "- Keep the tone impersonal and visible-only.\n"
+        "- Keep the tone visible-only.\n"
         "- Allowed example: \"this creates a cyclic angle carrier around a, c, d, and f.\"\n"
         "- Allowed example: \"this gives one local frame that can be reused later.\"\n"
         "- Forbidden example: \"so the angle at e can now be transferred\" when e is only reachable through a later hidden bridge not stated in the body.\n"
@@ -636,8 +636,6 @@ def validate_insight_writer_body(output_text: str, visible_goal="", injected_pre
         return False, "Writer body must not mention proof ids, rule names, or hidden proof language"
     if _INTERNAL_REF_RE.search(body):
         return False, "Writer body must not mention internal plan references"
-    if re.search(r"\b(I|we|We|I'll|we'll)\b", body):
-        return False, "Writer body must stay impersonal"
 
     if isinstance(plan, dict):
         required_effect = str(plan.get("required_aux_effect") or "").strip()
