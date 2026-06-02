@@ -1148,6 +1148,98 @@ class CotSftInsightPipelineTest(unittest.TestCase):
 
                 self.assertTrue(ok, message)
 
+    def test_validate_thinking_response_allows_soft_style_phrases_but_keeps_hard_markers(self):
+        point_coords = {"a": (0, 0), "b": (4, 0), "c": (0, 4), "d": (4, 4), "h": (2, 2)}
+        soft_phrase_sentences = {
+            "desired ratio": (
+                "That desired ratio wording only summarizes the local comparison around h before the route returns to a and d."
+            ),
+            "clear relationship": (
+                "That clear relationship wording only summarizes the helper frame around h before the final transfer returns to a and d."
+            ),
+            "help establish": (
+                "The midpoint helper and the equal-length frame help establish the last visible transfer back to the goal objects."
+            ),
+        }
+
+        for phrase, sentence in soft_phrase_sentences.items():
+            with self.subTest(kind="soft", phrase=phrase):
+                thinking = (
+                    "<thinking>"
+                    "The visible figure still lacks one local helper frame before the goal-side comparison can close. "
+                    "Construct point h such that ah equals dh and bh equals ch, which keeps the helper relation concrete and local. "
+                    f"{sentence} "
+                    "The argument stays on the visible objects and does not mention any hidden proof labels or internal milestones."
+                    "</thinking>"
+                )
+                ok, message = validate_thinking_response(
+                    thinking,
+                    point_coords,
+                    require_coord_tags=False,
+                    max_total_len=2600,
+                )
+
+                self.assertTrue(ok, message)
+
+        hard_markers = [
+            "<proof>",
+            "r63",
+            "sameclock",
+            "supervisor",
+            "coordinate table",
+        ]
+        for marker in hard_markers:
+            with self.subTest(kind="hard", marker=marker):
+                thinking = (
+                    "<thinking>"
+                    "The visible figure still lacks one local helper frame before the goal-side comparison can close. "
+                    f"Construct point h such that ah equals dh and bh equals ch, and the note {marker} appears in the middle of the explanation. "
+                    "That is exactly the kind of hidden or internal trace the final response must avoid even when the surrounding reasoning stays visible-only. "
+                    "</thinking>"
+                )
+                ok, message = validate_thinking_response(
+                    thinking,
+                    point_coords,
+                    require_coord_tags=False,
+                    max_total_len=2600,
+                )
+
+                self.assertFalse(ok)
+                self.assertIn("Forbidden leakage pattern", message)
+
+    def test_process_and_generate_sft_insight_image_v1_soft_style_phrases_audit_but_export(self):
+        record, scripted_plan, writer_body = _build_scripted_insight_fixture(1)
+        record["image_path"] = "fixture.png"
+        soft_phrase_body = " ".join(
+            [
+                writer_body,
+                "That desired ratio wording only summarizes the local comparison around b, e, and f before the last visible transfer closes.",
+                "That clear relationship wording only summarizes the same local carrier around b, e, and f without changing the visible relation content.",
+                "The concyclic helper and the collinear checkpoint help establish the last visible transfer back to the goal objects.",
+            ]
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result, output_records, item_records = _run_insight_pipeline(
+                record,
+                Path(temp_dir),
+                call_model_side_effect=[
+                    json.dumps(scripted_plan, ensure_ascii=False),
+                    soft_phrase_body,
+                ],
+            )
+
+        self.assertEqual(len(output_records), 1)
+        self.assertEqual(result["summary"]["generation_audit_issue_items"], 1)
+        self.assertEqual(result["summary"]["filtered_generation_audit_items"], 0)
+        self.assertTrue(item_records[0]["surface_pass"])
+        self.assertTrue(item_records[0]["success"])
+        self.assertTrue(item_records[0]["exported_to_dataset"])
+        self.assertIsNone(item_records[0]["dataset_filter_reason"])
+        self.assertIn("soft_style_phrase:desired ratio", item_records[0]["generation_audit"]["issues"])
+        self.assertIn("soft_style_phrase:clear relationship", item_records[0]["generation_audit"]["issues"])
+        self.assertIn("soft_style_phrase:help establish", item_records[0]["generation_audit"]["issues"])
+
     def test_process_and_generate_sft_insight_image_v1_exports_relaxed_generic_phrase_body(self):
         record, scripted_plan, writer_body = _build_scripted_insight_fixture(1)
         record["image_path"] = "fixture.png"

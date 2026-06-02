@@ -57,6 +57,51 @@ except ImportError:  # pragma: no cover - script execution path
     from insight_schema import INSIGHT_GENERATION_STYLES, INSIGHT_IMAGE_V1, INSIGHT_TEXT_V1  # type: ignore
 
 
+HARD_FORBIDDEN_THINKING_PATTERNS = [
+    re.compile(r"<\s*/?\s*(aux|proof|numerical_check)\s*>", re.IGNORECASE),
+    re.compile(r"\[\d{3}\]"),
+    re.compile(r"\bAR\b"),
+    re.compile(r"\ba\d{2,}\b"),
+    re.compile(r"\br\d+\b"),
+    re.compile(r"\bsameclock\b", re.IGNORECASE),
+    re.compile(r"\bsimtri?r?\b", re.IGNORECASE),
+    re.compile(r"rest of the proof", re.IGNORECASE),
+    re.compile(r"hidden reference", re.IGNORECASE),
+    re.compile(r"supervisor", re.IGNORECASE),
+    re.compile(r"given aux", re.IGNORECASE),
+    re.compile(r"\bcoordinate table\b", re.IGNORECASE),
+    re.compile(r"\brotational symmetry\b", re.IGNORECASE),
+    re.compile(r"\bcenter of symmetry\b", re.IGNORECASE),
+    re.compile(r"\bcenter of similarity\b", re.IGNORECASE),
+    re.compile(r"\bsimilarity center\b", re.IGNORECASE),
+    re.compile(r"`[^`]+`"),
+]
+SOFT_STYLE_THINKING_PHRASE_PATTERNS = [
+    ("the construction of point", re.compile(r"\bthe construction of point\b", re.IGNORECASE)),
+    ("this point is crucial", re.compile(r"\bthis point is crucial\b", re.IGNORECASE)),
+    ("necessary relationships", re.compile(r"\bnecessary relationships\b", re.IGNORECASE)),
+    ("it becomes evident", re.compile(r"\bit becomes evident\b", re.IGNORECASE)),
+    ("will help us", re.compile(r"\bwill help us\b", re.IGNORECASE)),
+    ("not directly evident", re.compile(r"\bnot directly evident\b", re.IGNORECASE)),
+    ("desired angle equality", re.compile(r"\bdesired angle equality\b", re.IGNORECASE)),
+    ("desired ratio", re.compile(r"\bdesired ratio\b", re.IGNORECASE)),
+    ("clear relationship", re.compile(r"\bclear relationship\b", re.IGNORECASE)),
+    ("essential for proving", re.compile(r"\bessential for proving\b", re.IGNORECASE)),
+    ("help establish", re.compile(r"\bhelp establish\b", re.IGNORECASE)),
+]
+SOFT_STYLE_THINKING_PATTERNS = [pattern for _, pattern in SOFT_STYLE_THINKING_PHRASE_PATTERNS]
+FORBIDDEN_THINKING_PATTERNS = HARD_FORBIDDEN_THINKING_PATTERNS + SOFT_STYLE_THINKING_PATTERNS
+
+
+def find_soft_style_phrase_issues(text: str) -> list[str]:
+    normalized_text = str(text or "")
+    issues = []
+    for phrase, pattern in SOFT_STYLE_THINKING_PHRASE_PATTERNS:
+        if pattern.search(normalized_text):
+            issues.append(f"soft_style_phrase:{phrase}")
+    return issues
+
+
 def get_point_coords(record: Dict[str, Any]) -> Dict[str, tuple[int, int]]:
     coords = record.get("grid_coord") or record.get("point_coords_grid") or {}
     normalized: Dict[str, tuple[int, int]] = {}
@@ -1525,6 +1570,11 @@ def audit_generation_quality(
     text_to_scan = " ".join(
         part for part in [generation.get("write_output"), generation.get("thinking")] if part
     ).lower()
+    issues.extend(
+        issue
+        for issue in find_soft_style_phrase_issues(text_to_scan)
+        if issue not in issues
+    )
     for marker in suspicious_markers:
         if marker == "parallelogram":
             supported_spans = list(iter_supported_parallelogram_mentions(record, text_to_scan))

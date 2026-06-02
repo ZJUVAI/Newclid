@@ -228,6 +228,65 @@ class CotSftReplayArtifactChecksTest(unittest.TestCase):
             self.assertIsNone(replay_row["current_dataset_filter_reason"])
             self.assertTrue(replay_row["current_all_checks_pass"])
 
+    def test_recheck_item_record_replays_soft_style_phrase_audit_without_blocking_export(self):
+        record, scripted_plan, writer_body = _build_scripted_insight_fixture(1)
+        record["image_path"] = "fixture.png"
+        soft_phrase_body = " ".join(
+            [
+                writer_body,
+                "That desired ratio wording only summarizes the local comparison around b, e, and f before the last visible transfer closes.",
+                "That clear relationship wording only summarizes the same local carrier around b, e, and f without changing the visible relation content.",
+                "The concyclic helper and the collinear checkpoint help establish the last visible transfer back to the goal objects.",
+            ]
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_dir_path = Path(temp_dir)
+            input_path = temp_dir_path / "input.jsonl"
+            output_path = temp_dir_path / "out.jsonl"
+            run_dir = temp_dir_path / "artifacts"
+
+            input_path.write_text(json.dumps(record, ensure_ascii=False) + "\n", encoding="utf-8")
+            (temp_dir_path / "fixture.png").write_bytes(b"fixture-image")
+
+            with patch(
+                "experiments.cot_sft_generation.generate_cot_sft.call_model",
+                side_effect=[json.dumps(scripted_plan, ensure_ascii=False), soft_phrase_body],
+            ):
+                process_and_generate_sft(
+                    input_jsonl=str(input_path),
+                    output_jsonl=str(output_path),
+                    sample_size=1,
+                    num_workers=1,
+                    model_name="fixture-model",
+                    verbose=True,
+                    random_sample=False,
+                    process_all=False,
+                    max_retries=1,
+                    generation_style=INSIGHT_IMAGE_V1,
+                    run_dir=run_dir,
+                )
+
+            item_record = json.loads((run_dir / "item_records.jsonl").read_text(encoding="utf-8").splitlines()[0])
+            replay_row = recheck_item_record(item_record)
+
+            self.assertTrue(replay_row["current_surface_pass"])
+            self.assertTrue(replay_row["current_exported_to_dataset"])
+            self.assertIsNone(replay_row["current_dataset_filter_reason"])
+            self.assertTrue(replay_row["current_all_checks_pass"])
+            self.assertIn(
+                "soft_style_phrase:desired ratio",
+                replay_row["current_generation_audit"]["issues"],
+            )
+            self.assertIn(
+                "soft_style_phrase:clear relationship",
+                replay_row["current_generation_audit"]["issues"],
+            )
+            self.assertIn(
+                "soft_style_phrase:help establish",
+                replay_row["current_generation_audit"]["issues"],
+            )
+
     def test_recheck_item_record_blocks_insight_hard_audit_issue_export(self):
         record, scripted_plan, writer_body = _build_scripted_insight_fixture(1)
         record["image_path"] = "fixture.png"

@@ -28,6 +28,8 @@ from pathlib import Path
 
 try:
     from .audits import (
+        FORBIDDEN_THINKING_PATTERNS,
+        HARD_FORBIDDEN_THINKING_PATTERNS,
         audit_generation_quality,
         audit_source_record,
         bridge_step_relation_realized,
@@ -134,6 +136,8 @@ try:
     )
 except ImportError:  # pragma: no cover - script execution path
     from audits import (
+        FORBIDDEN_THINKING_PATTERNS,
+        HARD_FORBIDDEN_THINKING_PATTERNS,
         audit_generation_quality,
         audit_source_record,
         bridge_step_relation_realized,
@@ -271,36 +275,6 @@ DEFAULT_FALLBACK_MODELS = [
 DEFAULT_API_TIMEOUT_SECONDS = float(os.getenv("ZJUVAI_TIMEOUT_SECONDS", "120"))
 DEFAULT_API_CALL_RETRIES = int(os.getenv("ZJUVAI_API_RETRIES", "3"))
 DEFAULT_API_RETRY_BACKOFF_SECONDS = float(os.getenv("ZJUVAI_API_RETRY_BACKOFF_SECONDS", "3"))
-FORBIDDEN_THINKING_PATTERNS = [
-    re.compile(r"<\s*/?\s*(aux|proof|numerical_check)\s*>", re.IGNORECASE),
-    re.compile(r"\[\d{3}\]"),
-    re.compile(r"\bAR\b"),
-    re.compile(r"\ba\d{2,}\b"),
-    re.compile(r"\br\d+\b"),
-    re.compile(r"\bsameclock\b", re.IGNORECASE),
-    re.compile(r"\bsimtri?r?\b", re.IGNORECASE),
-    re.compile(r"rest of the proof", re.IGNORECASE),
-    re.compile(r"hidden reference", re.IGNORECASE),
-    re.compile(r"supervisor", re.IGNORECASE),
-    re.compile(r"given aux", re.IGNORECASE),
-    re.compile(r"\bthe construction of point\b", re.IGNORECASE),
-    re.compile(r"\bthis point is crucial\b", re.IGNORECASE),
-    re.compile(r"\bnecessary relationships\b", re.IGNORECASE),
-    re.compile(r"\bit becomes evident\b", re.IGNORECASE),
-    re.compile(r"\bwill help us\b", re.IGNORECASE),
-    re.compile(r"\bnot directly evident\b", re.IGNORECASE),
-    re.compile(r"\bdesired angle equality\b", re.IGNORECASE),
-    re.compile(r"\bdesired ratio\b", re.IGNORECASE),
-    re.compile(r"\bclear relationship\b", re.IGNORECASE),
-    re.compile(r"\bessential for proving\b", re.IGNORECASE),
-    re.compile(r"\bhelp establish\b", re.IGNORECASE),
-    re.compile(r"\bcoordinate table\b", re.IGNORECASE),
-    re.compile(r"\brotational symmetry\b", re.IGNORECASE),
-    re.compile(r"\bcenter of symmetry\b", re.IGNORECASE),
-    re.compile(r"\bcenter of similarity\b", re.IGNORECASE),
-    re.compile(r"\bsimilarity center\b", re.IGNORECASE),
-    re.compile(r"`[^`]+`"),
-]
 DOSSIER_WRITER_SEMANTIC_PENALTY_PATTERNS = [
     re.compile(r"\bmoving us closer to the goal\b", re.IGNORECASE),
     re.compile(r"\bthis construction allows\b", re.IGNORECASE),
@@ -603,7 +577,7 @@ def validate_thinking_response(
     if internal_ref_hit:
         return False, f"Internal planning reference detected: {internal_ref_hit.group(0)}"
 
-    for pattern in FORBIDDEN_THINKING_PATTERNS:
+    for pattern in HARD_FORBIDDEN_THINKING_PATTERNS:
         hit = pattern.search(thinking_text)
         if hit:
             return False, f"Forbidden leakage pattern detected: {hit.group(0)}"
