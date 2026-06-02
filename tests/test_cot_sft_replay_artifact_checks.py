@@ -89,7 +89,6 @@ def _build_scripted_insight_fixture(index: int = 1):
         aux_part=aux_part,
         insight_slots=slots,
         visible_text_facts=build_visible_text_facts(record),
-        image_scan_candidates=["points b, d, and e appear nearly collinear"],
     )
     writer_body = build_scripted_insight_writer_body(scripted_plan)
     return record, scripted_plan, writer_body

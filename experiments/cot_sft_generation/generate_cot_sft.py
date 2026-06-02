@@ -9599,19 +9599,6 @@ def generate_insight_thinking(
     point_coords = get_point_coords(record)
     visible_goal = extract_problem_goal(record)
     visible_text_facts = build_visible_text_facts(record)
-    coordinate_candidates = build_hidden_coordinate_candidates(
-        point_coords,
-        max_items=RELAXED_COORDINATE_CANDIDATE_MAX_ITEMS,
-        relax_type_limits=True,
-    )
-    aux_points = {point.lower() for point in extract_aux_new_points(aux_part)}
-    image_scan_candidates = []
-    for candidate in coordinate_candidates:
-        relation = build_canonical_coordinate_relation(candidate)
-        if relation and not extract_point_mentions(relation, list(aux_points)) and relation not in image_scan_candidates:
-            image_scan_candidates.append(relation)
-        if len(image_scan_candidates) >= 4:
-            break
 
     dag = parse_proof_dag(record.get("llm_output_renamed", ""))
     insight_slots = extract_insight_slots(dag, visible_goal=visible_goal, aux_part=aux_part)
@@ -9641,7 +9628,6 @@ def generate_insight_thinking(
         record,
         aux_part=aux_part,
         visible_fact_relations=visible_fact_relations,
-        image_scan_candidates=image_scan_candidates,
         insight_slots=insight_slots,
     )
     plan_messages = [
@@ -9675,7 +9661,6 @@ def generate_insight_thinking(
             aux_part=aux_part,
             insight_slots=insight_slots,
             visible_text_facts=visible_text_facts,
-            image_scan_candidates=image_scan_candidates,
         )
         ok, message, cleaned_scripted_plan = validate_insight_plan_response(
             scripted_plan,

@@ -222,11 +222,11 @@ def build_insight_plan_prompt(
     record,
     aux_part: str,
     visible_fact_relations: list[str],
-    image_scan_candidates: list[str],
     insight_slots: dict,
 ):
     public_problem = build_public_problem_text(record)
     visible_goal = extract_problem_goal(record)
+    visible_point_coords = record.get("point_coords_grid") or record.get("grid_coord") or {}
     canonical_aux_construction = build_canonical_construction(aux_part or "")
     return (
         "You are planning an insight-first geometry CoT sample.\n\n"
@@ -237,8 +237,8 @@ def build_insight_plan_prompt(
         f"{visible_goal}\n\n"
         "[Visible Facts]\n"
         f"{json.dumps(visible_fact_relations, ensure_ascii=False, indent=2)}\n\n"
-        "[Visible Image Cues]\n"
-        f"{json.dumps(image_scan_candidates, ensure_ascii=False, indent=2)}\n\n"
+        "[Visible Point Coordinates]\n"
+        f"{json.dumps(visible_point_coords, ensure_ascii=False, indent=2)}\n\n"
         "[Approved Auxiliary Construction]\n"
         "This is the canonical auxiliary construction already chosen in the teacher record. Keep the geometry consistent with it.\n"
         f"{canonical_aux_construction}\n\n"
@@ -246,14 +246,18 @@ def build_insight_plan_prompt(
         "These slots come from the hidden proof DAG. Reuse them as internal anchors, but do not quote proof ids, rule names, or hidden-route language.\n"
         f"{json.dumps(insight_slots, ensure_ascii=False, indent=2)}\n\n"
         "[Task]\n"
-        "Return exactly one JSON object describing only the visible setup, the gap, the helper effect that is missing, and why the given auxiliary construction is the right move.\n\n"
+        "Return exactly one JSON object describing only the visible setup, the gap, the helper effect that is missing, and why the given auxiliary construction is the right move. "
+        "Derive any coordinate-backed image observations yourself from the visible point coordinates when they genuinely matter.\n\n"
         "[Critical Requirements]\n"
         "- Keep the plan insight-first. Do not write a full closure route.\n"
+        "- `image_scan` should be your own short list of concrete visible relation cues. Use the visible coordinates only when they help you decide which cues matter.\n"
         "- `required_aux_effect` must stay aligned with the slot-derived effect.\n"
         "- `aux_construction` should describe the approved auxiliary construction naturally, without changing the geometry.\n"
         "- `aux_selection_reason` must explain only why this helper is appropriate; it must reuse the slot information instead of inventing a different hidden relation or expanding into a proof route.\n"
         "- If the auxiliary construction introduces multiple new points or multiple staged facts, include `stage_order`.\n"
         "- `bonus_post_aux_tail` is optional; if you include it, keep it local to what the helper opens after construction.\n"
+        "- If coordinates help, convert them into a few relevant local observations instead of narrating the whole coordinate table.\n"
+        "- Stay visible-only: use only visible points and visible coordinates, and do not infer hidden proof steps from the coordinate table.\n"
         "- Do not list the construction's direct consequences one by one; keep them script-local.\n"
         "- Do not mention proof ids, rule names, hidden hints, or theorem catalogs.\n\n"
         "[Output Schema Example]\n"
@@ -264,6 +268,7 @@ def build_insight_plan_prompt(
 def build_insight_write_prompt(record, plan: dict):
     public_problem = build_public_problem_text(record)
     visible_goal = extract_problem_goal(record)
+    visible_point_coords = record.get("point_coords_grid") or record.get("grid_coord") or {}
     visible_plan = {
         "visible_facts": plan.get("visible_facts", []),
         "image_scan": plan.get("image_scan", []),
@@ -280,6 +285,8 @@ def build_insight_write_prompt(record, plan: dict):
         f"{public_problem}\n\n"
         "[Visible Goal]\n"
         f"{visible_goal}\n\n"
+        "[Visible Point Coordinates]\n"
+        f"{json.dumps(visible_point_coords, ensure_ascii=False, indent=2)}\n\n"
         "[Approved Insight Plan]\n"
         f"{json.dumps(visible_plan, ensure_ascii=False, indent=2)}\n\n"
         "[Writing Rules]\n"
@@ -288,6 +295,9 @@ def build_insight_write_prompt(record, plan: dict):
         "- Keep the post-construction boundary explicit: the body may describe the visible gap, the approved auxiliary construction, the construction's direct local effect, and cautious local unlock statements that stay near that helper effect.\n"
         "- Do not claim that a remote goal-side object is already connected, transferable, comparable, or resolved unless that supporting relation is explicitly stated in the body itself.\n"
         "- You do not need to quote `required_aux_effect` verbatim; describing the approved helper relation or its immediate geometric payoff is enough.\n"
+        "- You may write visible-point coordinates inline when they help anchor a key local observation to the figure, especially for the points that drive a coordinate-backed judgment.\n"
+        "- Use coordinates only when helpful; you do not need to attach coordinates to every point mention.\n"
+        "- Never assign coordinates to auxiliary points.\n"
         "- You may continue after the construction to explain what the helper unlocks locally, but do not turn that into a full hidden proof retelling.\n"
         "- Do not enumerate direct construction consequences one by one.\n"
         "- Do not retell the full proof. Do not list theorems. Do not mention proof ids or rule names.\n"
@@ -321,13 +331,7 @@ def build_scripted_insight_plan(
     aux_part: str,
     insight_slots: dict,
     visible_text_facts,
-    image_scan_candidates: list[str],
 ):
-    aux_points = {
-        str(point).lower()
-        for point in extract_aux_new_points(aux_part or "")
-        if isinstance(point, str) and point.strip()
-    }
     visible_facts = []
     for item in visible_text_facts or []:
         relation = item.get("relation") if isinstance(item, dict) else item
@@ -336,11 +340,6 @@ def build_scripted_insight_plan(
         if len(visible_facts) >= 4:
             break
 
-    image_scan = [
-        item
-        for item in image_scan_candidates
-        if isinstance(item, str) and item.strip() and not extract_point_mentions(item, list(aux_points))
-    ][:3]
     visible_goal = extract_problem_goal(record)
     goal_points = parse_goal_expression(visible_goal).get("points", [])
     goal_point_text = ", ".join(goal_points[:4]) if goal_points else "the target"
@@ -374,7 +373,7 @@ def build_scripted_insight_plan(
 
     return InsightPlan(
         visible_facts=visible_facts,
-        image_scan=image_scan,
+        image_scan=[],
         goal_gap_type=goal_gap_type,
         goal_gap_text=goal_gap_text,
         required_aux_effect=required_aux_effect,
@@ -462,7 +461,7 @@ def validate_insight_plan_response(
 
     ok, message, cleaned_image_scan = _canonical_relation_list(
         plan.get("image_scan"),
-        min_items=1,
+        min_items=0,
         field_name="image_scan",
     )
     if not ok:

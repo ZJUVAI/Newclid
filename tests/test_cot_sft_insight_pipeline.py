@@ -19,6 +19,7 @@ from experiments.cot_sft_generation.core.proof_dag import parse_proof_dag
 from experiments.cot_sft_generation.generate_cot_sft import (
     build_visible_text_facts,
     extract_aux_and_rest,
+    generate_insight_thinking,
     get_point_coords,
     process_and_generate_sft,
     validate_thinking_response,
@@ -54,7 +55,6 @@ def _build_scripted_insight_fixture(index: int = 1):
         aux_part=aux_part,
         insight_slots=slots,
         visible_text_facts=build_visible_text_facts(record),
-        image_scan_candidates=["points b, d, and e appear nearly collinear"],
     )
     writer_body = build_scripted_insight_writer_body(scripted_plan)
     return record, scripted_plan, writer_body
@@ -189,7 +189,6 @@ class CotSftInsightPipelineTest(unittest.TestCase):
             aux_part=aux_part,
             insight_slots=slots,
             visible_text_facts=build_visible_text_facts(record),
-            image_scan_candidates=["points b, d, and e appear nearly collinear"],
         )
 
         ok, message, cleaned = validate_insight_plan_response(
@@ -217,12 +216,14 @@ class CotSftInsightPipelineTest(unittest.TestCase):
             record,
             aux_part=aux_part,
             visible_fact_relations=[fact["relation"] for fact in build_visible_text_facts(record)],
-            image_scan_candidates=["points b, d, and e appear nearly collinear"],
             insight_slots=slots,
         )
 
+        self.assertIn("[Visible Point Coordinates]", prompt)
         self.assertIn("[Approved Auxiliary Construction]", prompt)
         self.assertIn("construct point f such that a, c, d, f are concyclic and b, d, f are collinear", prompt)
+        self.assertNotIn("[Visible Image Cues]", prompt)
+        self.assertNotIn("points b, d, and e appear nearly collinear", prompt)
         self.assertNotIn("at most two short sentences", prompt)
 
     def test_validate_insight_plan_response_accepts_lists_beyond_old_caps(self):
@@ -369,10 +370,12 @@ class CotSftInsightPipelineTest(unittest.TestCase):
             },
         )
 
+        self.assertIn("[Visible Point Coordinates]", prompt)
         self.assertNotIn("aux_immediate_effects", prompt)
         self.assertNotIn('"required_aux_effect"', prompt)
         self.assertNotIn('"goal_gap_type"', prompt)
         self.assertIn('"canonical_aux_construction"', prompt)
+        self.assertIn("You may write visible-point coordinates inline", prompt)
 
     def test_build_insight_write_prompt_forbids_downstream_overclaim_examples(self):
         prompt = build_insight_write_prompt(
@@ -395,6 +398,80 @@ class CotSftInsightPipelineTest(unittest.TestCase):
         self.assertNotIn("at most one cautious local unlock statement", prompt)
         self.assertNotIn("one or two short follow-up sentences", prompt)
         self.assertNotIn("Keep the tone impersonal", prompt)
+
+    def test_build_scripted_insight_plan_leaves_image_scan_empty_without_coordinate_cue_fabrication(self):
+        record = _load_record(1)
+        aux_part, _ = extract_aux_and_rest(record["llm_output_renamed"])
+        visible_goal = record["llm_input_renamed"].split("?", 1)[1].replace("</problem>", "").strip()
+        slots = extract_insight_slots(parse_proof_dag(record["llm_output_renamed"]), visible_goal, aux_part)
+
+        plan = build_scripted_insight_plan(
+            record,
+            aux_part=aux_part,
+            insight_slots=slots,
+            visible_text_facts=build_visible_text_facts(record),
+        )
+
+        self.assertEqual(plan["image_scan"], [])
+
+    def test_generate_insight_thinking_does_not_use_hidden_coordinate_candidate_synthesis(self):
+        record = dict(_load_record(1))
+        aux_part, _ = extract_aux_and_rest(record["llm_output_renamed"])
+        plan = {
+            "visible_facts": ["ab equals ac"],
+            "image_scan": [],
+            "goal_gap_type": "angle_transfer",
+            "goal_gap_text": "the visible givens still do not transfer the angle at the b-side onto the d-side",
+            "required_aux_effect": "a, c, d, f are concyclic",
+            "aux_construction": "construct point f such that a, c, d, f are concyclic and b, d, f are collinear",
+            "aux_selection_reason": "the cyclic helper around a, c, d, and f is the missing local carrier before the d-side can reuse the old frame",
+        }
+        writer_body = (
+            "The visible givens still do not move the needed angle from the b-side onto the d-side. "
+            "Construct point f such that a, c, d, f are concyclic and b, d, f are collinear. "
+            "That cyclic helper gives the figure one local angle carrier before the route returns to b and d."
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            image_path = Path(temp_dir) / "fixture.png"
+            image_path.write_bytes(b"fixture-image")
+
+            with patch(
+                "experiments.cot_sft_generation.generate_cot_sft.build_hidden_coordinate_candidates",
+                side_effect=AssertionError("hidden coordinate candidates should not be built for insight_v1"),
+            ), patch(
+                "experiments.cot_sft_generation.generate_cot_sft.run_plan_stage",
+                return_value={
+                    "success": True,
+                    "output": json.dumps(plan, ensure_ascii=False),
+                    "parsed": plan,
+                    "attempts_used": 1,
+                    "elapsed_seconds": 0.0,
+                    "error": None,
+                },
+            ), patch(
+                "experiments.cot_sft_generation.generate_cot_sft.run_writer_stage",
+                return_value={
+                    "success": True,
+                    "output": writer_body,
+                    "attempts_used": 1,
+                    "elapsed_seconds": 0.0,
+                    "error": None,
+                },
+            ):
+                result = generate_insight_thinking(
+                    record,
+                    image_path=image_path,
+                    aux_part=aux_part,
+                    sanitized_rest="",
+                    model_name="fixture-model",
+                    max_retries=1,
+                    verbose=True,
+                )
+
+        self.assertTrue(result["success"], result["error"])
+        self.assertIn("[Visible Point Coordinates]", result["plan_prompt"])
+        self.assertIn("[Visible Point Coordinates]", result["write_prompt"])
 
     def test_validate_insight_writer_body_rejects_proof_echo(self):
         plan = {
