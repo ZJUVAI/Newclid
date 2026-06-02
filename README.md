@@ -20,17 +20,19 @@ GenesisGeo is a neuro-symbolic system that proves geometry theorems by combining
 
 ## CoT SFT Mainline
 
-The auxiliary-construction CoT pipeline now defaults to `insight_v1`.
+The auxiliary-construction CoT pipeline now defaults to `insight_image_v1`.
 
-- Mainline: `insight_v1`
+- Mainline default: `insight_image_v1`
+- Sibling text-only mainline: `insight_text_v1`
 - Legacy / benchmark / fallback: `dossier_v1`
 - Older compatibility route: `model_evidence_legacy`
 
-The default `insight_v1` target is `insight -> aux`, not `aux -> full closure`.
+Both insight variants target `insight -> aux`, not `aux -> full closure`.
 Entry docs:
 
 - [CURRENT_DESIGN.md](experiments/cot_sft_generation/docs/current/CURRENT_DESIGN.md)
-- [INSIGHT_V1_MAINLINE.md](experiments/cot_sft_generation/docs/current/INSIGHT_V1_MAINLINE.md)
+- [INSIGHT_IMAGE_V1_MAINLINE.md](experiments/cot_sft_generation/docs/current/INSIGHT_IMAGE_V1_MAINLINE.md)
+- [INSIGHT_TEXT_V1_MAINLINE.md](experiments/cot_sft_generation/docs/current/INSIGHT_TEXT_V1_MAINLINE.md)
 - [DOSSIER_V1_MAINLINE.md](experiments/cot_sft_generation/docs/current/DOSSIER_V1_MAINLINE.md)
 
 ## Results (GenesisGeo-2B)

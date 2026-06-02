@@ -18,7 +18,13 @@
 1. 长期读 run 结果时，优先使用 `surface_pass`，不要再把 `success` 当主字段。
 2. `success` 目前只为兼容旧脚本保留，语义上等同于 `surface_pass`。
 3. 当前 run artifacts schema 版本为 `cot_sft_artifacts_v1`。
-4. 任何新增长期字段，都应先落到 `run_artifacts.py`，再同步更新本文档。
+4. 当前 live generation style 名称是：
+   - `insight_image_v1`
+   - `insight_text_v1`
+   - `dossier_v1`
+   - `model_evidence_legacy`
+5. `insight_v1` 只应被视为历史记录名称，不应再被当作当前可选 style。
+6. 任何新增长期字段，都应先落到 `run_artifacts.py`，再同步更新本文档。
 
 ## 2. `run_config.json`
 
@@ -64,6 +70,8 @@
 
 最终输出 JSONL 的每条记录由 `build_dataset_output_record(...)` 生成，稳定字段如下：
 
+共同字段：
+
 | 字段 | 类型 | 含义 |
 |------|------|------|
 | `instruction` | `str` | 训练指令文本 |
@@ -71,8 +79,15 @@
 | `thinking` | `str` | 最终 `<thinking>...</thinking>` |
 | `aux` | `str` | 原始 `<aux>...</aux>` |
 | `output` | `str` | `thinking + "\n" + aux` |
-| `image_path` | `str` | 图片路径 |
 | `_order` | `int` | 本次 run 中的样本顺序 |
+
+style 差异：
+
+- `insight_image_v1`
+  - 额外包含 `image_path`
+- `insight_text_v1`
+  - 不包含 `image_path`
+- insight family 两个 variant 都不会导出 point coordinates
 
 ## 5. `item_records.jsonl`
 
@@ -108,10 +123,10 @@
 说明：
 
 - `surface_pass=true` 不等于一定导出。
-- 当前只有 `insight_v1` 会被 generation-audit 的硬问题拦导出，硬问题范围为：
+- 当前整个 insight family 都会被 generation-audit 的硬问题拦导出，硬问题范围为：
   - `no_proof_echo`
   - `visible_only_boundary`
-- `goal_gap_specificity`、`aux_selection_grounded`、`multi_point_staging` 仍只记录在 artifacts，不阻止导出。
+- `goal_gap_specificity`、`aux_selection_grounded`、`multi_point_staging` 等仍只记录在 artifacts，不阻止导出。
 
 ## 6. `item_audits.jsonl`
 
@@ -238,29 +253,3 @@ python experiments/cot_sft_generation/semantic_review.py \
   --run-dir /path/to/run_artifacts \
   --write-summary
 ```
-
-5. 用刷新后的 `summary.json` 记录：
-   - `semantic_review_status`
-   - `semantic_pass_rate`
-   - `manual_critical_error_items`
-   - `manual_critical_error_rate`
-
-注意：
-
-- `semantic_review.py` 当前只刷新语义审读相关汇总字段，不会重新计算 `avg_attempts_used` 这类生成期统计。
-
-## 10. 最小验证入口
-
-为了避免长期维护依赖额外测试框架，当前最小验证入口应保证在标准库环境里可跑：
-
-```bash
-python experiments/cot_sft_generation/maintenance_smoke_check.py
-```
-
-它会统一覆盖：
-
-1. core files 的 `py_compile`
-2. benchmark manifest 与固定输入文件的一致性
-3. `generate_cot_sft.py --help`
-4. `semantic_review.py --help`
-5. `tests/test_cot_sft_*.py` 的 `unittest` 回归

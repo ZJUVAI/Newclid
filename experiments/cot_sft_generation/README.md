@@ -9,8 +9,8 @@
    - `point_coords_grid` / `grid_coord`
    - 其他源字段
 2. 最终导出的训练样本只保留学生模型在训练和评估时应当看到的输入：
-   - 图片
-   - 题目文本
+   - `insight_image_v1`：图片 + 题目文本
+   - `insight_text_v1`：题目文本
 
 因此，这个脚本做的是“full-information teacher -> visible-only student target”的数据蒸馏，而不是把完整证明直接暴露给训练模型。
 
@@ -19,7 +19,8 @@
 - [docs/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/README.md)：新的文档总入口，先按用途看文档，不要直接在平铺文件里找。
 - [docs/DOC_BOUNDARIES.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/DOC_BOUNDARIES.md)：先看这个，分清楚 agent 能改什么、不能改什么。
 - [docs/immutable/DATA_QUALITY_REQUIREMENTS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/immutable/DATA_QUALITY_REQUIREMENTS.md)：不可改的数据质量要求镜像。
-- [docs/current/INSIGHT_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/INSIGHT_V1_MAINLINE.md)：默认主线，先看这份。
+- [docs/current/INSIGHT_IMAGE_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/INSIGHT_IMAGE_V1_MAINLINE.md)：默认主线，先看这份。
+- [docs/current/INSIGHT_TEXT_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/INSIGHT_TEXT_V1_MAINLINE.md)：text-only sibling mainline。
 - [docs/current/DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/DOSSIER_V1_MAINLINE.md)：legacy / benchmark 路线说明。
 - [benchmarks/quality_review_v1/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/quality_review_v1/README.md)：当前主线默认使用的 review-oriented benchmark。
 
@@ -94,7 +95,7 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 
 每条输出样本包含两部分：
 
-- `thinking`：模型写出的 `<thinking>...</thinking>`，内容必须看起来只能依赖图片和题目得到，不能泄露 `<problem>...</problem>` 之后的信息
+- `thinking`：模型写出的 `<thinking>...</thinking>`，内容必须看起来只能依赖当前 style 允许的可见输入得到，不能泄露 `<problem>...</problem>` 之后的信息
 - `aux`：直接保留源数据中的原始 `<aux>...</aux>`
 
 此外还会保留一个兼容字段：
@@ -106,12 +107,14 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 当前这条生成链路的目标，不是只产出“看起来像 CoT”的文本，而是产出真正可用于训练辅助构造模型的高质量样本。具体要求如下：
 
 1. 可见输入边界必须严格
-   - 最终训练样本暴露给学生模型的只有图片和题目文本。
+   - 最终训练样本暴露给学生模型的只有当前 style 对应的可见输入。
+   - `insight_image_v1` 暴露图片和题目文本。
+   - `insight_text_v1` 只暴露题目文本。
    - `thinking` 不得泄露 `<problem>...</problem>` 之后的 hidden proof、proof IDs、规则名、数值检查字段、坐标表来源等生成期信息。
 
 2. `thinking` 必须像是从图和题面观察得到的
    - 文本应当从可见图形结构出发，而不是像在复述 formal proof。
-   - 允许生成期教师模型使用完整记录做监督，但最终导出的 `thinking` 必须读起来像“观察图片后得到的构造与验证思路”。
+   - 允许生成期教师模型使用完整记录做监督，但最终导出的 `thinking` 必须读起来像“观察当前可见输入后得到的构造与验证思路”。
 
 3. 不能只盯 2-3 个点，要对整张图有完整认识
    - 少量 tagged anchor points 只负责给图定向。
@@ -121,10 +124,11 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 4. 坐标应当服务于几何关系判断，而不是只做标签
    - 生成期可以使用 `point_coords_grid` / `grid_coord` 做内部 sanity check。
    - 坐标的作用应当是帮助教师模型确认哪些平行、垂直、等长、中点、共线等关系值得进一步追踪，而且这些判断不应只围着少数点打转。
-   - 当前实现允许最终 `thinking` 显式写出可见点坐标、向量/长度/面积残差这类 plain-text 计算，但这些计算必须服务于后续 bridge 或 goal，而不是装饰性堆算式。
+   - 当前实现允许 `insight_image_v1` 的最终 `thinking` 显式写出可见点坐标、向量/长度/面积残差这类 plain-text 计算，但这些计算必须服务于后续 bridge 或 goal，而不是装饰性堆算式。
+   - `insight_text_v1` 的 planner、writer、validation 和最终训练样本都不应出现图片或点坐标输入，也不应在正文里泄露坐标。
    - 文本里必须区分：
      - 题面直接给出的 visible text facts
-     - 从图片和可见点坐标中观察或计算出的 image / coordinate facts
+     - 从图片和可见点坐标中观察或计算出的 image / coordinate facts（仅 `insight_image_v1`）
 
 5. 需要包含从提出 aux 到解答出 goal 的完整逻辑
    - 高质量样本不能只说明“为什么要加这个点”，还要继续写清楚加点之后的关键关系如何逐步推进到最终结论。
@@ -237,52 +241,59 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 
 ## 当前生成框架
 
-如果你接下来明确要以新链路为主线继续做迭代，请先读 [INSIGHT_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/INSIGHT_V1_MAINLINE.md)。下面这节描述的是当前实现本身，而不是“下个会话最该先做什么”。
+如果你接下来明确要以新链路为主线继续做迭代，请先读 [INSIGHT_IMAGE_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/INSIGHT_IMAGE_V1_MAINLINE.md)；如果你明确要做 text-only 合同，再补读 [INSIGHT_TEXT_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/INSIGHT_TEXT_V1_MAINLINE.md)。下面这节描述的是当前实现本身，而不是“下个会话最该先做什么”。
 
 先区分两层文档角色：
 
 - `docs/immutable/` 代表最终质量标准，不随当前实验主线收窄而改变。
-- `docs/current/` 代表当前默认实现与阶段性策略，其中 `insight_v1` 是当前主线，`dossier_v1` 是 legacy / benchmark 路线。
+- `docs/current/` 代表当前默认实现与阶段性策略，其中 `insight_image_v1` 是默认主线，`insight_text_v1` 是 text-only sibling mainline，`dossier_v1` 是 legacy / benchmark 路线。
 
-当前默认主链已经切到 `insight_v1`，旧路线保留为显式可选项：
+当前默认主链已经切到 `insight_image_v1`，并新增显式 text-only 变体：
 
-- 默认：`--generation-style insight_v1`
+- 默认：`--generation-style insight_image_v1`
+- text-only sibling：`--generation-style insight_text_v1`
 - legacy / benchmark：`--generation-style dossier_v1`
 - 兼容 fallback：`--generation-style model_evidence_legacy`
 
-`insight_v1` 的核心思想是：阶段性把默认主线收窄到 “观察缺口 -> 说明 helper effect -> 提出 aux”，而不是默认要求完整 closure。这里的“收窄”只针对当前主线，不重写最终质量目标；[DATA_QUALITY_REQUIREMENTS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/immutable/DATA_QUALITY_REQUIREMENTS.md) 中第 5 点仍然是长期标准。
+`insight_image_v1` / `insight_text_v1` 的核心思想是：阶段性把默认主线收窄到 “观察缺口 -> 说明 helper effect -> 提出 aux”，而不是默认要求完整 closure。这里的“收窄”只针对当前主线，不重写最终质量目标；[DATA_QUALITY_REQUIREMENTS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/immutable/DATA_QUALITY_REQUIREMENTS.md) 中第 5 点仍然是长期标准。
 
 同时要避免两个误读：
 
 - 这不是要求压缩所有前段 reasoning。只要不泄露 hidden source，`pre-aux` 的 visible-only reasoning 仍然可以更丰富。
-- 这也不是禁止显式使用 visible-point coordinates。当前实现允许并且在需要时可以鼓励把可见点坐标用于前段 visible-only reasoning，但不要把当前 `insight_v1` 描述成已经继承了 `dossier_v1` 那套完整的 writer-coordinate 字段合同。
+- 这也不是在两个 variant 上都允许显式使用 visible-point coordinates。当前 `insight_image_v1` 允许并且在需要时可以鼓励把可见点坐标用于前段 visible-only reasoning；`insight_text_v1` 则要求 generation、validation、artifacts 和最终训练样本都避免图片与点坐标输入。
 
 1. `source audit`
    - 先检查图片、题面、`<aux>`、proof、坐标字段是否缺失或明显冲突。
+   - 对 `insight_image_v1`，图片路径和 visible coordinates 仍是常规 source audit 输入。
+   - 对 `insight_text_v1`，不会再把缺图或缺 visible coordinates 当作 source-audit 硬问题。
    - 发现异常先记录，不为了通过率强行硬写。
 
 2. `insight slots + plan`
    - 脚本先从 proof DAG 提取 `InsightSlots`，再让 planner 产出结构化 `InsightPlan`。
    - 当前默认 plan 只围绕 visible facts、image scan、goal gap、required helper effect、aux construction、aux selection reason，以及可选的 `stage_order` / `bonus_post_aux_tail`。
    - planner 不负责输出 full closure chain；`post-aux` 的完整收尾也不是当前默认合同。
+   - `insight_image_v1` 的 planner 仍会看到图片和 raw visible coordinates。
+   - `insight_text_v1` 的 planner 改为 text-only，不接收 `image_url`，也不接收 raw visible coordinates。
 
 3. 脚本兜底与规范化
    - 对 `image_scan` / `required_aux_effect` 等字段做自然语言归一化。
    - 当 validator 需要检查 `<aux>` 的直接后果时，脚本会本地临时现算，但不把这些内容扩展成当前默认 writer 合同。
-   - 如果 planner 失败，当前 `insight_v1` 允许回退到 scripted insight plan；如果 writer 校验失败，则该样本直接失败，不再自动降级到 `dossier_v1`。
+   - 如果 planner 失败，当前 insight family 仍允许回退到 scripted insight plan；如果 writer 校验失败，则该样本直接失败，不再自动降级到 `dossier_v1`。
    - `insight_slots` 和 `insight_plan_parsed` 会保存到 artifacts，方便 replay 与审计。
 
 4. `write`
    - writer 从批准后的 `InsightPlan` 写出完整 `thinking`。
    - 当前默认重点是 visible gap、helper effect、aux selection reason，以及非常短的 post-aux local tail。
-   - richer `pre-aux` visible-only reasoning 仍然允许；显式坐标也允许，但只应服务于可见结构判断，且不能泄露 hidden 坐标来源。
+   - richer `pre-aux` visible-only reasoning 仍然允许。
+   - `insight_image_v1` 允许显式坐标，但只应服务于可见结构判断，且不能泄露 hidden 坐标来源。
+   - `insight_text_v1` 的 writer prompt 和最终正文都不应出现图片或坐标输入。
 
 5. 终检、artifact 与语义审读
    - writer 正文通过脚本终检后，才会组装成最终 `<thinking>...</thinking>`。
    - 终检会检查：
      - 长度和格式
      - shorthand / 泄露
-     - inline visible-point coordinates 是否与源数据一致
+     - inline visible-point coordinates 是否与源数据一致（仅 `insight_image_v1`）
      - 当前 `InsightPlan` 是否与正文一致
      - multi-point aux 的 staged strategy 是否在需要时被保留
    - run artifacts 里会显式记录：
@@ -293,7 +304,7 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 
 ## 最新实测（2026-05-20）
 
-下面这组数字是 `dossier_v1` legacy benchmark 的历史记录，不应当被误读为当前默认 `insight_v1` 合同本身：
+下面这组数字是 `dossier_v1` legacy benchmark 的历史记录，不应当被误读为当前默认 insight family 合同本身：
 
 - 默认模型 `qwen/qwen2.5-vl-72b-instruct`
 - 基准：`benchmarks/stratified_v1_12sample_input.jsonl` 中分层抽样 `4` 条
@@ -333,16 +344,17 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
   - `midp` 必须明确 midpoint
   - `cyclic` 必须明确 circle / circumcircle / cyclic
   - `cong` 必须明确 equal / congruent / equidistant
-- 当前默认主线允许显式使用 visible-point coordinates，但这些坐标句必须服务于 visible-only reasoning，而不是装饰性标签或 hidden route 的替代品
-- 当前默认主线会检查 `goal_gap_text` / `required_aux_effect` / `aux_selection_reason` 是否保持 insight-first 且与批准后的 `InsightPlan` 对齐
-- 当前默认主线鼓励覆盖 anchor 之外的更多可见点与子结构，但不会把 README 写成 `dossier_v1` 那套字段级合同
+- 当前 `insight_image_v1` 允许显式使用 visible-point coordinates，但这些坐标句必须服务于 visible-only reasoning，而不是装饰性标签或 hidden route 的替代品
+- 当前 `insight_text_v1` 不允许 planner、writer 或最终 `thinking` 泄露图片和 visible-point coordinates 输入
+- 当前 insight family 会检查 `goal_gap_text` / `required_aux_effect` / `aux_selection_reason` 是否保持 insight-first 且与批准后的 `InsightPlan` 对齐
+- 当前 insight family 鼓励覆盖 anchor 之外的更多可见点与子结构，但不会把 README 写成 `dossier_v1` 那套字段级合同
 - 多点 aux 的 `construction` 必须显式写出 staged / combined strategy，否则会被拒绝
 
-如果需要 `dossier_v1` 的字段级校验口径，例如 `bridge_chain`、`goal_closure` 或更细的 coordinate contract，请直接看 [DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/DOSSIER_V1_MAINLINE.md)，不要把它当成当前默认 `insight_v1` 合同。
+如果需要 `dossier_v1` 的字段级校验口径，例如 `bridge_chain`、`goal_closure` 或更细的 coordinate contract，请直接看 [DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/DOSSIER_V1_MAINLINE.md)，不要把它当成当前默认 insight family 合同。
 
 ## 导出格式
 
-输出 JSONL 每行形如：
+`insight_image_v1` 输出 JSONL 每行形如：
 
 ```json
 {
@@ -355,6 +367,8 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 }
 ```
 
+`insight_text_v1` 的最终数据集记录与上面相同，但不包含 `image_path`。
+
 这里的 `input` 就是最终训练/评估时应暴露给学生模型的文本输入；隐藏证明和坐标索引不会写进训练输入。
 
 ## 使用方法
@@ -363,8 +377,21 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 python experiments/cot_sft_generation/generate_cot_sft.py \
   -n 100 \
   -w 8 \
+  --generation-style insight_image_v1 \
   --model-name qwen/qwen3.5-plus-02-15 \
   -o experiments/cot_sft_generation/generated/run.jsonl \
+  -v
+```
+
+text-only 版本：
+
+```bash
+python experiments/cot_sft_generation/generate_cot_sft.py \
+  -n 100 \
+  -w 8 \
+  --generation-style insight_text_v1 \
+  --model-name qwen/qwen3.5-plus-02-15 \
+  -o experiments/cot_sft_generation/generated/run_text.jsonl \
   -v
 ```
 
@@ -374,6 +401,7 @@ python experiments/cot_sft_generation/generate_cot_sft.py \
 python experiments/cot_sft_generation/generate_cot_sft.py \
   --process-all \
   -w 16 \
+  --generation-style insight_image_v1 \
   --model-name qwen/qwen3.5-plus-02-15 \
   -o experiments/cot_sft_generation/generated/full.jsonl
 ```
@@ -388,6 +416,7 @@ python experiments/cot_sft_generation/generate_cot_sft.py \
 | `--process-all` | 关闭 | 处理全部含 `<aux>` 的样本 |
 | `-w, --num-workers` | `4` | 并发 worker 数 |
 | `--model-name` | `qwen/qwen3.5-plus-02-15` | 教师模型 |
+| `--generation-style` | `insight_image_v1` | 当前 generation style；也可显式指定 `insight_text_v1` / `dossier_v1` / `model_evidence_legacy` |
 | `-r, --max-retries` | `3` | 每个阶段的最大重试次数 |
 | `--sequential` | 关闭 | 顺序取前 N 条，而不是随机抽样 |
 | `-v, --verbose` | 关闭 | 记录样本级 prompt / plan / body / final thinking |

@@ -37,7 +37,7 @@ python experiments/cot_sft_generation/semantic_review.py \
 每条样本至少同时看：
 
 - 原题文本
-- 图片
+- 图片（如果当前 style 有图）
 - 最终 `thinking`
 - 原始 `aux`
 
@@ -46,14 +46,15 @@ python experiments/cot_sft_generation/semantic_review.py \
 - `plan_parsed`
 - `generation_audit`
 - `source_audit`
+- `generation_style`
 
 ## 2. `semantic_pass` 判定规则
 
 只有下面几项同时成立，才应标 `semantic_pass = true`：
 
-- 文本整体读起来像是从图片和题面观察得到，而不是在复述 hidden proof
+- 文本整体读起来像是从当前 style 对应的可见输入观察得到，而不是在复述 hidden proof
 - 坐标 / 视觉 cue 不是只被点名，而是真正进入了推理链
-- `aux_direct_relations -> bridge_steps -> goal_finish` 形成了真实闭环
+- `aux_direct_relations -> bridge_steps -> goal_finish` 形成了真实闭环，或者当前 insight 合同至少把 helper effect 与 aux grounding 写清楚
 - 每个关键 bridge relation 都能由前文 support 推出
 - 最后 2 到 4 步确实落到目标，而不是表面相似的替代结论
 
@@ -66,6 +67,7 @@ python experiments/cot_sft_generation/semantic_review.py \
 - 关键 bridge relation 明显不成立
 - 末段闭环到错的 goal relation 或错的 goal modality
 - `thinking` 明显依赖 hidden proof 口吻或不可见信息
+- `insight_text_v1` 样本明显示用了图片或点坐标输入
 - 多点 aux 的 staged strategy 严重缺失，导致正文基本不可用
 
 `manual_critical_error = true` 时，不应再标 `semantic_pass = true`。
@@ -114,7 +116,8 @@ python experiments/cot_sft_generation/semantic_review.py \
 1. 先看目标是什么，确定这是 angle / ratio / similarity / congruence 哪一类闭环。
 2. 再看 `aux` 的直接后果是否被正文正确承接。
 3. 再看 bridge 是否逐步回接到旧图，而不是中途发明新路线。
-4. 最后只盯末段 2 到 4 步，确认是否真的闭到目标。
+4. 如果是 `insight_text_v1`，额外确认正文没有借用图片或 visible-point coordinates。
+5. 最后只盯末段 2 到 4 步，确认是否真的闭到目标。
 
 ## 6. 审读记录示例
 

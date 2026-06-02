@@ -4,7 +4,8 @@
 
 当前默认主线已经阶段性从 “默认要求 `aux -> full closure`” 收窄到 `insight -> aux`：
 
-- 默认：`insight_v1`
+- 默认：`insight_image_v1`
+- text-only sibling：`insight_text_v1`
 - legacy：`dossier_v1`
 - fallback compatibility：`model_evidence_legacy`
 
@@ -20,7 +21,8 @@
 
 ### 已完成
 
-- `insight_v1` generation style 已落地并成为 CLI 默认值
+- `insight_image_v1` generation style 已落地并成为 CLI 默认值
+- `insight_text_v1` generation style 已作为 sibling mainline 落地
 - proof DAG -> `InsightSlots` 的脚本抽取已落地
 - `InsightPlan` planner / writer contract 已落地
 - `item_records.jsonl` 已保存：
@@ -30,6 +32,8 @@
   - `thinking`
   - `aux`
   - `output = thinking + "\n" + aux`
+- `insight_image_v1` 最终样本保留 `image_path`
+- `insight_text_v1` 最终样本省略 `image_path`
 - `dossier_v1` 已明确降级为：
   - legacy
   - benchmark
@@ -42,9 +46,8 @@
 - `tests/test_cot_sft_insight_pipeline.py`
 - `tests/test_cot_sft_writer_contracts.py`
 - `tests/test_cot_sft_review_artifacts.py`
-- `tests/test_cot_sft_proof_dag.py`
+- `tests/test_cot_sft_replay_artifact_checks.py`
 - `tests/test_cot_sft_audits.py`
-- `tests/test_cot_sft_fixture_pipeline.py`
 
 ## 当前风险
 
@@ -52,7 +55,7 @@
 
 proof DAG 已经是强监督源，但 `required_aux_effect`、`first_bridge_checkpoint`、`pre_goal_checkpoint` 仍然是脚本启发式选点，不是 proof engine 原生字段。
 
-### 2. `insight_v1` writer 仍偏保守
+### 2. insight-family writer 仍偏保守
 
 当前 writer contract 明确限制：
 
@@ -68,12 +71,12 @@ proof DAG 已经是强监督源，但 `required_aux_effect`、`first_bridge_chec
 
 ## Benchmark 口径
 
-当前建议把评测拆成两层：
+当前建议把评测拆成三层：
 
 1. `dossier_v1`
    - 继续作为 legacy benchmark / 对照基线
 
-2. `insight_v1`
+2. `insight_image_v1`
    - 重点看：
      - `goal_gap_specificity`
      - `aux_selection_grounded`
@@ -81,6 +84,9 @@ proof DAG 已经是强监督源，但 `required_aux_effect`、`first_bridge_chec
      - `multi_point_staging`
      - `no_proof_echo`
 
-结论上，`dossier_v1` 的 surface 通过率不再等价于主线质量；主线是否有效，应优先看 `insight_v1` 的 gap-specificity 和 aux-grounding。
+3. `insight_text_v1`
+   - 除了上面这些，还要额外看：
+     - 是否真的不依赖图片
+     - 是否真的不泄露 visible-point coordinates
 
-同时要明确：当前 benchmark 重点与最终质量目标并不完全一致。当前主线可以允许更丰富的 `pre-aux` visible-only reasoning，也允许显式使用 visible-point coordinates；阶段性被降权的是完整 post-aux closure 的默认要求，不是这些前段观察能力。
+结论上，`dossier_v1` 的 surface 通过率不再等价于主线质量；主线是否有效，应优先看 insight family 的 gap-specificity 和 aux-grounding。
