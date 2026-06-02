@@ -91,42 +91,59 @@ python experiments/cot_sft_generation/generate_cot_sft.py \
 - 找 goal 前最后一个非纯 AR checkpoint 的 `pre_goal_checkpoint`
 - 推断 `goal_gap_type`
 
-### 2. planner 只看 slots，不看 full proof
+### 2. planner 只看可见输入和 slots，不看 full proof
 
 [core/insight_pipeline.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/core/insight_pipeline.py) 的 planner prompt 只给：
 
 - public problem
 - visible facts
-- visible image cues
+- raw `[Visible Point Coordinates]`
+- approved auxiliary construction
 - `InsightSlots`
 
 planner 不再看完整 proof，也不负责输出 full closure chain。
+`image_scan` 现在由模型根据 raw visible coordinates 自己决定是否生成，不再预先塞入脚本合成的 coordinate-relation text。
 `<aux>` 的 direct consequences 仍可由脚本本地临时现算，但不再作为 planner / writer 合同字段。
 
-### 3. writer 只看批准后的 `InsightPlan`
+[generate_cot_sft.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/generate_cot_sft.py) 里的 `generate_insight_thinking(...)` 对 `insight_v1` 已不再构造脚本侧 coordinate-derived `image_scan_candidates`；planner 运行时就是直接拿 visible facts、visible coordinates 和 slots 自行组织 `image_scan`。
+
+### 3. writer 看批准后的 `InsightPlan`，也看 raw visible coordinates
 
 当前实现里，writer 默认聚焦：
 
 - 说清 visible gap
 - 说清 helper 需要制造的 effect
 - 说明为什么这个 aux 合适
-- 如有必要，只补 1 到 2 句 very short post-aux tail
+- 在 construction 之后，只继续补与 helper 局部 unlock 直接相关的内容，不扩写成 full hidden closure retelling
 
 这是一条默认收窄的实现主线，不是唯一合法内容边界。
 
 - 更丰富的 `pre-aux` visible-only reasoning 仍然允许
-- 显式 visible-point coordinates 仍然允许，只要它们服务于可见结构判断，且不把当前实现误写成已有完整的 writer-coordinate contract
+- writer prompt 当前会同时给 approved plan 和 raw `[Visible Point Coordinates]`
+- 显式 visible-point coordinates 仍然允许，只要它们服务于可见结构判断
+- coordinates 只在有帮助时内联即可，不要求每次提到 visible point 都带坐标
+- auxiliary points 不得被赋予坐标
 
 ## 校验边界
 
-当前 validator 会重点拦这几类退化：
+当前合同已经放松了一些更早版本里的泛化措辞限制和硬性篇幅上限；真正仍然重要的硬边界是：
 
 - `goal_gap_type` 和 goal family 冲突
 - `required_aux_effect` 脱离 slots
 - `required_aux_effect` 与 `<aux>` 的 direct consequence 不对齐
 - `aux_selection_reason` 发明新的 hidden relation
 - multi-point aux 缺少 `stage_order`
-- writer 退化成 proof retelling / theorem list / hidden marker leak
+- hidden-proof leakage / proof retelling / theorem list / hidden marker leak
+- internal refs，例如 `visible_facts[i]`、`image_scan[i]` 这类内部引用语法
+- visible-only boundary：不能把未在正文中建立的远端 goal-side 连接直接说成已经打通
+- 如果正文内联 visible-point coordinates，这些坐标必须和可见坐标表一致
+- auxiliary points 不得写成带坐标的点
+
+fail-closed 语义保持不变：
+
+- planner 失败时仍可回退到 scripted insight plan
+- 但 scripted fallback 不再伪造 coordinate-derived `image_scan`，当前可能直接保留 `image_scan=[]`
+- writer 失败仍直接判该样本失败，不再启用 scripted writer fallback
 
 ## Artifact 约定
 

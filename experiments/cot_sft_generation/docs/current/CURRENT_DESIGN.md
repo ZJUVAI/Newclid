@@ -49,7 +49,9 @@
 2. `core/insight_pipeline.py`
    - 定义 planner / writer prompt
    - 校验 `InsightPlan`
-   - 提供 scripted fallback plan
+   - planner 和 writer 都会拿到 raw `[Visible Point Coordinates]`
+   - planner 自行从 visible coordinates 提炼 `image_scan`；脚本不再为 `insight_v1` 预制 coordinate-derived `image_scan`
+   - 提供 scripted fallback plan，但 fallback 也不再伪造 coordinate-derived `image_scan`
    - writer 校验失败时按 fail-closed 处理，不再使用 scripted writer fallback
 
 3. [generate_cot_sft.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/generate_cot_sft.py)
@@ -88,10 +90,19 @@
 `process_and_generate_sft(...)` 的当前分发顺序是：
 
 1. 如果指定 `insight_v1`，先跑 insight planner / writer
-2. `insight_v1` 内部允许 planner 失败后回退到 scripted insight plan
+2. `insight_v1` 内部允许 planner 失败后回退到 scripted insight plan，但该 fallback 可以保留空的 `image_scan`
 3. 若 writer 校验失败，则该样本直接失败，不再自动降级到 `dossier_v1`
 4. 若显式指定 `dossier_v1`，只走 legacy dossier 路线
 5. 若显式指定 `model_evidence_legacy`，走最旧的兼容链路
+
+## 当前合同摘要
+
+`insight_v1` 当前主线合同可以压缩成四点：
+
+- planner 输入是 public problem、visible facts、raw `[Visible Point Coordinates]`、approved auxiliary construction 和 `InsightSlots`
+- writer 输入不是只有 approved plan；它还会拿到 raw `[Visible Point Coordinates]`
+- writer 可以在 construction 之后继续解释 helper 在局部打开了什么，但当前合同不再保留旧版的硬句数上限或固定语气要求
+- 当前真正保留的硬边界是 hidden-proof leakage、internal refs、visible-only boundary，以及正文里若写 visible-point coordinates 时必须写对，且不能给 auxiliary points 编坐标
 
 ## Artifact 约定
 
