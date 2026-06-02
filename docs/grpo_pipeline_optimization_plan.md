@@ -1,6 +1,6 @@
 # GRPO 迭代状态与后续计划
 
-最后更新：2026-05-28 | 当前 commit: `0c0201385a6dd4048481d45e65058b65693b657f`
+最后更新：2026-06-02 | 当前 commit: `750d5feba8ef7daeeea41b1341e58618e6be65c1`
 
 ## 主要结果概览
 
@@ -13,10 +13,12 @@
 | v18 checkpoint-500 | `vlm` | 14/16 | 55/95 | 10k `bucket_unified`，非当前 commit 历史结果（`f384d702`） |
 | **v19 checkpoint-500** | **`qwen3_vl_text` multiaux** | **14/16** | **58/95** | **ddar bug fix 后重跑（20260521）**，`select_balanced` 10k |
 | v27 checkpoint-500 | `qwen3_vl_text` multiaux | 14/16 | 58/95 | 与 `v19` 同配方的显式脚本化复跑（20260527），headline 与当前 baseline / v19 持平 |
+| v28 checkpoint-500 | `qwen3_vl_text` multiaux | 13/16 | 56/95 | 新 `maxaux8_20260528` balanced 10k 复跑（20260601），同配方下低于 v19 / v27 |
 | v26 checkpoint-1000 | `qwen3_vl_text` multiaux | 12/16 | 52/95 | `v19` 同配置拉长到 1000 steps，完整评测后明显回退（20260525） |
 
 补充说明：
 - ddar bug fix（commit `ed0b877`）后，sft44 / v17 / v19 / v27 在 imo_95 上分别为 58/95、56/95、58/95、58/95；GRPO 相对 baseline 的 headline 优势在当前 commit 下消失。`v27` 与当前 baseline 虽然同为 `58/95`，但逐题 solved-set 有 2 题互换：`v27` 新增 `imo_sl_1999_g6`、`imo_sl_2020_g6`，同时丢失 `imo_sl_2013_g2`、`imo_sl_2016_g5_variant`。
+- `v28` 使用新的 `maxaux8_20260528` 样本池衍生出的 `select_balanced` 10k 数据，在与 `v19/v27` 相同的 `grpo + group + token` 配方下最终为 `dev_imo 13/16`、`imo_95 56/95`；目前这次新样本池复跑没有带来收益。
 - v19 历史最高曾达 `66/95`（旧 run），ddar bug fix 前最新完整补跑为 `65/95`（commit `6e24d512`）；这些历史结果保留在下方来源列表中。
 - `v26` 说明继续把 `v19` 同配置从 `500` 步拉到 `1000` 步并不会带来更好的 benchmark 结果；虽然 KL 明显增大，但 `dev_imo` 和 `imo_95` 都回退。
 - v17/v19 使用的是 `qwen3_vl_text` multiaux 评估链路；v18 历史结果来自更早的 `vlm` 链路，跨版本比较主要用于主线演进记录。
@@ -133,6 +135,27 @@
 - 但它也不是“完全同一组 58 题”。相对当前 baseline，`v27` 多解了 `imo_sl_1999_g6`、`imo_sl_2020_g6`，少解了 `imo_sl_2013_g2`、`imo_sl_2016_g5_variant`。
 - 这说明当前 headline 已经进入“同分但逐题组成波动”的区间；单次复跑 `58/95` 本身还不足以证明 `v19` 配方相对当前 baseline 存在稳定优势。
 
+## v28 新样本池 balanced 10k 复跑
+
+`v28` 不是继续改训练目标，而是在保持 `v19/v27` 同一套 `grpo + group + token` 训练配方不变的前提下，切换到新生成的 `maxaux8_20260528` 样本池衍生出的 balanced 10k 训练集，直接测试新数据源本身是否能带来稳定增益。
+
+- 数据集：`datasets/maxaux8_20260528/20260529_grpo/geometry_clauses10_samples1M_select_balanced_10k.jsonl`
+- 模型目录：`models/grpo_vlm_sft44_geometry100k_v28_s1_4gpu_lr5e6/v0-20260601-054854/checkpoint-500`
+- 基座模型：`/C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084`
+- 配置族：`grpo + group + token`，`lr=5e-6`，`beta=0.02`，`num_generations=8`，`temperature=1.1`
+- 训练步数：`500` steps，`save_steps=50`
+
+**评估结果**：
+- ✅ dev_imo：**13/16**
+  - [v28 dev_imo CSV](/C20545/home/wangzi/GenesisGeo-grpo/results/v28_lr5e6_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v0-20260601-054854_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260601T085350Z.csv)
+- ✅ imo_95：**56/95**
+  - [v28 imo_95 CSV](/C20545/home/wangzi/GenesisGeo-grpo/results/v28_lr5e6_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_v0-20260601-054854_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260601T103143Z.csv)
+
+**结论**：
+- `v28` 明确低于当前主线：相较 `v19/v27` 的 `14/16`、`58/95`，它回退到 `13/16`、`56/95`。
+- 因为这次只换了训练数据来源而没有改训练配方，所以当前证据更支持“新 `maxaux8_20260528` balanced 10k 数据并未优于旧 `select_balanced` 10k 主线”，而不是训练脚本或评估链路的问题。
+- 这也说明现阶段主线版本仍应保留 `v19/v27`，`v28` 更适合作为“新样本池复跑未带来提升”的反例记录。
+
 ## IMO-95 代理 Benchmark 子集
 
 为了把 `imo_95` 的题目级差异单独拿出来复跑或做 trace drill-down，当前仓库额外维护两个从 [benchmarks/imo_95.txt](/C20545/home/wangzi/GenesisGeo-grpo/benchmarks/imo_95.txt) 抽取出的代理 benchmark：
@@ -179,6 +202,11 @@
   - partial CSV（46/95）：`results/v27_lr5e6_checkpoint500_qwen3_vl_text_multiaux/imo_95_resume_from_20260527_082737_partial.csv`
   - remaining CSV（12/49）：`results/v27_lr5e6_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_resume_from_20260527_082737_remaining_v0-20260527-030853_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260527T152852Z.csv`
   - **merged 最终结果 CSV（58/95）**：`results/v27_lr5e6_checkpoint500_qwen3_vl_text_multiaux/imo_95_resume_from_20260527_082737_merged.csv`
+- v28 multiaux
+  - agent：`qwen3_vl_text`
+  - model：`models/grpo_vlm_sft44_geometry100k_v28_s1_4gpu_lr5e6/v0-20260601-054854/checkpoint-500`
+  - dev_imo CSV（20260601，13/16）：`results/v28_lr5e6_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v0-20260601-054854_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260601T085350Z.csv`
+  - **imo_95 最终结果 CSV（56/95）**：`results/v28_lr5e6_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_v0-20260601-054854_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260601T103143Z.csv`
 - v17 singleaux
   - agent：`qwen3_vl_text`
   - model：`models/grpo_vlm_sft44_geometry100k_v17_s1_4gpu_lr5e6/v0-20260423-165556/checkpoint-500`
@@ -953,6 +981,7 @@ mid gate 固定检查：
 | v25 | `datasets/maxaux8/20260429/geometry_clauses10_samples1M_select_balanced_10k.jsonl` | `models/grpo_vlm_sft44_geometry100k_v25_s1_4gpu_dapo_grouptoken/` |
 | v26 | `datasets/maxaux8/20260429/geometry_clauses10_samples1M_select_balanced_10k.jsonl` | `models/grpo_vlm_sft44_geometry100k_v26_s1_4gpu_lr5e6_1000steps/` |
 | v27 | `datasets/maxaux8/20260429/geometry_clauses10_samples1M_select_balanced_10k.jsonl` | `models/grpo_vlm_sft44_geometry100k_v27_s1_4gpu_lr5e6/` |
+| v28 | `datasets/maxaux8_20260528/20260529_grpo/geometry_clauses10_samples1M_select_balanced_10k.jsonl` | `models/grpo_vlm_sft44_geometry100k_v28_s1_4gpu_lr5e6/` |
 
 **版本说明**：
 - **v13**：原称"v10 复跑"，使用 v10_auxfix_stage_balanced selector 在 geometry100k maxaux5 数据源上的实验，50-step smoke 边缘失败（avg_zero_std = 0.4364）
@@ -970,3 +999,4 @@ mid gate 固定检查：
 - **v25**：目录名虽为 `dapo_grouptoken`，但实际参数与 `v20` 相同，属于 `dapo + batch + sequence` 的复跑；修正后仍为 `5/11`
 - **v26**：与 `v19` 保持相同 `grpo + group + token` 配置，只把训练从 `500` 步拉长到 `1000` 步；训练 KL 显著增大，但完整评测回退到 `dev_imo 12/16`、`imo_95 52/95`，说明单纯加步数不是有效方向
 - **v27**：把 `v19` 同配方用独立版本脚本显式固化后重新完整评测，结果为 `dev_imo 14/16`、`imo_95 58/95`；headline 与当前 baseline / v19 持平，但逐题 solved-set 相对 baseline 发生 2 题互换
+- **v28**：保持 `v19/v27` 相同训练配方，只切换到新的 `maxaux8_20260528` balanced 10k 数据；最终 `dev_imo 13/16`、`imo_95 56/95`，低于旧主线，说明这次新样本池复跑没有带来提升
