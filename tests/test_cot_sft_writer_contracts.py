@@ -1,5 +1,6 @@
 import unittest
 
+from experiments.cot_sft_generation.core.insight_pipeline import INSIGHT_TEXT_V1
 from experiments.cot_sft_generation.writer_contracts import (
     build_coordinate_derivation_block,
     build_instruction_text,
@@ -14,6 +15,11 @@ class CotSftWriterContractsTest(unittest.TestCase):
         text = build_instruction_text()
         self.assertIn("auxiliary construction", text)
         self.assertIn("goal", text)
+
+    def test_build_instruction_text_text_variant_omits_image_reference(self):
+        text = build_instruction_text(generation_style=INSIGHT_TEXT_V1)
+        self.assertNotIn("geometry image", text)
+        self.assertIn("formal problem text", text)
 
     def test_join_natural_list_formats_three_items(self):
         text = join_natural_list(["a", "b", "c"])

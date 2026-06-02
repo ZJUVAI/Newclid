@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from experiments.cot_sft_generation.core.insight_pipeline import INSIGHT_IMAGE_V1
 from experiments.cot_sft_generation.run_artifacts import (
     ARTIFACT_SCHEMA_VERSION,
     SEMANTIC_REVIEW_CHECKLIST_VERSION,
@@ -166,7 +167,7 @@ class CotSftReviewArtifactsTest(unittest.TestCase):
             num_workers=1,
             max_retries_per_stage=3,
             model_name="model",
-            generation_style="insight_v1",
+            generation_style=INSIGHT_IMAGE_V1,
             output_jsonl="out.jsonl",
             artifacts_dir="artifacts",
             runtime_seconds=1.0,
@@ -506,7 +507,7 @@ class CotSftReviewArtifactsTest(unittest.TestCase):
                 "generation_audit": {"issues": ["no_proof_echo"]},
                 "attempts_used": 2,
                 "error": None,
-                "generation_style": "insight_v1",
+                "generation_style": INSIGHT_IMAGE_V1,
             }
         ]
         item_audits = [

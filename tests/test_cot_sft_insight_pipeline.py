@@ -8,6 +8,8 @@ from unittest.mock import patch
 from experiments.cot_sft_generation.core.insight_extractor import extract_insight_slots
 from experiments.cot_sft_generation.core.audits import audit_generation_quality
 from experiments.cot_sft_generation.core.insight_pipeline import (
+    INSIGHT_IMAGE_V1,
+    INSIGHT_TEXT_V1,
     build_insight_plan_prompt,
     build_insight_write_prompt,
     build_scripted_insight_plan,
@@ -66,6 +68,7 @@ def _run_insight_pipeline(
     *,
     call_model_side_effect,
     audit_result=None,
+    generation_style=INSIGHT_IMAGE_V1,
 ):
     input_path = temp_dir_path / "input.jsonl"
     output_path = temp_dir_path / "out.jsonl"
@@ -101,7 +104,7 @@ def _run_insight_pipeline(
             random_sample=False,
             process_all=False,
             max_retries=1,
-            generation_style="insight_v1",
+            generation_style=generation_style,
             run_dir=run_dir,
         )
 
@@ -201,8 +204,8 @@ class CotSftInsightPipelineTest(unittest.TestCase):
         )
 
         self.assertTrue(ok, msg=message)
-        self.assertEqual(cleaned["generation_style"], "insight_v1")
-        self.assertEqual(cleaned["insight_version"], "insight_v1")
+        self.assertEqual(cleaned["generation_style"], INSIGHT_IMAGE_V1)
+        self.assertEqual(cleaned["insight_version"], INSIGHT_IMAGE_V1)
         self.assertEqual(cleaned["goal_gap_type"], slots["goal_gap_type"])
         self.assertNotIn("aux_immediate_effects", cleaned)
 
@@ -217,6 +220,7 @@ class CotSftInsightPipelineTest(unittest.TestCase):
             aux_part=aux_part,
             visible_fact_relations=[fact["relation"] for fact in build_visible_text_facts(record)],
             insight_slots=slots,
+            generation_style=INSIGHT_IMAGE_V1,
         )
 
         self.assertIn("[Visible Point Coordinates]", prompt)
@@ -368,6 +372,7 @@ class CotSftInsightPipelineTest(unittest.TestCase):
                 "aux_construction": "construct point f such that a, c, d, f are concyclic and b, d, f are collinear",
                 "aux_selection_reason": "this helper creates the cyclic carrier that the slot requires before the old side can be reused",
             },
+            generation_style=INSIGHT_IMAGE_V1,
         )
 
         self.assertIn("[Visible Point Coordinates]", prompt)
@@ -387,6 +392,7 @@ class CotSftInsightPipelineTest(unittest.TestCase):
                 "aux_construction": "construct point f such that a, c, d, f are concyclic and b, d, f are collinear",
                 "aux_selection_reason": "the cyclic helper is the missing local frame before the old figure can be revisited",
             },
+            generation_style=INSIGHT_IMAGE_V1,
         )
 
         self.assertIn("direct local effect", prompt)
@@ -398,6 +404,41 @@ class CotSftInsightPipelineTest(unittest.TestCase):
         self.assertNotIn("at most one cautious local unlock statement", prompt)
         self.assertNotIn("one or two short follow-up sentences", prompt)
         self.assertNotIn("Keep the tone impersonal", prompt)
+
+    def test_build_insight_plan_prompt_text_variant_omits_image_and_coordinates(self):
+        record = _load_record(1)
+        aux_part, _ = extract_aux_and_rest(record["llm_output_renamed"])
+        visible_goal = record["llm_input_renamed"].split("?", 1)[1].replace("</problem>", "").strip()
+        slots = extract_insight_slots(parse_proof_dag(record["llm_output_renamed"]), visible_goal, aux_part)
+
+        prompt = build_insight_plan_prompt(
+            record,
+            aux_part=aux_part,
+            visible_fact_relations=[fact["relation"] for fact in build_visible_text_facts(record)],
+            insight_slots=slots,
+            generation_style=INSIGHT_TEXT_V1,
+        )
+
+        self.assertNotIn("[Visible Point Coordinates]", prompt)
+        self.assertIn("The final student will only see the public problem text.", prompt)
+        self.assertIn("Stay text-only", prompt)
+
+    def test_build_insight_write_prompt_text_variant_omits_coordinates(self):
+        prompt = build_insight_write_prompt(
+            _load_record(1),
+            {
+                "visible_facts": ["ab equals ac"],
+                "image_scan": ["the formal givens already fix one isosceles frame around a, b, and c"],
+                "goal_gap_text": "the visible givens still do not transfer the angle at the b-side onto the d-side",
+                "aux_construction": "construct point f such that a, c, d, f are concyclic and b, d, f are collinear",
+                "aux_selection_reason": "the cyclic helper is the missing local frame before the old figure can be revisited",
+            },
+            generation_style=INSIGHT_TEXT_V1,
+        )
+
+        self.assertNotIn("[Visible Point Coordinates]", prompt)
+        self.assertIn("Do not mention any image or point coordinates", prompt)
+        self.assertNotIn("You may write visible-point coordinates inline", prompt)
 
     def test_build_scripted_insight_plan_leaves_image_scan_empty_without_coordinate_cue_fabrication(self):
         record = _load_record(1)
@@ -438,7 +479,7 @@ class CotSftInsightPipelineTest(unittest.TestCase):
 
             with patch(
                 "experiments.cot_sft_generation.generate_cot_sft.build_hidden_coordinate_candidates",
-                side_effect=AssertionError("hidden coordinate candidates should not be built for insight_v1"),
+                side_effect=AssertionError("hidden coordinate candidates should not be built for insight_image_v1"),
             ), patch(
                 "experiments.cot_sft_generation.generate_cot_sft.run_plan_stage",
                 return_value={
@@ -472,6 +513,65 @@ class CotSftInsightPipelineTest(unittest.TestCase):
         self.assertTrue(result["success"], result["error"])
         self.assertIn("[Visible Point Coordinates]", result["plan_prompt"])
         self.assertIn("[Visible Point Coordinates]", result["write_prompt"])
+
+    def test_generate_insight_thinking_text_variant_omits_image_and_coordinate_prompts(self):
+        record = dict(_load_record(1))
+        aux_part, _ = extract_aux_and_rest(record["llm_output_renamed"])
+        plan = {
+            "visible_facts": ["ab equals ac"],
+            "image_scan": ["the formal givens already fix one isosceles frame around a, b, and c"],
+            "goal_gap_type": "angle_transfer",
+            "goal_gap_text": "the visible givens still do not transfer the angle at the b-side onto the d-side",
+            "required_aux_effect": "a, c, d, f are concyclic",
+            "aux_construction": "construct point f such that a, c, d, f are concyclic and b, d, f are collinear",
+            "aux_selection_reason": "the cyclic helper around a, c, d, and f is the missing local carrier before the d-side can reuse the old frame",
+            "generation_style": INSIGHT_TEXT_V1,
+            "insight_version": INSIGHT_TEXT_V1,
+        }
+        writer_body = (
+            "The visible givens still do not move the needed angle from the b-side onto the d-side. "
+            "Construct point f such that a, c, d, f are concyclic and b, d, f are collinear. "
+            "That cyclic helper gives the figure one local angle carrier before the route returns to b and d."
+        )
+
+        with patch(
+            "experiments.cot_sft_generation.generate_cot_sft._encode_image_base64",
+            side_effect=AssertionError("text variant must not encode images"),
+        ), patch(
+            "experiments.cot_sft_generation.generate_cot_sft.run_plan_stage",
+            return_value={
+                "success": True,
+                "output": json.dumps(plan, ensure_ascii=False),
+                "parsed": plan,
+                "attempts_used": 1,
+                "elapsed_seconds": 0.0,
+                "error": None,
+            },
+        ), patch(
+            "experiments.cot_sft_generation.generate_cot_sft.run_writer_stage",
+            return_value={
+                "success": True,
+                "output": writer_body,
+                "attempts_used": 1,
+                "elapsed_seconds": 0.0,
+                "error": None,
+            },
+        ):
+            result = generate_insight_thinking(
+                record,
+                image_path=None,
+                aux_part=aux_part,
+                sanitized_rest="",
+                model_name="fixture-model",
+                max_retries=1,
+                verbose=True,
+                generation_style=INSIGHT_TEXT_V1,
+            )
+
+        self.assertTrue(result["success"], result["error"])
+        self.assertNotIn("[Visible Point Coordinates]", result["plan_prompt"])
+        self.assertNotIn("[Visible Point Coordinates]", result["write_prompt"])
+        self.assertIn("public problem text", result["plan_prompt"])
 
     def test_validate_insight_writer_body_rejects_proof_echo(self):
         plan = {
@@ -674,7 +774,7 @@ class CotSftInsightPipelineTest(unittest.TestCase):
 
         generation_audit = audit_generation_quality(
             {"grid_coord": point_coords},
-            {"plan_parsed": cleaned, "write_output": "", "generation_style": "insight_v1"},
+            {"plan_parsed": cleaned, "write_output": "", "generation_style": INSIGHT_IMAGE_V1},
             "<aux> x00 f : cyclic a c d f [001] ; x00 f : coll b e f [002] ; </aux>",
         )
         self.assertIn("aux_construction_mismatch", generation_audit["issues"])
@@ -694,7 +794,7 @@ class CotSftInsightPipelineTest(unittest.TestCase):
         self.assertNotIn("This immediately gives", writer_body)
         self.assertIn("a, c, d, f are concyclic", writer_body)
 
-    def test_process_and_generate_sft_insight_v1_failure_does_not_fallback_to_dossier(self):
+    def test_process_and_generate_sft_insight_image_v1_failure_does_not_fallback_to_dossier(self):
         record = dict(_load_record(1))
         record["image_path"] = "fixture.png"
         failed_generation = {
@@ -710,7 +810,7 @@ class CotSftInsightPipelineTest(unittest.TestCase):
             "elapsed_seconds": 0.0,
             "error": "insight_failed",
             "write_output": None,
-            "generation_style": "insight_v1",
+            "generation_style": INSIGHT_IMAGE_V1,
         }
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -738,7 +838,7 @@ class CotSftInsightPipelineTest(unittest.TestCase):
                     random_sample=False,
                     process_all=False,
                     max_retries=1,
-                    generation_style="insight_v1",
+                    generation_style=INSIGHT_IMAGE_V1,
                     run_dir=run_dir,
                 )
 
@@ -751,13 +851,13 @@ class CotSftInsightPipelineTest(unittest.TestCase):
                 for line in (run_dir / "item_records.jsonl").read_text(encoding="utf-8").splitlines()
                 if line.strip()
             ]
-            self.assertEqual(item_records[0]["generation_style"], "insight_v1")
+            self.assertEqual(item_records[0]["generation_style"], INSIGHT_IMAGE_V1)
             self.assertFalse(item_records[0]["success"])
             self.assertFalse(item_records[0]["exported_to_dataset"])
             self.assertEqual(item_records[0]["dataset_filter_reason"], "generation_failed")
             self.assertEqual(item_records[0]["error"], "insight_failed")
 
-    def test_process_and_generate_sft_insight_v1_writer_failure_does_not_use_scripted_body(self):
+    def test_process_and_generate_sft_insight_image_v1_writer_failure_does_not_use_scripted_body(self):
         record, scripted_plan, _ = _build_scripted_insight_fixture(1)
         record["image_path"] = "fixture.png"
         invalid_writer_body = (
@@ -785,7 +885,7 @@ class CotSftInsightPipelineTest(unittest.TestCase):
         self.assertEqual(item_records[0]["dataset_filter_reason"], "generation_failed")
         self.assertEqual(item_records[0]["write_output"], invalid_writer_body)
 
-    def test_process_and_generate_sft_insight_v1_hard_audit_issue_blocks_export_only(self):
+    def test_process_and_generate_sft_insight_image_v1_hard_audit_issue_blocks_export_only(self):
         record, scripted_plan, writer_body = _build_scripted_insight_fixture(1)
         record["image_path"] = "fixture.png"
 
@@ -810,7 +910,7 @@ class CotSftInsightPipelineTest(unittest.TestCase):
         self.assertFalse(item_records[0]["exported_to_dataset"])
         self.assertEqual(item_records[0]["dataset_filter_reason"], "generation_audit_hard_issue")
 
-    def test_process_and_generate_sft_insight_v1_soft_audit_issue_still_exports(self):
+    def test_process_and_generate_sft_insight_image_v1_soft_audit_issue_still_exports(self):
         record, scripted_plan, writer_body = _build_scripted_insight_fixture(1)
         record["image_path"] = "fixture.png"
 
@@ -832,7 +932,7 @@ class CotSftInsightPipelineTest(unittest.TestCase):
         self.assertTrue(item_records[0]["exported_to_dataset"])
         self.assertIsNone(item_records[0]["dataset_filter_reason"])
 
-    def test_process_and_generate_sft_runs_insight_v1_and_persists_artifacts(self):
+    def test_process_and_generate_sft_runs_insight_image_v1_and_persists_artifacts(self):
         record, scripted_plan, writer_body = _build_scripted_insight_fixture(1)
         record["image_path"] = "fixture.png"
 
@@ -846,19 +946,49 @@ class CotSftInsightPipelineTest(unittest.TestCase):
                 ],
             )
 
-            self.assertEqual(result["summary"]["generation_style"], "insight_v1")
+            self.assertEqual(result["summary"]["generation_style"], INSIGHT_IMAGE_V1)
             self.assertEqual(len(output_records), 1)
             self.assertIn("<thinking>", output_records[0]["thinking"])
             self.assertTrue(output_records[0]["output"].endswith(output_records[0]["aux"]))
             self.assertEqual(result["summary"]["exported_items"], 1)
             self.assertEqual(result["summary"]["filtered_generation_audit_items"], 0)
             self.assertEqual(result["summary"]["exported_rate"], 1.0)
-            self.assertEqual(item_records[0]["generation_style"], "insight_v1")
+            self.assertEqual(item_records[0]["generation_style"], INSIGHT_IMAGE_V1)
             self.assertIsInstance(item_records[0]["insight_slots"], dict)
             self.assertIsInstance(item_records[0]["insight_plan_parsed"], dict)
             self.assertNotIn("aux_immediate_effects", item_records[0]["insight_plan_parsed"])
             self.assertTrue(item_records[0]["exported_to_dataset"])
             self.assertIsNone(item_records[0]["dataset_filter_reason"])
+
+    def test_process_and_generate_sft_runs_insight_text_v1_without_image_inputs(self):
+        record, scripted_plan, writer_body = _build_scripted_insight_fixture(1)
+        record["image_path"] = "missing.png"
+        scripted_plan = dict(scripted_plan)
+        scripted_plan["generation_style"] = INSIGHT_TEXT_V1
+        scripted_plan["insight_version"] = INSIGHT_TEXT_V1
+
+        with tempfile.TemporaryDirectory() as temp_dir, patch(
+            "experiments.cot_sft_generation.generate_cot_sft._encode_image_base64",
+            side_effect=AssertionError("text variant must not encode images"),
+        ):
+            result, output_records, item_records = _run_insight_pipeline(
+                record,
+                Path(temp_dir),
+                call_model_side_effect=[
+                    json.dumps(scripted_plan, ensure_ascii=False),
+                    writer_body,
+                ],
+                generation_style=INSIGHT_TEXT_V1,
+            )
+
+        self.assertEqual(result["summary"]["generation_style"], INSIGHT_TEXT_V1)
+        self.assertEqual(len(output_records), 1)
+        self.assertNotIn("image_path", output_records[0])
+        self.assertTrue(item_records[0]["exported_to_dataset"])
+        self.assertNotIn("missing_image", item_records[0]["source_audit"]["issues"])
+        self.assertNotIn("missing_point_coords", item_records[0]["source_audit"]["issues"])
+        self.assertNotIn("[Visible Point Coordinates]", item_records[0]["plan_prompt"])
+        self.assertNotIn("[Visible Point Coordinates]", item_records[0]["write_prompt"])
 
     def test_process_and_generate_sft_continues_after_unexpected_item_exception(self):
         failing_record = dict(_load_record(0))
@@ -871,14 +1001,14 @@ class CotSftInsightPipelineTest(unittest.TestCase):
             "plan_prompt": None,
             "write_prompt": None,
             "plan_output": None,
-            "plan_parsed": {"generation_style": "insight_v1"},
+            "plan_parsed": {"generation_style": INSIGHT_IMAGE_V1},
             "insight_slots": {"goal_gap_type": "angle_transfer"},
-            "insight_plan_parsed": {"generation_style": "insight_v1"},
+            "insight_plan_parsed": {"generation_style": INSIGHT_IMAGE_V1},
             "attempts_used": 1,
             "elapsed_seconds": 0.0,
             "error": None,
             "write_output": "body",
-            "generation_style": "insight_v1",
+            "generation_style": INSIGHT_IMAGE_V1,
         }
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -921,7 +1051,7 @@ class CotSftInsightPipelineTest(unittest.TestCase):
                     random_sample=False,
                     process_all=False,
                     max_retries=1,
-                    generation_style="insight_v1",
+                    generation_style=INSIGHT_IMAGE_V1,
                     run_dir=run_dir,
                 )
 
@@ -1018,7 +1148,7 @@ class CotSftInsightPipelineTest(unittest.TestCase):
 
                 self.assertTrue(ok, message)
 
-    def test_process_and_generate_sft_insight_v1_exports_relaxed_generic_phrase_body(self):
+    def test_process_and_generate_sft_insight_image_v1_exports_relaxed_generic_phrase_body(self):
         record, scripted_plan, writer_body = _build_scripted_insight_fixture(1)
         record["image_path"] = "fixture.png"
         relaxed_writer_body = " ".join(
@@ -1047,7 +1177,7 @@ class CotSftInsightPipelineTest(unittest.TestCase):
         self.assertTrue(item_records[0]["surface_pass"])
         self.assertTrue(item_records[0]["exported_to_dataset"])
 
-    def test_process_and_generate_sft_insight_v1_uses_unbounded_thinking_validation_budget(self):
+    def test_process_and_generate_sft_insight_image_v1_uses_unbounded_thinking_validation_budget(self):
         record, scripted_plan, writer_body = _build_scripted_insight_fixture(1)
         record["image_path"] = "fixture.png"
         captured = {}

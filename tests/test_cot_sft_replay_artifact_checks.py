@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from experiments.cot_sft_generation.core.insight_pipeline import INSIGHT_IMAGE_V1
 from experiments.cot_sft_generation.core.insight_extractor import extract_insight_slots
 from experiments.cot_sft_generation.core.insight_pipeline import (
     build_scripted_insight_plan,
@@ -211,7 +212,7 @@ class CotSftReplayArtifactChecksTest(unittest.TestCase):
                     random_sample=False,
                     process_all=False,
                     max_retries=1,
-                    generation_style="insight_v1",
+                    generation_style=INSIGHT_IMAGE_V1,
                     run_dir=run_dir,
                 )
 
@@ -254,7 +255,7 @@ class CotSftReplayArtifactChecksTest(unittest.TestCase):
                     random_sample=False,
                     process_all=False,
                     max_retries=1,
-                    generation_style="insight_v1",
+                    generation_style=INSIGHT_IMAGE_V1,
                     run_dir=run_dir,
                 )
 

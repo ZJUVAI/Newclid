@@ -2,6 +2,7 @@ import json
 import unittest
 from pathlib import Path
 
+from experiments.cot_sft_generation.core.insight_pipeline import INSIGHT_IMAGE_V1, INSIGHT_TEXT_V1
 from experiments.cot_sft_generation.audits import (
     audit_generation_quality,
     audit_source_record,
@@ -95,6 +96,24 @@ class CotSftAuditsTest(unittest.TestCase):
 
         self.assertTrue(audit["has_issue"])
         self.assertIn("missing_image", audit["issues"])
+        self.assertIn("proof_guidance_missing_goal_finish_relations", audit["issues"])
+
+    def test_audit_source_record_text_variant_skips_missing_image_and_coords(self):
+        record = {
+            "llm_input_renamed": "<problem>g1: cong a b a c [000] ? eqangle a b a c</problem>",
+        }
+
+        audit = audit_source_record(
+            record,
+            image_path=Path("/tmp/nonexistent.png"),
+            aux_part="<aux>x00 d : coll d a b [001] ; </aux>",
+            visible_goal="eqangle a b a c",
+            proof_guidance={},
+            generation_style=INSIGHT_TEXT_V1,
+        )
+
+        self.assertNotIn("missing_image", audit["issues"])
+        self.assertNotIn("missing_point_coords", audit["issues"])
         self.assertIn("proof_guidance_missing_goal_finish_relations", audit["issues"])
 
     def test_bridge_step_relation_realized_requires_explicit_relation(self):
@@ -402,7 +421,7 @@ class CotSftAuditsTest(unittest.TestCase):
         }
         generation = {
             "plan_parsed": {
-                "insight_version": "insight_v1",
+                "insight_version": INSIGHT_IMAGE_V1,
                 "goal_gap_type": "angle_transfer",
                 "goal_gap_text": "the visible givens still do not transfer the angle from b and c onto d and e in one local frame",
                 "required_aux_effect": "a, c, d, f are concyclic",
@@ -444,7 +463,7 @@ class CotSftAuditsTest(unittest.TestCase):
         }
         generation = {
             "plan_parsed": {
-                "insight_version": "insight_v1",
+                "insight_version": INSIGHT_IMAGE_V1,
                 "goal_gap_type": "angle_transfer",
                 "goal_gap_text": "the visible givens still do not transfer the angle from b and c onto d and f in one local frame",
                 "required_aux_effect": "a, c, d, f are concyclic",
@@ -485,7 +504,7 @@ class CotSftAuditsTest(unittest.TestCase):
         }
         generation = {
             "plan_parsed": {
-                "insight_version": "insight_v1",
+                "insight_version": INSIGHT_IMAGE_V1,
                 "goal_gap_type": "angle_transfer",
                 "goal_gap_text": "the visible givens still do not transfer the angle from b and c onto d and f in one local frame",
                 "required_aux_effect": "a, c, d, f are concyclic",
@@ -536,7 +555,7 @@ class CotSftAuditsTest(unittest.TestCase):
         }
         generation = {
             "plan_parsed": {
-                "insight_version": "insight_v1",
+                "insight_version": INSIGHT_IMAGE_V1,
                 "goal_gap_type": "ratio_transfer",
                 "goal_gap_text": "the visible givens still do not transfer the ratio from a and d onto b and e in one local frame",
                 "required_aux_effect": "h is the midpoint of ad",
@@ -578,7 +597,7 @@ class CotSftAuditsTest(unittest.TestCase):
         }
         generation = {
             "plan_parsed": {
-                "insight_version": "insight_v1",
+                "insight_version": INSIGHT_IMAGE_V1,
                 "goal_gap_type": "angle_transfer",
                 "goal_gap_text": "the visible givens still do not transfer the angle from b and c onto d and e in one local frame",
                 "required_aux_effect": "a, c, d, f are concyclic",
@@ -621,7 +640,7 @@ class CotSftAuditsTest(unittest.TestCase):
         }
         generation = {
             "plan_parsed": {
-                "insight_version": "insight_v1",
+                "insight_version": INSIGHT_IMAGE_V1,
                 "goal_gap_type": "angle_transfer",
                 "goal_gap_text": "the visible givens still do not transfer the angle from b and c onto d and e in one local frame",
                 "required_aux_effect": "a, c, d, f are concyclic",
