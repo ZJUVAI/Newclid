@@ -127,6 +127,11 @@ try:
         validate_insight_plan_response,
         validate_insight_writer_body,
     )
+    from .core.insight_schema import (
+        INSIGHT_GENERATION_STYLES,
+        INSIGHT_IMAGE_V1,
+        INSIGHT_TEXT_V1,
+    )
 except ImportError:  # pragma: no cover - script execution path
     from audits import (
         audit_generation_quality,
@@ -227,6 +232,11 @@ except ImportError:  # pragma: no cover - script execution path
         build_scripted_insight_plan,
         validate_insight_plan_response,
         validate_insight_writer_body,
+    )
+    from core.insight_schema import (  # type: ignore[no-redef]
+        INSIGHT_GENERATION_STYLES,
+        INSIGHT_IMAGE_V1,
+        INSIGHT_TEXT_V1,
     )
 
 try:
@@ -468,6 +478,39 @@ def resolve_image_path(image_path: str, input_jsonl: Path) -> Path:
     if input_relative.exists():
         return input_relative
     return raw.resolve()
+
+
+def is_insight_generation_style(generation_style: str | None) -> bool:
+    return generation_style in INSIGHT_GENERATION_STYLES
+
+
+def requires_image_input(generation_style: str | None) -> bool:
+    return generation_style != INSIGHT_TEXT_V1
+
+
+def build_visibility_contract_message(
+    prompt_text: str,
+    generation_style: str,
+    image_path: Path | None = None,
+):
+    content = []
+    if requires_image_input(generation_style):
+        if image_path is None:
+            raise ValueError(f"image_path is required for generation_style={generation_style}")
+        content.append({"type": "image_url", "image_url": {"url": _encode_image_base64(image_path)}})
+    content.append({"type": "text", "text": prompt_text})
+    return [{"role": "user", "content": content}]
+
+
+def validate_text_only_thinking_surface(output_text: str) -> tuple[bool, str]:
+    stripped = str(output_text or "")
+    if "<coord>" in stripped.lower():
+        return False, "Text-only insight output must not include <coord> tags"
+    if RAW_POINT_TAG_RE.search(stripped) or POINT_TAG_RE.search(stripped):
+        return False, "Text-only insight output must not include point/coord tags"
+    if INLINE_POINT_COORD_RE.search(stripped):
+        return False, "Text-only insight output must not include inline point coordinates"
+    return True, "Text-only thinking surface valid"
 
 
 def extract_aux_and_rest(formal_output: str):
@@ -9585,7 +9628,7 @@ def run_writer_stage(
 
 def generate_insight_thinking(
     record,
-    image_path: Path,
+    image_path: Path | None,
     aux_part,
     sanitized_rest,
     model_name,
@@ -9594,9 +9637,11 @@ def generate_insight_thinking(
     plan_mode=None,
     fallback_model_names=None,
     source_audit=None,
+    generation_style: str = INSIGHT_IMAGE_V1,
 ):
     del sanitized_rest, source_audit
-    point_coords = get_point_coords(record)
+    use_image_contract = generation_style == INSIGHT_IMAGE_V1
+    point_coords = get_point_coords(record) if use_image_contract else {}
     visible_goal = extract_problem_goal(record)
     visible_text_facts = build_visible_text_facts(record)
 
@@ -9616,7 +9661,7 @@ def generate_insight_thinking(
             "elapsed_seconds": 0.0,
             "error": "insight_slots_unavailable",
             "write_output": None,
-            "generation_style": "insight_v1",
+            "generation_style": generation_style,
         }
 
     visible_fact_relations = [
@@ -9629,16 +9674,13 @@ def generate_insight_thinking(
         aux_part=aux_part,
         visible_fact_relations=visible_fact_relations,
         insight_slots=insight_slots,
+        generation_style=generation_style,
     )
-    plan_messages = [
-        {
-            "role": "user",
-            "content": [
-                {"type": "image_url", "image_url": {"url": _encode_image_base64(image_path)}},
-                {"type": "text", "text": plan_prompt},
-            ],
-        }
-    ]
+    plan_messages = build_visibility_contract_message(
+        plan_prompt,
+        generation_style=generation_style,
+        image_path=image_path,
+    )
     plan_result = run_plan_stage(
         "insight_plan",
         plan_messages,
@@ -9652,7 +9694,11 @@ def generate_insight_thinking(
         visible_premise_summaries=visible_fact_relations,
         visible_text_facts=visible_text_facts,
         max_retries=max_retries,
-        validator_fn=partial(validate_insight_plan_response, insight_slots=insight_slots),
+        validator_fn=partial(
+            validate_insight_plan_response,
+            insight_slots=insight_slots,
+            generation_style=generation_style,
+        ),
         retry_feedback_builder=build_insight_plan_retry_feedback,
     )
     if not plan_result["success"]:
@@ -9661,6 +9707,7 @@ def generate_insight_thinking(
             aux_part=aux_part,
             insight_slots=insight_slots,
             visible_text_facts=visible_text_facts,
+            generation_style=generation_style,
         )
         ok, message, cleaned_scripted_plan = validate_insight_plan_response(
             scripted_plan,
@@ -9669,6 +9716,7 @@ def generate_insight_thinking(
             aux_part=aux_part,
             visible_text_facts=visible_text_facts,
             insight_slots=insight_slots,
+            generation_style=generation_style,
         )
         if not ok:
             return {
@@ -9684,7 +9732,7 @@ def generate_insight_thinking(
                 "elapsed_seconds": plan_result["elapsed_seconds"],
                 "error": f"{plan_result['error']}; scripted insight fallback invalid: {message}",
                 "write_output": None,
-                "generation_style": "insight_v1",
+                "generation_style": generation_style,
             }
         logger.warning(
             "[insight_plan] Falling back to scripted insight plan after planner failure: %s",
@@ -9713,19 +9761,19 @@ def generate_insight_thinking(
             "elapsed_seconds": plan_result["elapsed_seconds"],
             "error": None,
             "write_output": None,
-            "generation_style": "insight_v1",
+            "generation_style": generation_style,
         }
 
-    write_prompt = build_insight_write_prompt(record, plan_result["parsed"])
-    write_messages = [
-        {
-            "role": "user",
-            "content": [
-                {"type": "image_url", "image_url": {"url": _encode_image_base64(image_path)}},
-                {"type": "text", "text": write_prompt},
-            ],
-        }
-    ]
+    write_prompt = build_insight_write_prompt(
+        record,
+        plan_result["parsed"],
+        generation_style=generation_style,
+    )
+    write_messages = build_visibility_contract_message(
+        write_prompt,
+        generation_style=generation_style,
+        image_path=image_path,
+    )
     write_result = run_writer_stage(
         "insight_write",
         write_messages,
@@ -9735,13 +9783,31 @@ def generate_insight_thinking(
         injected_prefix="",
         plan=plan_result["parsed"],
         max_retries=max_retries,
-        validator_fn=validate_insight_writer_body,
+        validator_fn=partial(validate_insight_writer_body, generation_style=generation_style),
         retry_feedback_builder=build_insight_writer_retry_feedback,
     )
 
     assembled_thinking = None
     if write_result["output"]:
         assembled_thinking = f"<thinking>{write_result['output'].strip()}</thinking>"
+        if generation_style == INSIGHT_TEXT_V1:
+            ok, message = validate_text_only_thinking_surface(assembled_thinking)
+            if not ok:
+                return {
+                    "success": False,
+                    "thinking": assembled_thinking,
+                    "plan_prompt": plan_prompt if verbose else None,
+                    "write_prompt": write_prompt if verbose else None,
+                    "plan_output": json.dumps(plan_result["parsed"], ensure_ascii=False, indent=2) if verbose else None,
+                    "plan_parsed": plan_result["parsed"],
+                    "insight_slots": insight_slots,
+                    "insight_plan_parsed": plan_result["parsed"],
+                    "attempts_used": plan_result["attempts_used"] + write_result["attempts_used"],
+                    "elapsed_seconds": (plan_result["elapsed_seconds"] or 0.0) + (write_result["elapsed_seconds"] or 0.0),
+                    "error": f"Final assembly validation failed: {message}",
+                    "write_output": write_result["output"],
+                    "generation_style": generation_style,
+                }
         is_valid, message = validate_thinking_response(
             assembled_thinking,
             point_coords=point_coords,
@@ -9762,7 +9828,7 @@ def generate_insight_thinking(
                 "elapsed_seconds": (plan_result["elapsed_seconds"] or 0.0) + (write_result["elapsed_seconds"] or 0.0),
                 "error": f"Final assembly validation failed: {message}",
                 "write_output": write_result["output"],
-                "generation_style": "insight_v1",
+                "generation_style": generation_style,
             }
 
     return {
@@ -9778,7 +9844,7 @@ def generate_insight_thinking(
         "attempts_used": plan_result["attempts_used"] + write_result["attempts_used"],
         "error": write_result["error"],
         "write_output": write_result["output"],
-        "generation_style": "insight_v1",
+        "generation_style": generation_style,
     }
 
 
@@ -10981,7 +11047,7 @@ def process_and_generate_sft(
     process_all,
     max_retries,
     plan_mode=None,
-    generation_style="insight_v1",
+    generation_style=INSIGHT_IMAGE_V1,
     planner_style="default",
     run_metadata=None,
     run_dir=None,
@@ -11046,12 +11112,14 @@ def process_and_generate_sft(
 
     def process_item(idx_record):
         sample_order, record = idx_record
-        image_path = resolve_image_path(record.get("image_path", ""), input_path)
+        image_path = None
         source_audit = {"issues": [], "has_issue": False}
         goal_type = None
         aux_type = None
         public_problem = None
         try:
+            if requires_image_input(generation_style):
+                image_path = resolve_image_path(record.get("image_path", ""), input_path)
             visible_goal = extract_problem_goal(record)
             public_problem = build_public_problem_text(record)
             goal_type = parse_goal_expression(visible_goal).get("predicate") or None
@@ -11069,12 +11137,13 @@ def process_and_generate_sft(
             )
             source_audit = audit_source_record(
                 record,
-                image_path=image_path,
+                image_path=image_path or Path(record.get("image_path", "") or "."),
                 aux_part=aux_part,
                 visible_goal=visible_goal,
                 proof_guidance=proof_guidance,
+                generation_style=generation_style,
             )
-            if not image_path.exists():
+            if requires_image_input(generation_style) and (image_path is None or not image_path.exists()):
                 return {
                     "result_data": None,
                     "item_record": build_missing_image_item_record(
@@ -11087,7 +11156,7 @@ def process_and_generate_sft(
                     ),
                 }
 
-            if generation_style == "insight_v1":
+            if is_insight_generation_style(generation_style):
                 generation = generate_insight_thinking(
                     record,
                     image_path=image_path,
@@ -11099,6 +11168,7 @@ def process_and_generate_sft(
                     plan_mode=plan_mode,
                     fallback_model_names=fallback_model_names,
                     source_audit=source_audit,
+                    generation_style=generation_style,
                 )
             elif generation_style == "dossier_v1":
                 generation = generate_proof_dag_thinking(
@@ -11170,17 +11240,18 @@ def process_and_generate_sft(
             if exported_to_dataset:
                 result_data = build_dataset_output_record(
                     sample_order=sample_order,
-                    instruction=build_instruction_text(),
+                    instruction=build_instruction_text(generation_style=resolved_generation_style),
                     public_problem=public_problem,
                     thinking=thinking,
                     aux_part=aux_part,
+                    generation_style=resolved_generation_style,
                     image_path=record.get("image_path", ""),
                 )
 
             item_record = build_item_record(
                 sample_order=sample_order,
                 input_index=record["_source_index"],
-                image_path=str(image_path),
+                image_path=str(image_path or ""),
                 public_problem=public_problem,
                 aux_part=aux_part,
                 goal_type=goal_type,
@@ -11204,14 +11275,14 @@ def process_and_generate_sft(
                 generation_style,
             )
             return {
-                "result_data": None,
-                "item_record": build_generation_failure_item_record(
-                    sample_order=sample_order,
-                    input_index=record["_source_index"],
-                    image_path=str(image_path),
-                    error=f"unexpected_exception: {type(exc).__name__}: {exc}",
-                    source_audit=source_audit,
-                    generation_style=generation_style,
+                    "result_data": None,
+                    "item_record": build_generation_failure_item_record(
+                        sample_order=sample_order,
+                        input_index=record["_source_index"],
+                        image_path=str(image_path or ""),
+                        error=f"unexpected_exception: {type(exc).__name__}: {exc}",
+                        source_audit=source_audit,
+                        generation_style=generation_style,
                     goal_type=goal_type,
                     aux_type=aux_type,
                     public_problem=public_problem,
@@ -11231,7 +11302,9 @@ def process_and_generate_sft(
             try:
                 result = future.result()
             except Exception as exc:
-                image_path = resolve_image_path(record.get("image_path", ""), input_path)
+                image_path = None
+                if requires_image_input(generation_style):
+                    image_path = resolve_image_path(record.get("image_path", ""), input_path)
                 logger.exception(
                     "Worker future escaped item-level failure handling: sample_order=%s input_index=%s image_path=%s generation_style=%s",
                     sample_order,
@@ -11244,7 +11317,7 @@ def process_and_generate_sft(
                     "item_record": build_generation_failure_item_record(
                         sample_order=sample_order,
                         input_index=record["_source_index"],
-                        image_path=str(image_path),
+                        image_path=str(image_path or ""),
                         error=f"worker_future_exception: {type(exc).__name__}: {exc}",
                         generation_style=generation_style,
                         aux_part=record.get("_aux_part"),
@@ -11383,9 +11456,9 @@ def parse_args():
     parser.add_argument(
         "--generation-style",
         type=str,
-        default="insight_v1",
-        choices=["insight_v1", "dossier_v1", "model_evidence_legacy"],
-        help="Generation pipeline style. Default: insight_v1.",
+        default=INSIGHT_IMAGE_V1,
+        choices=[INSIGHT_IMAGE_V1, INSIGHT_TEXT_V1, "dossier_v1", "model_evidence_legacy"],
+        help=f"Generation pipeline style. Default: {INSIGHT_IMAGE_V1}.",
     )
     parser.add_argument(
         "--plan-only",

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Script-side DAG extraction for the insight_v1 mainline.
+Script-side DAG extraction for the insight-family mainline.
 """
 
 from __future__ import annotations

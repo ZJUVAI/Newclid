@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Planner and writer contracts for the insight_v1 CoT SFT mainline.
+Planner and writer contracts for the insight CoT SFT mainline variants.
 """
 
 from __future__ import annotations
@@ -23,7 +23,13 @@ try:
         relation_keyword_present,
         relations_semantically_match,
     )
-    from .insight_schema import INSIGHT_GAP_TYPES, INSIGHT_V1, InsightPlan
+    from .insight_schema import (
+        INSIGHT_GAP_TYPES,
+        INSIGHT_GENERATION_STYLES,
+        INSIGHT_IMAGE_V1,
+        INSIGHT_TEXT_V1,
+        InsightPlan,
+    )
 except ImportError:  # pragma: no cover - script execution path
     from geometry_text import (  # type: ignore
         build_aux_direct_consequences,
@@ -39,7 +45,13 @@ except ImportError:  # pragma: no cover - script execution path
         relation_keyword_present,
         relations_semantically_match,
     )
-    from insight_schema import INSIGHT_GAP_TYPES, INSIGHT_V1, InsightPlan  # type: ignore
+    from insight_schema import (  # type: ignore
+        INSIGHT_GAP_TYPES,
+        INSIGHT_GENERATION_STYLES,
+        INSIGHT_IMAGE_V1,
+        INSIGHT_TEXT_V1,
+        InsightPlan,
+    )
 
 
 _RULE_LEAK_RE = re.compile(r"(?:\[\d{3}\]|\bAR\b|\br\d+\b|\bproof\b|\bhidden\b)", re.IGNORECASE)
@@ -47,6 +59,11 @@ _INTERNAL_REF_RE = re.compile(
     r"\b(?:visible_facts|image_scan|aux_immediate_effects|evidence_windows|slots|plan|bridge_chain)\[\d+\]"
 )
 _AUX_POINT_TEXT_RE = re.compile(r"\bconstruct\s+point\s+([a-z]\w*)\b", re.IGNORECASE)
+_POINT_NAME_RE = re.compile(r"\b([a-z]\w*)\b", re.IGNORECASE)
+_INLINE_POINT_COORD_RE = re.compile(
+    r"\b([a-z]\w*)\s*=\s*\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)",
+    re.IGNORECASE,
+)
 
 
 def _extract_json_object(output_text: str):
@@ -223,22 +240,40 @@ def build_insight_plan_prompt(
     aux_part: str,
     visible_fact_relations: list[str],
     insight_slots: dict,
+    generation_style: str = INSIGHT_IMAGE_V1,
 ):
     public_problem = build_public_problem_text(record)
     visible_goal = extract_problem_goal(record)
     visible_point_coords = record.get("point_coords_grid") or record.get("grid_coord") or {}
     canonical_aux_construction = build_canonical_construction(aux_part or "")
+    if generation_style == INSIGHT_TEXT_V1:
+        visible_input_text = "The final student will only see the public problem text."
+        visible_coordinate_block = ""
+        coordinate_requirements = (
+            "- `image_scan` should be your own short list of concrete visible relation cues grounded in the formal problem text.\n"
+            "- Stay text-only: use only the formal problem text and named visible points, and do not rely on any image or coordinate table.\n"
+        )
+    else:
+        visible_input_text = "The final student will only see the image and the public problem text."
+        visible_coordinate_block = (
+            "[Visible Point Coordinates]\n"
+            f"{json.dumps(visible_point_coords, ensure_ascii=False, indent=2)}\n\n"
+        )
+        coordinate_requirements = (
+            "- `image_scan` should be your own short list of concrete visible relation cues. Use the visible coordinates only when they help you decide which cues matter.\n"
+            "- If coordinates help, convert them into a few relevant local observations instead of narrating the whole coordinate table.\n"
+            "- Stay visible-only: use only visible points and visible coordinates, and do not infer hidden proof steps from the coordinate table.\n"
+        )
     return (
         "You are planning an insight-first geometry CoT sample.\n\n"
         "[Visible Inputs]\n"
-        "The final student will only see the image and the public problem text.\n"
+        f"{visible_input_text}\n"
         f"{public_problem}\n\n"
         "[Visible Goal]\n"
         f"{visible_goal}\n\n"
         "[Visible Facts]\n"
         f"{json.dumps(visible_fact_relations, ensure_ascii=False, indent=2)}\n\n"
-        "[Visible Point Coordinates]\n"
-        f"{json.dumps(visible_point_coords, ensure_ascii=False, indent=2)}\n\n"
+        f"{visible_coordinate_block}"
         "[Approved Auxiliary Construction]\n"
         "This is the canonical auxiliary construction already chosen in the teacher record. Keep the geometry consistent with it.\n"
         f"{canonical_aux_construction}\n\n"
@@ -250,14 +285,12 @@ def build_insight_plan_prompt(
         "Derive any coordinate-backed image observations yourself from the visible point coordinates when they genuinely matter.\n\n"
         "[Critical Requirements]\n"
         "- Keep the plan insight-first. Do not write a full closure route.\n"
-        "- `image_scan` should be your own short list of concrete visible relation cues. Use the visible coordinates only when they help you decide which cues matter.\n"
+        f"{coordinate_requirements}"
         "- `required_aux_effect` must stay aligned with the slot-derived effect.\n"
         "- `aux_construction` should describe the approved auxiliary construction naturally, without changing the geometry.\n"
         "- `aux_selection_reason` must explain only why this helper is appropriate; it must reuse the slot information instead of inventing a different hidden relation or expanding into a proof route.\n"
         "- If the auxiliary construction introduces multiple new points or multiple staged facts, include `stage_order`.\n"
         "- `bonus_post_aux_tail` is optional; if you include it, keep it local to what the helper opens after construction.\n"
-        "- If coordinates help, convert them into a few relevant local observations instead of narrating the whole coordinate table.\n"
-        "- Stay visible-only: use only visible points and visible coordinates, and do not infer hidden proof steps from the coordinate table.\n"
         "- Do not list the construction's direct consequences one by one; keep them script-local.\n"
         "- Do not mention proof ids, rule names, hidden hints, or theorem catalogs.\n\n"
         "[Output Schema Example]\n"
@@ -265,7 +298,7 @@ def build_insight_plan_prompt(
     )
 
 
-def build_insight_write_prompt(record, plan: dict):
+def build_insight_write_prompt(record, plan: dict, generation_style: str = INSIGHT_IMAGE_V1):
     public_problem = build_public_problem_text(record)
     visible_goal = extract_problem_goal(record)
     visible_point_coords = record.get("point_coords_grid") or record.get("grid_coord") or {}
@@ -279,14 +312,30 @@ def build_insight_write_prompt(record, plan: dict):
         "stage_order": plan.get("stage_order"),
         "bonus_post_aux_tail": plan.get("bonus_post_aux_tail"),
     }
+    if generation_style == INSIGHT_TEXT_V1:
+        visible_coordinate_block = ""
+        visibility_rules = (
+            "- Use only the formal problem text and the approved plan. Do not mention any image or point coordinates.\n"
+            "- Keep the tone text-only.\n"
+        )
+    else:
+        visible_coordinate_block = (
+            "[Visible Point Coordinates]\n"
+            f"{json.dumps(visible_point_coords, ensure_ascii=False, indent=2)}\n\n"
+        )
+        visibility_rules = (
+            "- You may write visible-point coordinates inline when they help anchor a key local observation to the figure, especially for the points that drive a coordinate-backed judgment.\n"
+            "- Use coordinates only when helpful; you do not need to attach coordinates to every point mention.\n"
+            "- Never assign coordinates to auxiliary points.\n"
+            "- Keep the tone visible-only.\n"
+        )
     return (
         "Write one insight-first geometry thinking trace.\n\n"
         "[Visible Problem]\n"
         f"{public_problem}\n\n"
         "[Visible Goal]\n"
         f"{visible_goal}\n\n"
-        "[Visible Point Coordinates]\n"
-        f"{json.dumps(visible_point_coords, ensure_ascii=False, indent=2)}\n\n"
+        f"{visible_coordinate_block}"
         "[Approved Insight Plan]\n"
         f"{json.dumps(visible_plan, ensure_ascii=False, indent=2)}\n\n"
         "[Writing Rules]\n"
@@ -295,13 +344,10 @@ def build_insight_write_prompt(record, plan: dict):
         "- Keep the post-construction boundary explicit: the body may describe the visible gap, the approved auxiliary construction, the construction's direct local effect, and cautious local unlock statements that stay near that helper effect.\n"
         "- Do not claim that a remote goal-side object is already connected, transferable, comparable, or resolved unless that supporting relation is explicitly stated in the body itself.\n"
         "- You do not need to quote `required_aux_effect` verbatim; describing the approved helper relation or its immediate geometric payoff is enough.\n"
-        "- You may write visible-point coordinates inline when they help anchor a key local observation to the figure, especially for the points that drive a coordinate-backed judgment.\n"
-        "- Use coordinates only when helpful; you do not need to attach coordinates to every point mention.\n"
-        "- Never assign coordinates to auxiliary points.\n"
+        f"{visibility_rules}"
         "- You may continue after the construction to explain what the helper unlocks locally, but do not turn that into a full hidden proof retelling.\n"
         "- Do not enumerate direct construction consequences one by one.\n"
         "- Do not retell the full proof. Do not list theorems. Do not mention proof ids or rule names.\n"
-        "- Keep the tone visible-only.\n"
         "- Allowed example: \"this creates a cyclic angle carrier around a, c, d, and f.\"\n"
         "- Allowed example: \"this gives one local frame that can be reused later.\"\n"
         "- Forbidden example: \"so the angle at e can now be transferred\" when e is only reachable through a later hidden bridge not stated in the body.\n"
@@ -331,6 +377,7 @@ def build_scripted_insight_plan(
     aux_part: str,
     insight_slots: dict,
     visible_text_facts,
+    generation_style: str = INSIGHT_IMAGE_V1,
 ):
     visible_facts = []
     for item in visible_text_facts or []:
@@ -381,7 +428,26 @@ def build_scripted_insight_plan(
         aux_selection_reason=aux_selection_reason,
         stage_order=stage_order,
         bonus_post_aux_tail=bonus_tail,
+        generation_style=generation_style,
+        insight_version=generation_style,
     ).to_dict()
+
+
+def _derive_visible_points_for_insight_validation(
+    point_coords,
+    visible_goal: str,
+    visible_text_facts,
+) -> list[str]:
+    if point_coords:
+        return extract_visible_point_names(point_coords or {})
+    point_names = set()
+    for fact in visible_text_facts or []:
+        relation = fact.get("relation") if isinstance(fact, dict) else fact
+        if isinstance(relation, str) and relation.strip():
+            point_names.update(match.lower() for match in _POINT_NAME_RE.findall(relation))
+    if isinstance(visible_goal, str) and visible_goal.strip():
+        point_names.update(match.lower() for match in _POINT_NAME_RE.findall(visible_goal))
+    return sorted(point_names)
 
 
 def _canonical_relation_list(values, min_items: int, field_name: str):
@@ -408,13 +474,16 @@ def validate_insight_plan_response(
     visible_premise_summaries=None,
     visible_text_facts=None,
     insight_slots=None,
+    generation_style: str = INSIGHT_IMAGE_V1,
 ):
     del coordinate_candidates, sanitized_rest, visible_premise_summaries
     plan = output_text if isinstance(output_text, dict) else _extract_json_object(output_text)
     if not isinstance(plan, dict):
         return False, "Planner must return a single JSON object", None
     if not isinstance(insight_slots, dict):
-        return False, "Insight slots are required for insight_v1 validation", None
+        return False, "Insight slots are required for insight validation", None
+    if generation_style not in INSIGHT_GENERATION_STYLES:
+        return False, f"Unsupported insight generation_style: {generation_style}", None
 
     required_keys = [
         "visible_facts",
@@ -429,7 +498,11 @@ def validate_insight_plan_response(
     if missing:
         return False, f"Insight plan missing keys: {missing}", None
 
-    visible_points = extract_visible_point_names(point_coords or {})
+    visible_points = _derive_visible_points_for_insight_validation(
+        point_coords,
+        visible_goal,
+        visible_text_facts,
+    )
     aux_points = {
         str(point).lower()
         for point in extract_aux_new_points(aux_part or "")
@@ -466,6 +539,10 @@ def validate_insight_plan_response(
     )
     if not ok:
         return False, message, None
+    if generation_style == INSIGHT_TEXT_V1:
+        for item in cleaned_image_scan:
+            if _INLINE_POINT_COORD_RE.search(item) or "<coord>" in item.lower():
+                return False, "text-only insight plans must not mention point coordinates", None
     for item in cleaned_image_scan:
         if extract_point_mentions(item, list(aux_points)):
             return False, "image_scan must not mention auxiliary points before construction", None
@@ -585,6 +662,8 @@ def validate_insight_plan_response(
         aux_selection_reason=aux_selection_reason,
         stage_order=cleaned_stage_order,
         bonus_post_aux_tail=cleaned_bonus_tail,
+        generation_style=generation_style,
+        insight_version=generation_style,
     ).to_dict()
     cleaned_plan["goal_family"] = parse_goal_expression(visible_goal or "").get("predicate") or ""
     cleaned_plan["insight_slots"] = insight_slots
@@ -624,7 +703,13 @@ def build_scripted_insight_writer_body(plan: dict):
     return " ".join(sentence.strip().rstrip(".") + "." for sentence in sentences if sentence and sentence.strip())
 
 
-def validate_insight_writer_body(output_text: str, visible_goal="", injected_prefix="", plan=None):
+def validate_insight_writer_body(
+    output_text: str,
+    visible_goal="",
+    injected_prefix="",
+    plan=None,
+    generation_style: str = INSIGHT_IMAGE_V1,
+):
     del injected_prefix, visible_goal
     body = str(output_text or "").strip()
     if not body:
@@ -635,6 +720,10 @@ def validate_insight_writer_body(output_text: str, visible_goal="", injected_pre
         return False, "Writer body must not mention proof ids, rule names, or hidden proof language"
     if _INTERNAL_REF_RE.search(body):
         return False, "Writer body must not mention internal plan references"
+    if generation_style == INSIGHT_TEXT_V1 and (
+        _INLINE_POINT_COORD_RE.search(body) or "<coord>" in body.lower()
+    ):
+        return False, "Text-only insight writer body must not mention point coordinates"
 
     if isinstance(plan, dict):
         required_effect = str(plan.get("required_aux_effect") or "").strip()
@@ -672,7 +761,8 @@ def validate_insight_writer_body(output_text: str, visible_goal="", injected_pre
 
 
 __all__ = [
-    "INSIGHT_V1",
+    "INSIGHT_IMAGE_V1",
+    "INSIGHT_TEXT_V1",
     "build_insight_plan_prompt",
     "build_insight_plan_retry_feedback",
     "build_insight_write_prompt",

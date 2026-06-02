@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Structured schemas for the insight_v1 CoT SFT mainline.
+Structured schemas for the insight CoT SFT mainline variants.
 """
 
 from __future__ import annotations
@@ -9,7 +9,12 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 
-INSIGHT_V1 = "insight_v1"
+INSIGHT_IMAGE_V1 = "insight_image_v1"
+INSIGHT_TEXT_V1 = "insight_text_v1"
+INSIGHT_GENERATION_STYLES = {
+    INSIGHT_IMAGE_V1,
+    INSIGHT_TEXT_V1,
+}
 INSIGHT_GAP_TYPES = {
     "angle_transfer",
     "ratio_transfer",
@@ -60,8 +65,8 @@ class InsightPlan:
     aux_selection_reason: str
     stage_order: list[str] | None = None
     bonus_post_aux_tail: list[str] | None = None
-    generation_style: str = INSIGHT_V1
-    insight_version: str = INSIGHT_V1
+    generation_style: str = INSIGHT_IMAGE_V1
+    insight_version: str = INSIGHT_IMAGE_V1
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -69,7 +74,9 @@ class InsightPlan:
 
 __all__ = [
     "INSIGHT_GAP_TYPES",
-    "INSIGHT_V1",
+    "INSIGHT_GENERATION_STYLES",
+    "INSIGHT_IMAGE_V1",
+    "INSIGHT_TEXT_V1",
     "InsightEvidenceWindow",
     "InsightPlan",
     "InsightSlots",

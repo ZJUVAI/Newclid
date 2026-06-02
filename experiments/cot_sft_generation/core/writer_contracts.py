@@ -7,8 +7,19 @@ from __future__ import annotations
 
 import json
 
+try:
+    from .insight_schema import INSIGHT_TEXT_V1
+except ImportError:  # pragma: no cover - script execution path
+    from insight_schema import INSIGHT_TEXT_V1  # type: ignore
 
-def build_instruction_text():
+
+def build_instruction_text(generation_style: str | None = None):
+    if generation_style == INSIGHT_TEXT_V1:
+        return (
+            "Given the formal problem text, write a forward-thinking trace that explains "
+            "the visible gap, motivates the auxiliary construction, and briefly carries "
+            "the route to the goal."
+        )
     return (
         "Given the geometry image and the formal problem text, write a forward-thinking "
         "trace that explains the visible gap, motivates the auxiliary construction, "

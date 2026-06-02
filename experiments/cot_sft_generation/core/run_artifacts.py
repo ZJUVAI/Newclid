@@ -15,10 +15,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional
 
+try:
+    from .insight_schema import INSIGHT_GENERATION_STYLES, INSIGHT_IMAGE_V1
+except ImportError:  # pragma: no cover - script execution path
+    from insight_schema import INSIGHT_GENERATION_STYLES, INSIGHT_IMAGE_V1  # type: ignore
+
 
 ARTIFACT_SCHEMA_VERSION = "cot_sft_artifacts_v1"
 SEMANTIC_REVIEW_CHECKLIST_VERSION = "cot_sft_semantic_review_v1"
-INSIGHT_V1_HARD_GENERATION_AUDIT_ISSUES = {
+INSIGHT_FAMILY_HARD_GENERATION_AUDIT_ISSUES = {
     "no_proof_echo",
     "visible_only_boundary",
 }
@@ -153,18 +158,21 @@ def build_dataset_output_record(
     public_problem: str,
     thinking: str,
     aux_part: str,
-    image_path: str,
+    generation_style: str,
+    image_path: str | None = None,
 ) -> Dict[str, Any]:
     output = f"{thinking}\n{aux_part}"
-    return {
+    record = {
         "instruction": instruction,
         "input": public_problem,
         "thinking": thinking,
         "aux": aux_part,
         "output": output,
-        "image_path": image_path,
         "_order": sample_order,
     }
+    if generation_style == INSIGHT_IMAGE_V1 and image_path:
+        record["image_path"] = image_path
+    return record
 
 
 def build_missing_image_item_record(
@@ -241,14 +249,14 @@ def build_generation_failure_item_record(
     }
 
 
-def _insight_v1_has_hard_generation_audit_issue(
+def _insight_family_has_hard_generation_audit_issue(
     generation_style: Optional[str],
     generation_audit: Dict[str, Any],
 ) -> bool:
-    if generation_style != "insight_v1":
+    if generation_style not in INSIGHT_GENERATION_STYLES:
         return False
     issues = generation_audit.get("issues") or []
-    return any(issue in INSIGHT_V1_HARD_GENERATION_AUDIT_ISSUES for issue in issues)
+    return any(issue in INSIGHT_FAMILY_HARD_GENERATION_AUDIT_ISSUES for issue in issues)
 
 
 def resolve_dataset_export_decision(
@@ -258,7 +266,7 @@ def resolve_dataset_export_decision(
 ) -> tuple[bool, Optional[str]]:
     if not generation.get("success") or not generation.get("thinking"):
         return False, "generation_failed"
-    if _insight_v1_has_hard_generation_audit_issue(generation_style, generation_audit):
+    if _insight_family_has_hard_generation_audit_issue(generation_style, generation_audit):
         return False, "generation_audit_hard_issue"
     return True, None
 

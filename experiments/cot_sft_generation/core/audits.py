@@ -34,6 +34,7 @@ try:
         split_formal_relation_chain,
         summarize_aux_clause,
     )
+    from .insight_schema import INSIGHT_GENERATION_STYLES, INSIGHT_IMAGE_V1, INSIGHT_TEXT_V1
 except ImportError:  # pragma: no cover - script execution path
     from geometry_text import (
         PROBLEM_BODY_RE,
@@ -53,6 +54,7 @@ except ImportError:  # pragma: no cover - script execution path
         split_formal_relation_chain,
         summarize_aux_clause,
     )
+    from insight_schema import INSIGHT_GENERATION_STYLES, INSIGHT_IMAGE_V1, INSIGHT_TEXT_V1  # type: ignore
 
 
 def get_point_coords(record: Dict[str, Any]) -> Dict[str, tuple[int, int]]:
@@ -62,6 +64,22 @@ def get_point_coords(record: Dict[str, Any]) -> Dict[str, tuple[int, int]]:
         if isinstance(pair, (list, tuple)) and len(pair) == 2:
             normalized[str(point_name)] = (int(pair[0]), int(pair[1]))
     return normalized
+
+
+def _derive_visible_points_from_record_text(
+    record: Dict[str, Any],
+    visible_goal: str = "",
+) -> set[str]:
+    point_names = set()
+    for fact in extract_visible_formal_facts(record):
+        point_names.update(_extract_fact_points(fact))
+    goal_text = visible_goal or extract_problem_goal(record)
+    if isinstance(goal_text, str) and goal_text.strip():
+        point_names.update(
+            token.lower()
+            for token in re.findall(r"\b[a-z]\w*\b", goal_text)
+        )
+    return point_names
 
 
 def extract_visible_formal_facts(record: Dict[str, Any]) -> list[Dict[str, Any]]:
@@ -1171,18 +1189,22 @@ def audit_source_record(
     aux_part: str,
     visible_goal: str,
     proof_guidance: Dict[str, Any],
+    generation_style: str = INSIGHT_IMAGE_V1,
 ) -> Dict[str, Any]:
     issues = []
     point_coords = get_point_coords(record)
     goal_spec = parse_goal_expression(visible_goal)
     goal_points = set(goal_spec["points"])
-    visible_points = set(extract_visible_point_names(point_coords))
+    if generation_style == INSIGHT_TEXT_V1:
+        visible_points = _derive_visible_points_from_record_text(record, visible_goal=visible_goal)
+    else:
+        visible_points = set(extract_visible_point_names(point_coords))
     aux_scope = extract_aux_point_scope(aux_part)
     aux_direct = build_aux_direct_consequences(aux_part)
 
-    if not image_path.exists():
+    if generation_style != INSIGHT_TEXT_V1 and not image_path.exists():
         issues.append("missing_image")
-    if not point_coords:
+    if generation_style != INSIGHT_TEXT_V1 and not point_coords:
         issues.append("missing_point_coords")
     if not visible_goal:
         issues.append("missing_visible_goal")
@@ -1195,7 +1217,7 @@ def audit_source_record(
     relation_conflicts = detect_visible_premise_relation_conflicts(record)
     if relation_conflicts:
         issues.extend(relation_conflicts[:8])
-    if point_coords:
+    if generation_style != INSIGHT_TEXT_V1 and point_coords:
         visible_fact_conflicts = []
         for fact in extract_visible_formal_facts(record):
             conflict = _visible_fact_coordinate_conflict(fact, point_coords)
@@ -1246,13 +1268,14 @@ def audit_generation_quality(
     ]
 
     if plan:
-        if plan.get("insight_version") == "insight_v1":
+        if plan.get("insight_version") in INSIGHT_GENERATION_STYLES:
             write_output = generation.get("write_output") or ""
             goal_gap_type = str(plan.get("goal_gap_type") or "").strip()
             goal_gap_text = str(plan.get("goal_gap_text") or "").strip()
             aux_selection_reason = str(plan.get("aux_selection_reason") or "").strip()
             slot_effect = str((plan.get("insight_slots") or {}).get("required_aux_effect") or "").strip()
             aux_effect = str(plan.get("required_aux_effect") or "").strip()
+            insight_style = str(plan.get("insight_version") or plan.get("generation_style") or INSIGHT_IMAGE_V1)
             if plan.get("aux_construction_matches_canonical") is False:
                 issues.append("aux_construction_mismatch")
             if not goal_gap_text or len(goal_gap_text) < 24:
@@ -1289,6 +1312,11 @@ def audit_generation_quality(
                     issues.append("no_proof_echo")
                 if re.search(r"\b(?:hidden|milestone|evidence window|goal closure|bridge chain)\b", write_output, re.IGNORECASE):
                     issues.append("visible_only_boundary")
+                if insight_style == INSIGHT_TEXT_V1 and (
+                    re.search(r"\b[a-z]\w*\s*=\s*\(\s*-?\d+\s*,\s*-?\d+\s*\)", write_output, re.IGNORECASE)
+                    or "<coord>" in write_output.lower()
+                ):
+                    issues.append("text_variant_coordinate_leak")
                 if detect_insight_v1_downstream_overclaim(
                     write_output,
                     plan,
