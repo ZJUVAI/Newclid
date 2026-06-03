@@ -47,7 +47,6 @@ class Statistics:
 
     def add(self, summary: dict[str, any]):
         self.summaries.append(summary)
-        self.df = pd.DataFrame(self.summaries)
         # logging.info(self.df.describe())
 
     def _convert_types_for_json(self, obj):
@@ -75,8 +74,10 @@ class Statistics:
         - JSON file with detailed aggregated data
         """
         if self.df is None or self.df.empty:
-            logging.warning("No data loaded, cannot generate report.")
-            return
+            if not self.summaries:
+                logging.warning("No data loaded, cannot generate report.")
+                return
+            self.df = pd.DataFrame(self.summaries)
 
         # Unified command-line output
         print("\n--- Generation Summary ---")
