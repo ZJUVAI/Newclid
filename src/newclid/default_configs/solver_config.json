@@ -1,6 +1,6 @@
 {
   "using_log": true,
-  "using_exp": true,
+  "using_exp": false,
   "light": false,
   "use_predicate_cache": true,
   "verbose": false,
