@@ -1,37 +1,65 @@
 from __future__ import annotations
 
-import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import base64
+from copy import deepcopy
 from functools import lru_cache
-from typing import Any
+import logging
+from pathlib import Path
+import time
+from typing import TYPE_CHECKING, Any
 
 import ray
 import requests
 from transformers import AutoTokenizer
 
-from newclid.agent.agents_interface import DeductiveAgent
+from newclid.agent.base import BaseAgent
+from newclid.agent.runtime.model_pool import WorkerHandleWrapper
 from newclid.agent.runtime.search_runtime import (
     BeamQueue,
+    build_problem_proof,
     get_new_point_name,
     problem_to_text_dsl,
-    run_aux_ddar_remote,
+    problem_to_visual_dsl,
     run_ddar_on_proof,
+    translate_dsl_to_construction,
     try_dsl_to_constructions,
 )
+from newclid.agent.runtime.text_worker import (
+    _accumulate_request_profile,
+    _build_request_profile,
+    _create_worker_batch_profile,
+)
+from newclid.formulations.problem import ProblemJGEX
+from newclid.generation.writer import save_figure_as_png
+from newclid.numerical.draw_clause_figure import draw_clause_figure
 from newclid.proof import ProofState
+
+if TYPE_CHECKING:
+    from newclid.formulations.rule import Rule
+
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = "You are a helpful assistant."
 MAX_NEW_TOKENS = 100
 LENGTH_PENALTY = 1.0
 AUX_STOP = "</aux>"
 AUX_CANDIDATE_STOP = " ;"
-RESPONSE_PREFIX = "<aux> x00"
-HTTP_WORKERS = 16
+DEFAULT_VLLM_WORKERS = 16
 
 
-@lru_cache(maxsize=4)
+@lru_cache(maxsize=8)
 def _load_tokenizer(tokenizer_name: str):
     return AutoTokenizer.from_pretrained(tokenizer_name, trust_remote_code=True)
+
+
+def discover_served_model(base_url: str) -> tuple[str, list[str | None]]:
+    response = requests.get(f"{base_url.rstrip('/')}/v1/models", timeout=120.0)
+    response.raise_for_status()
+    server_models = [item.get("id") for item in response.json().get("data", [])]
+    if not server_models or not server_models[0]:
+        raise ValueError(f"No served models returned by {base_url}/v1/models.")
+    return str(server_models[0]), server_models
 
 
 def build_chat_messages(
@@ -47,401 +75,501 @@ def build_chat_messages(
     ]
 
 
+def build_visual_messages(
+    *,
+    image_data_url: str,
+    query: str,
+    response_prefix: str,
+    new_point_name: str,
+) -> list[dict[str, Any]]:
+    return [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {
+            "role": "user",
+            "content": [
+                {"type": "image_url", "image_url": {"url": image_data_url}},
+                {"type": "text", "text": query},
+            ],
+        },
+        {
+            "role": "assistant",
+            "content": f"<think>\n\n</think>\n\n{response_prefix} {new_point_name}",
+        },
+    ]
+
+
 def _sequence_score(token_logprobs: list[float | None]) -> float:
     total = sum(float(lp) for lp in token_logprobs if lp is not None)
     length = max(sum(lp is not None for lp in token_logprobs), 1)
     return total / (length**LENGTH_PENALTY)
 
 
-def _rank(aux_dsl_scores: dict[str, float]) -> list[tuple[str, float]]:
-    return sorted(aux_dsl_scores.items(), key=lambda item: item[1], reverse=True)
+def _score_chat_choices(
+    *,
+    choices: list[dict[str, Any]],
+    request: dict[str, Any],
+    stop_token_ids: list[int],
+) -> tuple[dict[str, float], list[int]]:
+    response_prefix = str(request.get("response_prefix", "<aux> x00"))
+    new_point_name = str(request["new_point_name"])
+    stop_set = {int(token_id) for token_id in stop_token_ids}
+    aux_dsl_dict: dict[str, float] = {}
+    generated_token_counts: list[int] = []
+    for choice in choices:
+        message = choice.get("message") or {}
+        text = str(message.get("content", "")) if isinstance(message, dict) else ""
+        idx_stop = text.find(AUX_STOP)
+        continuation = (text[:idx_stop] if idx_stop >= 0 else text).rstrip()
+        token_ids = [int(token_id) for token_id in choice.get("token_ids", [])]
+        raw_content_logprobs = (choice.get("logprobs") or {}).get("content", [])
+        token_logprobs = [
+            item.get("logprob") if isinstance(item, dict) else item
+            for item in raw_content_logprobs
+        ]
+        limit = next(
+            (index for index, token_id in enumerate(token_ids) if token_id in stop_set),
+            min(len(token_ids), len(token_logprobs)),
+        )
+        trimmed_logprobs = token_logprobs[:limit]
+        generated_token_counts.append(limit)
+        aux_dsl = f"{response_prefix} {new_point_name}{continuation}"
+        score = _sequence_score(trimmed_logprobs)
+        if aux_dsl not in aux_dsl_dict or score > aux_dsl_dict[aux_dsl]:
+            aux_dsl_dict[aux_dsl] = score
+    return aux_dsl_dict, generated_token_counts
 
 
-class VLLMLMAgent(DeductiveAgent):
+def create_vllm_workers(
+    *,
+    base_url: str,
+    served_model_name: str,
+    worker_count: int = DEFAULT_VLLM_WORKERS,
+) -> list[WorkerHandleWrapper]:
+    if worker_count <= 0:
+        raise ValueError(f"worker_count must be positive, got {worker_count}.")
+    return [
+        WorkerHandleWrapper(
+            VLLMWorker.remote(
+                base_url=base_url,
+                served_model_name=served_model_name,
+                worker_slot=worker_slot,
+            ),
+            worker_trace_id=f"vllm:{worker_slot}",
+            worker_device="http",
+        )
+        for worker_slot in range(worker_count)
+    ]
+
+
+class _BaseQwen3Agent(BaseAgent):
+    def __init__(
+        self,
+        model_pool,
+        decoding_size: int,
+        beam_size: int,
+        search_depth: int,
+        *,
+        search_version: str = "v1",
+        max_pending_ddar: int = 1,
+        trace_writer=None,
+    ):
+        if search_version not in {"v1", "v2", "hybrid"}:
+            raise ValueError(f"Unsupported search_version: {search_version}")
+        super().__init__(
+            model_pool=model_pool,
+            decoding_size=decoding_size,
+            beam_size=beam_size,
+            search_depth=search_depth,
+            gpu_batch_size=1,
+            gpu_batch_timeout_ms=0,
+            agent_type=self.agent_name,
+            max_pending_ddar=max_pending_ddar,
+            prepare_request_workers=1,
+            prepare_prefetch_limit=max(1, 2 * beam_size),
+            ddar_returns_proof=False,
+            trace_writer=trace_writer,
+        )
+        self.search_version = search_version
+        self._active_search_mode = "v1"
+
+    @property
+    def agent_name(self) -> str:
+        raise NotImplementedError
+
+    def run(
+        self, proof: ProofState, rules: list["Rule"], timeout: int = 3600
+    ) -> dict[str, Any]:
+        if self.search_version != "hybrid":
+            self._active_search_mode = self.search_version
+            self._trace("search_mode", mode=self._active_search_mode)
+            return super().run(proof, rules, timeout)
+
+        started_at = time.time()
+        self._active_search_mode = "v1"
+        self._trace("search_mode", mode="v1")
+        first_result = super().run(proof, rules, timeout)
+        if first_result.get("success") or first_result.get("error") == "Timeout":
+            return first_result
+
+        remaining_timeout = max(0, timeout - int(time.time() - started_at))
+        if remaining_timeout <= 0:
+            first_result["error"] = "Timeout"
+            return first_result
+
+        self._active_search_mode = "v2"
+        self._trace("search_mode", mode="v2")
+        return super().run(proof, rules, remaining_timeout)
+
+    def _response_prefix(self, aux_prefix: str) -> str:
+        if self._active_search_mode != "v2":
+            return "<aux> x00"
+        separator = " ;" if aux_prefix.strip() else ""
+        return f"<aux>{aux_prefix}{separator} x00"
+
+    def get_problem_from_state(self, state: Any) -> ProblemJGEX:
+        if self._active_search_mode == "v2":
+            return state[0]
+        return state
+
+    def make_next_state_from_unsolved_ddar(
+        self,
+        *,
+        new_problem: ProblemJGEX,
+        prior_state: Any,
+        ddar_result: dict[str, object],
+        proof: ProofState,
+        request: dict[str, Any],
+        aux_dsl: str,
+        raw_aux_text: str,
+    ) -> Any:
+        del ddar_result, proof, request, raw_aux_text
+        if self._active_search_mode == "v2":
+            return new_problem, aux_dsl[len("<aux>") :]
+        del prior_state, aux_dsl
+        return new_problem
+
+    def get_new_point_name(self, problem: ProblemJGEX) -> str:
+        return get_new_point_name(problem)
+
+    def try_dsl_to_constructions(self, content: str):
+        return try_dsl_to_constructions(content)
+
+    def translate_dsl_to_construction(
+        self, point: str, predicate: str, args: list[str]
+    ):
+        return translate_dsl_to_construction(point, predicate, args)
+
+    def run_ddar_c(
+        self,
+        proof: ProofState,
+        rules: list["Rule"],
+        start_time: float,
+        timeout: int = 3600,
+    ) -> bool:
+        del rules, start_time, timeout
+        return run_ddar_on_proof(proof)
+
+
+class Qwen3Agent(_BaseQwen3Agent):
+    agent_name = "qwen3_text"
+
+    def __init__(self, model_pool, decoding_size: int, beam_size: int, search_depth: int, *, search_version: str = "v1", max_pending_ddar: int = 1, trace_writer=None):
+        super().__init__(
+            model_pool,
+            decoding_size,
+            beam_size,
+            search_depth,
+            search_version=search_version,
+            max_pending_ddar=max_pending_ddar,
+            trace_writer=trace_writer,
+        )
+        self._root_problem_dsl: str | None = None
+
+    def seed_state(self, proof: ProofState, base_proof: ProofState) -> Any:
+        del proof
+        self._root_problem_dsl = self.problem_to_dsl(self.problemJGEX, base_proof.defs)
+        if self._active_search_mode == "v2":
+            return self.problemJGEX, ""
+        return self.problemJGEX
+
+    def prepare_request(
+        self, *, request_id: str, state: Any, proof: ProofState, depth: int
+    ) -> dict[str, Any]:
+        del depth
+        if self._active_search_mode == "v2":
+            problem, aux_prefix = state
+            query = self._root_problem_dsl
+            response_prefix = self._response_prefix(aux_prefix)
+        else:
+            problem = state
+            query = self.problem_to_dsl(problem, proof.defs)
+            response_prefix = self._response_prefix("")
+        if query is None:
+            raise ValueError("Root text DSL is unavailable during request preparation.")
+        return {
+            "request_id": request_id,
+            "runtime_kind": "vllm",
+            "search_mode": self._active_search_mode,
+            "messages": build_chat_messages(
+                query=query,
+                response_prefix=response_prefix,
+                new_point_name=self.get_new_point_name(problem),
+            ),
+            "query": query,
+            "new_point_name": self.get_new_point_name(problem),
+            "response_prefix": response_prefix,
+            "with_predicate": False,
+            "decoding_size": self.decoding_size,
+        }
+
+    def problem_to_dsl(self, problem: ProblemJGEX, defs) -> str:
+        return problem_to_text_dsl(problem, defs)
+
+
+class Qwen3VLAgent(_BaseQwen3Agent):
+    agent_name = "qwen3_vl"
+
+    def __init__(
+        self,
+        model_pool,
+        decoding_size: int,
+        beam_size: int,
+        search_depth: int,
+        *,
+        search_version: str = "v1",
+        render_root: str | Path = "temp/eval_rendered_images",
+        max_pending_ddar: int = 1,
+        trace_writer=None,
+    ):
+        super().__init__(
+            model_pool,
+            decoding_size,
+            beam_size,
+            search_depth,
+            search_version=search_version,
+            max_pending_ddar=max_pending_ddar,
+            trace_writer=trace_writer,
+        )
+        self.render_root = Path(render_root)
+        self.render_root.mkdir(parents=True, exist_ok=True)
+        self._proof_defs: dict[str, Any] | None = None
+        self._root_problem_dsl: str | None = None
+
+    def base_ddar_proof(self, proof: ProofState) -> ProofState:
+        return deepcopy(proof)
+
+    def seed_state(self, proof: ProofState, base_proof: ProofState) -> Any:
+        del proof
+        self._proof_defs = base_proof.defs
+        self._root_problem_dsl = self.problem_to_dsl(self.problemJGEX, base_proof.defs)
+        if self._active_search_mode == "v2":
+            return self.problemJGEX, base_proof, ""
+        return self.problemJGEX, base_proof
+
+    def prepare_request(
+        self, *, request_id: str, state: Any, proof: ProofState, depth: int
+    ) -> dict[str, Any]:
+        del proof
+        if self._active_search_mode == "v2":
+            problem, current_proof, aux_prefix = state
+            query = self._root_problem_dsl
+            response_prefix = self._response_prefix(aux_prefix)
+        else:
+            problem, current_proof = state
+            query = self.problem_to_dsl(problem, current_proof.defs)
+            response_prefix = self._response_prefix("")
+        if current_proof is None:
+            raise ValueError("Visual frontier state is missing a materialized proof.")
+        if query is None:
+            raise ValueError("Root visual DSL is unavailable during request preparation.")
+        png_path = self.render_root / f"d{depth}_{request_id}.png"
+        fig = draw_clause_figure(
+            current_proof,
+            problem,
+            None,
+            current_proof.rng,
+            draw_annotations=True,
+            theme=None,
+        )
+        save_figure_as_png(
+            fig,
+            png_path=str(png_path),
+            img_pixels=512,
+            direct_png=True,
+        )
+        data_url = "data:image/png;base64," + base64.b64encode(
+            png_path.read_bytes()
+        ).decode("ascii")
+        return {
+            "request_id": request_id,
+            "runtime_kind": "vllm",
+            "search_mode": self._active_search_mode,
+            "messages": build_visual_messages(
+                image_data_url=data_url,
+                query=query,
+                response_prefix=response_prefix,
+                new_point_name=self.get_new_point_name(problem),
+            ),
+            "query": query,
+            "image_data_url": data_url,
+            "new_point_name": self.get_new_point_name(problem),
+            "response_prefix": response_prefix,
+            "with_predicate": False,
+            "decoding_size": self.decoding_size,
+        }
+
+    def finalize_next_queue(
+        self, *, next_queue: BeamQueue, profiling: dict[str, Any]
+    ) -> BeamQueue:
+        del profiling
+        if self._proof_defs is None:
+            raise ValueError("Visual agent definitions are unavailable.")
+        materialized_queue = BeamQueue(max_size=next_queue.max_size)
+        for val, stable_key, _, node in next_queue.iter_entries():
+            node_id, parent_node_id, path_key, state = node
+            if self._active_search_mode == "v2":
+                problem, current_proof, aux_prefix = state
+            else:
+                problem, current_proof = state
+                aux_prefix = None
+            if current_proof is None:
+                current_proof = build_problem_proof(problem, self._proof_defs)
+            next_state = (
+                (problem, current_proof, aux_prefix)
+                if self._active_search_mode == "v2"
+                else (problem, current_proof)
+            )
+            materialized_queue.add(
+                node=(node_id, parent_node_id, path_key, next_state),
+                val=val,
+                stable_key=stable_key,
+            )
+        return materialized_queue
+
+    def problem_to_dsl(self, problem: ProblemJGEX, defs) -> str:
+        return problem_to_visual_dsl(problem, defs)
+
+
+@ray.remote(num_cpus=0, max_concurrency=1)
+class VLLMWorker:
     def __init__(
         self,
         *,
         base_url: str,
-        decoding_size: int,
-        beam_size: int,
-        search_depth: int,
-        served_model_name: str | None = None,
-        search_version: str = "v1",
+        served_model_name: str,
+        worker_slot: int = 0,
     ):
-        self.problemJGEX = None
         self.base_url = base_url.rstrip("/")
-        self.session = requests.Session()
-        adapter = requests.adapters.HTTPAdapter(
-            pool_connections=HTTP_WORKERS, pool_maxsize=HTTP_WORKERS
+        self.served_model_name = served_model_name
+        self.worker_slot = int(worker_slot)
+        self.worker_id = f"vllm:{self.worker_slot}"
+        self.device_label = "http"
+        self.tokenizer = _load_tokenizer(self.served_model_name)
+        self.stop_token_ids = self.tokenizer.encode(
+            AUX_CANDIDATE_STOP, add_special_tokens=False
         )
+        self.session = requests.Session()
+        adapter = requests.adapters.HTTPAdapter(pool_connections=1, pool_maxsize=1)
         self.session.mount("http://", adapter)
         self.session.mount("https://", adapter)
-        self.server_models: list[str | None] = []
-        self.served_model_name = served_model_name or self._discover_model()
-        self.tokenizer = _load_tokenizer(self.served_model_name)
-        stop_ids = self.tokenizer.encode(AUX_CANDIDATE_STOP, add_special_tokens=False)
-        if len(stop_ids) != 1:
-            raise ValueError(
-                f"Expected {AUX_CANDIDATE_STOP!r} to map to one token, got {stop_ids}."
-            )
-        self.stop_token_ids = stop_ids
-        self.decoding_size = decoding_size
-        self.beam_size = beam_size
-        self.search_depth = search_depth
-        self.search_version = search_version
-        self._defs_ref: Any | None = None
-        self._root_dsl: str | None = None
-        self._max_pending = 1
-        self._step = 0
-        self._ddar_calls = 0
-        self._ddar_wall = 0.0
-        self._llm_calls = 0
-        self._llm_wall = 0.0
+        self.num_requests = 0
+        self.num_batches = 0
 
-    def step(self, proof: ProofState, rules) -> bool:
-        del proof, rules
-        return True
-
-    def _discover_model(self) -> str:
-        resp = self.session.get(f"{self.base_url}/v1/models", timeout=120.0)
-        resp.raise_for_status()
-        self.server_models = [item.get("id") for item in resp.json().get("data", [])]
-        if not self.server_models or not self.server_models[0]:
-            raise ValueError(f"No served models returned by {self.base_url}/v1/models.")
-        return str(self.server_models[0])
-
-    def server_info(self) -> dict[str, Any]:
-        if not self.server_models:
-            self.server_models = [self.served_model_name]
+    def warmup(self) -> dict[str, Any]:
         return {
             "served_model_name": self.served_model_name,
-            "server_models": self.server_models,
-            "search_version": self.search_version,
+            "worker_id": self.worker_id,
+            "device": self.device_label,
+            "runtime": "vllm",
         }
 
-    def run(self, proof: ProofState, rules, timeout: int = 3600) -> dict[str, Any]:
-        del rules
-        t0 = time.time()
-        deadline = t0 + timeout
-        self._step = 0
-        self._ddar_calls = 0
-        self._ddar_wall = 0.0
-        self._llm_calls = 0
-        self._llm_wall = 0.0
-        self._max_pending = max(1, 2 * int(ray.cluster_resources().get("CPU", 1)))
-
-        if any(not g.check_numerical() for g in proof.goals):
-            return self._infos(t0, False, "goal fails numerical check")
-        if run_ddar_on_proof(proof):
-            return self._infos(t0, True)
-
-        self._defs_ref = ray.put(proof.defs)
-        self._root_dsl = problem_to_text_dsl(self.problemJGEX, proof.defs)
-        modes = ("v1", "v2") if self.search_version == "hybrid" else (self.search_version,)
-        error = "Tried but failed."
-        for mode in modes:
-            if time.time() >= deadline:
-                return self._infos(t0, False, "Timeout")
-            solved, error = self._search(mode, proof, deadline)
-            if solved:
-                return self._infos(t0, True)
-        if time.time() >= deadline:
-            return self._infos(t0, False, "Timeout")
-        return self._infos(t0, False, error)
-
-    def _search(
-        self, mode: str, proof: ProofState, deadline: float
-    ) -> tuple[bool, str]:
-        beam = BeamQueue(max_size=self.beam_size)
-        beam.add(node=((), self.problemJGEX, ""), val=0.0, stable_key=())
-
-        for depth in range(self.search_depth):
-            self._step = depth + 1
-            frontier = list(beam)
-            if not frontier:
-                break
-            if time.time() >= deadline:
-                return False, "Timeout"
-
-            last_depth = depth == self.search_depth - 1
-            next_beam = BeamQueue(max_size=self.beam_size)
-            requests_list, context = self._build_requests(
-                mode, depth, frontier, proof
-            )
-            if not requests_list:
-                beam = next_beam
-                continue
-
-            pending: list[Any] = []
-            meta: dict[Any, dict[str, Any]] = {}
-            solved = False
-            lm_start = time.time()
-            last_lm_done = lm_start
-
-            with ThreadPoolExecutor(max_workers=HTTP_WORKERS) as executor:
-                future_to_request = {
-                    executor.submit(self._request_chat_completions, request): request
-                    for request in requests_list
-                }
-                for future in as_completed(future_to_request):
-                    result = future.result()
-                    self._llm_calls += 1
-                    last_lm_done = float(
-                        result.get("completed_at_unix_s", time.time())
-                    )
-                    solved = self._submit(
-                        result, context, pending, meta, next_beam, last_depth, deadline
-                    )
-                    if solved:
-                        break
-                    if self._collect(
-                        pending, meta, next_beam, last_depth, deadline, block=False
-                    ):
-                        solved = True
-                        break
-
-            self._llm_wall += max(last_lm_done - lm_start, 0.0)
-
-            if not solved:
-                solved = self._collect(
-                    pending, meta, next_beam, last_depth, deadline, block=True
-                )
-            if solved:
-                self._cancel(pending)
-                return True, ""
-            beam = next_beam
-
-        return False, "Tried but failed."
-
-    def _submit(
-        self,
-        result: dict[str, Any],
-        context: dict[str, dict[str, Any]],
-        pending: list[Any],
-        meta: dict[Any, dict[str, Any]],
-        next_beam: BeamQueue,
-        last_depth: bool,
-        deadline: float,
-    ) -> bool:
-        ctx = context[result["request_id"]]
-        request = ctx["request"]
-        response_prefix = str(request["response_prefix"])
-        aux_scores = self._score_choices(list(result["choices"]), request)
-
-        for rank, (aux_dsl, score) in enumerate(_rank(aux_scores)):
-            if not aux_dsl.startswith(response_prefix):
-                continue
-            aux_content = aux_dsl[len(response_prefix) :].strip()
-            aux_construction = try_dsl_to_constructions(aux_content)
-            if aux_construction is None:
-                continue
-
-            while len(pending) >= self._max_pending:
-                if self._collect(
-                    pending, meta, next_beam, last_depth, deadline, block=True
-                ):
-                    return True
-
-            future = run_aux_ddar_remote.options(max_retries=0).remote(
-                ctx["problem_ref"],
-                self._defs_ref,
-                aux_construction,
-                content_is_construction=True,
-                return_problem=not last_depth,
-            )
-            pending.append(future)
-            meta[future] = {
-                "prev_score": ctx["prev_score"],
-                "path_key": ctx["path_key"],
-                "rank": rank,
-                "score": score,
-                "child_aux_prefix": aux_dsl[len("<aux>") :],
-            }
-        return False
-
-    def _collect(
-        self,
-        pending: list[Any],
-        meta: dict[Any, dict[str, Any]],
-        next_beam: BeamQueue,
-        last_depth: bool,
-        deadline: float,
-        *,
-        block: bool,
-    ) -> bool:
-        while pending:
-            if block and time.time() >= deadline:
-                self._cancel(pending)
-                return False
-
-            wait_start = time.perf_counter()
-            done, remaining = ray.wait(
-                pending, num_returns=1, timeout=1.0 if block else 0.0
-            )
-            self._ddar_wall += time.perf_counter() - wait_start
-            if not done:
-                if block:
-                    continue
-                return False
-
-            pending[:] = remaining
-            result = ray.get(done[0])
-            info = meta.pop(done[0])
-
-            if not result.get("candidate_valid", False):
-                if block:
-                    continue
-                return False
-
-            self._ddar_calls += 1
-            if result.get("status") == "solved":
-                self._cancel(pending)
-                return True
-
-            if (
-                result.get("status") == "unsolved"
-                and not last_depth
-                and result.get("problem") is not None
-            ):
-                path_key = info["path_key"] + (info["rank"],)
-                next_beam.add(
-                    node=(path_key, result["problem"], info["child_aux_prefix"]),
-                    val=float(info["prev_score"]) + float(info["score"]),
-                    stable_key=path_key,
-                )
-
-            if not block:
-                return False
-        return False
-
-    def _cancel(self, pending: list[Any]) -> None:
-        for future in pending:
-            try:
-                ray.cancel(future, force=False)
-            except Exception:
-                pass
-        pending.clear()
-
-    def _build_requests(
-        self, mode: str, depth: int, frontier: list, proof: ProofState
-    ) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
-        requests_list: list[dict[str, Any]] = []
-        context: dict[str, dict[str, Any]] = {}
-        for prev_score, (path_key, problem, aux_prefix) in frontier:
-            suffix = "root" if not path_key else "-".join(map(str, path_key))
-            request_id = f"d{depth}_p{suffix}"
-            if mode == "v2":
-                separator = " ;" if aux_prefix.strip() else ""
-                response_prefix = f"<aux>{aux_prefix}{separator} x00"
-                query = self._root_dsl
-            else:
-                response_prefix = RESPONSE_PREFIX
-                query = problem_to_text_dsl(problem, proof.defs)
-
-            new_point_name = get_new_point_name(problem)
-            request = {
-                "request_id": request_id,
-                "search_mode": mode,
-                "depth": depth,
-                "messages": build_chat_messages(
-                    query=query,
-                    response_prefix=response_prefix,
-                    new_point_name=new_point_name,
-                ),
-                "new_point_name": new_point_name,
-                "response_prefix": response_prefix,
-            }
-            requests_list.append(request)
-            context[request_id] = {
-                "prev_score": prev_score,
-                "path_key": path_key,
-                "problem_ref": ray.put(problem),
-                "request": request,
-            }
-        return requests_list, context
-
-    def _request_chat_completions(self, request: dict[str, Any]) -> dict[str, Any]:
-        payload = {
-            "model": self.served_model_name,
-            "messages": request["messages"],
-            "continue_final_message": True,
-            "add_generation_prompt": False,
-            "max_tokens": MAX_NEW_TOKENS,
-            "n": self.decoding_size,
-            "temperature": 1.0,
-            "top_p": 1.0,
-            "top_k": -1,
-            "min_p": 0.0,
-            "repetition_penalty": 1.0,
-            "logprobs": True,
-            "top_logprobs": 1,
-            "return_token_ids": True,
-            "stream": False,
-            "include_stop_str_in_output": False,
-            "stop": [AUX_CANDIDATE_STOP],
-            "stop_token_ids": self.stop_token_ids,
-        }
-        resp = self.session.post(
-            f"{self.base_url}/v1/chat/completions", json=payload, timeout=120.0
-        )
-        if not resp.ok:
-            raise requests.HTTPError(
-                f"vLLM chat completion failed status={resp.status_code}: {resp.text}",
-                response=resp,
-            )
-        choices = list(resp.json().get("choices", []))
-        if len(choices) != self.decoding_size:
-            raise ValueError(
-                f"Expected {self.decoding_size} choices, got {len(choices)}."
-            )
+    def stats(self) -> dict[str, Any]:
         return {
-            "request_id": request["request_id"],
-            "choices": choices,
-            "completed_at_unix_s": time.time(),
+            "served_model_name": self.served_model_name,
+            "worker_id": self.worker_id,
+            "device": self.device_label,
+            "num_requests": self.num_requests,
+            "num_batches": self.num_batches,
+            "avg_batch_size": (self.num_requests / self.num_batches)
+            if self.num_batches
+            else 0.0,
+            "runtime": "vllm",
         }
 
-    def _score_choices(
-        self, choices: list[dict[str, Any]], request: dict[str, Any]
-    ) -> dict[str, float]:
-        response_prefix = str(request.get("response_prefix", RESPONSE_PREFIX))
-        new_point_name = str(request["new_point_name"])
-        stop_set = {int(t) for t in self.stop_token_ids}
-        aux_dsl_dict: dict[str, float] = {}
-        for choice in choices:
-            message = choice.get("message") or {}
-            text = str(message.get("content", "")) if isinstance(message, dict) else ""
-            idx_stop = text.find(AUX_STOP)
-            continuation = (text[:idx_stop] if idx_stop >= 0 else text).rstrip()
-            logprobs = choice.get("logprobs") or {}
-            token_ids = [int(t) for t in choice.get("token_ids", [])]
-            raw_content_logprobs = logprobs.get("content", [])
-            token_logprobs = [
-                item.get("logprob") if isinstance(item, dict) else item
-                for item in raw_content_logprobs
-            ]
-            limit = next(
-                (j + 1 for j, token_id in enumerate(token_ids) if token_id in stop_set),
-                min(len(token_ids), len(token_logprobs)),
+    def generate_batch(self, requests_batch: list[dict[str, Any]]) -> dict[str, Any]:
+        perf_start = time.perf_counter()
+        started_at_unix_s = time.time()
+        worker_batch_profile = _create_worker_batch_profile(batch_size=len(requests_batch))
+        worker_batch_profile["runtime"] = "vllm"
+        results: list[dict[str, Any]] = []
+        for request in requests_batch:
+            request_start = time.perf_counter()
+            payload = {
+                "model": self.served_model_name,
+                "messages": request["messages"],
+                "continue_final_message": True,
+                "add_generation_prompt": False,
+                "max_tokens": MAX_NEW_TOKENS,
+                "n": int(request["decoding_size"]),
+                "temperature": 1.0,
+                "top_p": 1.0,
+                "top_k": -1,
+                "min_p": 0.0,
+                "repetition_penalty": 1.0,
+                "logprobs": True,
+                "top_logprobs": 1,
+                "return_token_ids": True,
+                "stream": False,
+                "include_stop_str_in_output": False,
+                "stop": [AUX_CANDIDATE_STOP],
+                "stop_token_ids": self.stop_token_ids,
+            }
+            worker_batch_profile["input_build_time_s"] += time.perf_counter() - request_start
+            response = self.session.post(
+                f"{self.base_url}/v1/chat/completions",
+                json=payload,
+                timeout=120.0,
             )
-            token_logprobs = token_logprobs[:limit]
-            aux_dsl = f"{response_prefix} {new_point_name}{continuation}"
-            score = _sequence_score(token_logprobs)
-            if aux_dsl not in aux_dsl_dict or score > aux_dsl_dict[aux_dsl]:
-                aux_dsl_dict[aux_dsl] = score
-        return aux_dsl_dict
+            response.raise_for_status()
+            generate_done = time.perf_counter()
+            worker_batch_profile["generate_time_s"] += generate_done - request_start
+            choices = list(response.json().get("choices", []))
+            if len(choices) != int(request["decoding_size"]):
+                raise ValueError(
+                    f"Expected {request['decoding_size']} choices, got {len(choices)}."
+                )
+            aux_dsl_dict, generated_token_counts = _score_chat_choices(
+                choices=choices,
+                request=request,
+                stop_token_ids=self.stop_token_ids,
+            )
+            decode_done = time.perf_counter()
+            worker_batch_profile["decode_time_s"] += decode_done - generate_done
+            usage = response.json().get("usage") or {}
+            request_profile = _build_request_profile(
+                prompt_token_count=int(usage.get("prompt_tokens", 0)),
+                generated_token_counts=generated_token_counts,
+                raw_candidate_count=len(choices),
+                unique_candidate_count=len(aux_dsl_dict),
+            )
+            _accumulate_request_profile(worker_batch_profile, request_profile)
+            results.append(
+                {
+                    "request_id": request["request_id"],
+                    "aux_dsl_dict": aux_dsl_dict,
+                    "request_profile": request_profile,
+                }
+            )
 
-    def _infos(
-        self, t0: float, success: bool, error: str | None = None
-    ) -> dict[str, Any]:
-        infos: dict[str, Any] = {
-            "runtime": time.time() - t0,
-            "success": success,
-            "steps": self._step,
-            "ddar_calls": self._ddar_calls,
-            "ddar_real_time_s": round(self._ddar_wall, 3),
-            "llm_calls": self._llm_calls,
-            "llm_real_time_s": round(self._llm_wall, 3),
+        finished_at_unix_s = time.time()
+        worker_batch_profile["worker_inference_time_s"] = time.perf_counter() - perf_start
+        worker_batch_profile["gpu_worker_id"] = self.worker_id
+        worker_batch_profile["gpu_device"] = self.device_label
+        worker_batch_profile["worker_started_at_unix_s"] = started_at_unix_s
+        worker_batch_profile["worker_finished_at_unix_s"] = finished_at_unix_s
+        self.num_requests += len(requests_batch)
+        self.num_batches += 1
+        return {
+            "results": results,
+            "worker_batch_profile": worker_batch_profile,
         }
-        if error:
-            infos["error"] = error
-        return infos

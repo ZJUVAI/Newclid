@@ -616,6 +616,16 @@ class BaseAgent(DeductiveAgent, ABC):
                 gpu_worker_id=event.get("gpu_worker_id"),
                 gpu_device=event.get("gpu_device"),
             )
+            if event.get("runtime_kind") == "vllm":
+                self._trace(
+                    "chat_submit",
+                    depth=depth,
+                    request_ids=event.get("request_ids", []),
+                    batch_size=event.get("batch_size"),
+                    submitted_at_unix_s=event.get("submitted_at_unix_s"),
+                    gpu_worker_id=event.get("gpu_worker_id"),
+                    gpu_device=event.get("gpu_device"),
+                )
 
     def _handle_gpu_result(
         self,
@@ -754,6 +764,21 @@ class BaseAgent(DeductiveAgent, ABC):
                 "generate_time_s": worker_batch_profile.get("generate_time_s"),
             },
         )
+        if dispatcher_profile.get("runtime_kind") == "vllm":
+            self._trace(
+                "chat_complete",
+                depth=depth,
+                request_ids=gpu_batch_payload.get("request_ids", []),
+                batch_size=batch_size,
+                submitted_at_unix_s=dispatcher_profile.get("submitted_at_unix_s"),
+                completed_at_unix_s=worker_batch_profile.get(
+                    "worker_finished_at_unix_s"
+                ),
+                gpu_worker_id=worker_batch_profile.get("gpu_worker_id")
+                or dispatcher_profile.get("gpu_worker_id"),
+                gpu_device=worker_batch_profile.get("gpu_device")
+                or dispatcher_profile.get("gpu_device"),
+            )
 
         for gpu_result in batch_results:
             request_id = gpu_result["request_id"]
@@ -786,6 +811,16 @@ class BaseAgent(DeductiveAgent, ABC):
                 except Exception:
                     increment_profiling_count(profiling, "candidate_parse_failed_count")
                     self._trace(
+                        "candidate_parse",
+                        request_id=request_id,
+                        parent_node_id=parent_node_id,
+                        node_id=None,
+                        candidate_rank=candidate_rank,
+                        depth=depth,
+                        success=False,
+                        raw_aux_text=raw_aux_text,
+                    )
+                    self._trace(
                         "candidate_transition",
                         attempt_key=build_attempt_key(request_id, candidate_rank, None),
                         request_id=request_id,
@@ -804,6 +839,16 @@ class BaseAgent(DeductiveAgent, ABC):
                 if not aux:
                     increment_profiling_count(profiling, "candidate_parse_failed_count")
                     self._trace(
+                        "candidate_parse",
+                        request_id=request_id,
+                        parent_node_id=parent_node_id,
+                        node_id=None,
+                        candidate_rank=candidate_rank,
+                        depth=depth,
+                        success=False,
+                        raw_aux_text=raw_aux_text,
+                    )
+                    self._trace(
                         "candidate_transition",
                         attempt_key=build_attempt_key(request_id, candidate_rank, None),
                         request_id=request_id,
@@ -820,10 +865,32 @@ class BaseAgent(DeductiveAgent, ABC):
                     continue
 
                 increment_profiling_count(profiling, "candidate_parse_success_count")
+                self._trace(
+                    "candidate_parse",
+                    request_id=request_id,
+                    parent_node_id=parent_node_id,
+                    node_id=None,
+                    candidate_rank=candidate_rank,
+                    depth=depth,
+                    success=True,
+                    raw_aux_text=raw_aux_text,
+                    construction_text=aux,
+                )
                 try:
                     new_problem = problem.with_more_construction(aux)
                 except Exception:
                     increment_profiling_count(profiling, "candidate_build_failed_count")
+                    self._trace(
+                        "candidate_build",
+                        request_id=request_id,
+                        parent_node_id=parent_node_id,
+                        node_id=None,
+                        candidate_rank=candidate_rank,
+                        depth=depth,
+                        success=False,
+                        raw_aux_text=raw_aux_text,
+                        construction_text=aux,
+                    )
                     self._trace(
                         "candidate_transition",
                         attempt_key=build_attempt_key(request_id, candidate_rank, None),
@@ -843,6 +910,17 @@ class BaseAgent(DeductiveAgent, ABC):
                 increment_profiling_count(profiling, "candidate_build_success_count")
                 child_node_id = next_node_id
                 next_node_id += 1
+                self._trace(
+                    "candidate_build",
+                    request_id=request_id,
+                    parent_node_id=parent_node_id,
+                    node_id=child_node_id,
+                    candidate_rank=candidate_rank,
+                    depth=depth,
+                    success=True,
+                    raw_aux_text=raw_aux_text,
+                    construction_text=aux,
+                )
                 child_path_key = self._child_path_key(parent_path_key, candidate_rank)
                 pending_ddar_submit.append(
                     {

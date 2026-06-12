@@ -162,6 +162,7 @@ class GenerationDispatcher:
                 "worker": worker,
                 "request_ids": request_ids,
                 "batch_size": len(batch),
+                "runtime_kind": batch[0].get("runtime_kind") if batch else None,
                 "submitted_at": submit_time,
                 "submitted_at_unix_s": submit_time_unix_s,
                 "request_queue_time_s_sum": request_queue_time_s_sum,
@@ -174,6 +175,7 @@ class GenerationDispatcher:
                 {
                     "request_ids": request_ids,
                     "batch_size": len(batch),
+                    "runtime_kind": batch[0].get("runtime_kind") if batch else None,
                     "submitted_at": submit_time,
                     "submitted_at_unix_s": submit_time_unix_s,
                     "request_queue_time_s_sum": request_queue_time_s_sum,
@@ -237,6 +239,7 @@ class GenerationDispatcher:
                 "batch_round_trip_time_s": done_time - running_meta["submitted_at"],
                 "batch_result_ray_get_time_s": ray_get_elapsed_s,
                 "submitted_at_unix_s": running_meta["submitted_at_unix_s"],
+                "runtime_kind": running_meta.get("runtime_kind"),
                 "gpu_worker_id": running_meta["gpu_worker_id"],
                 "gpu_device": running_meta["gpu_device"],
                 "batch_oldest_request_wait_time_s": max(

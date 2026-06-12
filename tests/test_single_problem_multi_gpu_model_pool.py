@@ -241,46 +241,41 @@ class GenerationDispatcherTests(unittest.TestCase):
 
 
 class EvalOutputNamingTests(unittest.TestCase):
-    def test_build_eval_output_stem_includes_gpu_batch_params(self):
+    def test_build_eval_output_stem_uses_vllm_fields_only(self):
         stem = build_eval_output_stem(
-            agent_type="vlm",
-            search_version="v1",
+            agent_type="qwen3_vl",
+            search_version="hybrid",
             problems_path=Path("benchmarks/imo_2000_p6.txt"),
-            model_path="models/vlm_sft50/checkpoint-19194",
+            served_model_name="/tmp/models/checkpoint-7049",
             decoding_size=2,
             beam_size=4,
             search_depth=1,
-            gpu_batch_size=3,
-            gpu_batch_timeout_ms=250,
         )
 
         self.assertEqual(
             stem,
-            "eval_single_problem_multi_gpu_vlm_imo_2000_p6_vlm_sft50_checkpoint-19194"
-            "_sv1_d2_b4_s1_gbs3_gbt250_seed123",
+            "eval_vllm_qwen3_vl_imo_2000_p6_checkpoint-7049_svhybrid_d2_b4_s1",
         )
 
     def test_trace_run_id_uses_eval_stem_and_timestamp_suffix(self):
         stem = build_eval_output_stem(
-            agent_type="lm",
+            agent_type="qwen3_text",
             search_version="v1",
             problems_path=Path("benchmarks/imo_2004_p1.txt"),
-            model_path="models/sft34/checkpoint-25750",
+            served_model_name="served/checkpoint-25750",
             decoding_size=8,
             beam_size=64,
             search_depth=4,
-            gpu_batch_size=1,
-            gpu_batch_timeout_ms=0,
         )
         timestamp = "20260409T120000Z"
 
         with patch("newclid.search_trace.get_git_commit", return_value="deadbeef"):
             trace_run = TraceRun(
                 Path("/tmp/traces"),
-                route="evaluation_single_problem_multi_gpu",
-                agent="lm",
+                route="evaluation_vllm",
+                agent="qwen3_text",
                 dataset_path=Path("benchmarks/imo_2004_p1.txt"),
-                model_path="models/sft34/checkpoint-25750",
+                model_path="served/checkpoint-25750",
                 params={"output_name_stem": stem},
                 run_name=stem,
                 run_timestamp=timestamp,
@@ -291,7 +286,7 @@ class EvalOutputNamingTests(unittest.TestCase):
         self.assertEqual(trace_run.run_dir.name, f"{stem}_{timestamp}")
 
     def test_build_timestamped_output_stem_reuses_trace_timestamp_suffix(self):
-        stem = "eval_single_problem_multi_gpu_vlm_imo_2008_p1b_model_sv2_d32_b512_s4_gbs4_gbt100"
+        stem = "eval_vllm_qwen3_vl_imo_2008_p1b_model_sv2_d32_b512_s4"
         timestamp = "20260410T120000Z"
 
         self.assertEqual(
@@ -299,60 +294,47 @@ class EvalOutputNamingTests(unittest.TestCase):
             f"{stem}_{timestamp}",
         )
 
-    def test_csv_and_profiling_names_align_with_trace_timestamp(self):
-        stem = "eval_single_problem_multi_gpu_vlm_imo_2008_p1b_model_sv2_d32_b512_s4_gbs4_gbt100"
+    def test_csv_name_has_no_seed_suffix(self):
+        stem = "eval_vllm_qwen3_vl_imo_2008_p1b_model_sv2_d32_b512_s4"
         timestamp = "20260410T120000Z"
         timestamped_stem = build_timestamped_output_stem(stem, timestamp)
 
         self.assertEqual(f"{timestamped_stem}.csv", f"{stem}_{timestamp}.csv")
-        self.assertEqual(
-            f"{timestamped_stem}_profiling.csv",
-            f"{stem}_{timestamp}_profiling.csv",
-        )
+        self.assertNotIn("seed", timestamped_stem)
 
 
 class SingleProblemEvalRunnerTests(unittest.TestCase):
     def test_create_agent_passes_search_version_to_text_agent(self):
-        with patch("scripts.evaluation.LMAgent") as mock_lm_agent:
+        with patch("scripts.evaluation.Qwen3Agent") as mock_text_agent:
             eval_runner_module.create_agent(
-                agent_type="lm",
-                search_version="v2",
-                visual_render_mode="new",
+                agent_type="qwen3_text",
+                search_version="hybrid",
                 model_pool="pool",
                 decoding_size=8,
                 beam_size=16,
                 search_depth=2,
-                gpu_batch_size=1,
-                gpu_batch_timeout_ms=0,
                 max_pending_ddar=4,
-                prepare_request_workers=2,
-                prepare_prefetch_limit=2,
                 render_root=Path("/tmp/render-root"),
             )
 
-        self.assertEqual(mock_lm_agent.call_args.kwargs["search_version"], "v2")
+        self.assertEqual(mock_text_agent.call_args.kwargs["search_version"], "hybrid")
 
     def test_create_agent_passes_search_version_to_visual_agent(self):
-        with patch("scripts.evaluation.VLMAgent") as mock_vlm_agent:
+        with patch("scripts.evaluation.Qwen3VLAgent") as mock_vl_agent:
             eval_runner_module.create_agent(
-                agent_type="vlm",
+                agent_type="qwen3_vl",
                 search_version="v2",
-                visual_render_mode="new",
                 model_pool="pool",
                 decoding_size=8,
                 beam_size=16,
                 search_depth=2,
-                gpu_batch_size=1,
-                gpu_batch_timeout_ms=0,
                 max_pending_ddar=4,
-                prepare_request_workers=2,
-                prepare_prefetch_limit=2,
                 render_root=Path("/tmp/render-root"),
             )
 
-        self.assertEqual(mock_vlm_agent.call_args.kwargs["search_version"], "v2")
+        self.assertEqual(mock_vl_agent.call_args.kwargs["search_version"], "v2")
 
-    def test_main_defaults_visual_render_mode_to_new(self):
+    def test_main_parses_vllm_cli(self):
         captured = {}
 
         def _fake_solve(**kwargs):
@@ -360,22 +342,25 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
 
         argv = [
             "evaluation.py",
+            "--vllm_base_url",
+            "http://127.0.0.1:8000",
+            "--agent",
+            "qwen3_text",
             "--problems_path",
             "benchmarks/dev_imo.txt",
-            "--model_path",
-            "/tmp/model",
         ]
 
         with patch.object(sys, "argv", argv):
             with patch(
-                "scripts.evaluation.solve_problems_single_problem_multi_gpu",
+                "scripts.evaluation.solve_problems_vllm",
                 side_effect=_fake_solve,
             ):
                 eval_runner_module.main()
 
-        self.assertEqual(captured["visual_render_mode"], "new")
+        self.assertEqual(captured["vllm_base_url"], "http://127.0.0.1:8000")
+        self.assertEqual(captured["agent_type"], "qwen3_text")
 
-    def test_main_passes_explicit_legacy_visual_render_mode(self):
+    def test_main_allows_qwen3_vl(self):
         captured = {}
 
         def _fake_solve(**kwargs):
@@ -383,68 +368,24 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
 
         argv = [
             "evaluation.py",
+            "--vllm_base_url",
+            "http://127.0.0.1:8000",
+            "--agent",
+            "qwen3_vl",
             "--problems_path",
             "benchmarks/dev_imo.txt",
-            "--model_path",
-            "/tmp/model",
-            "--visual_render_mode",
-            "legacy",
         ]
 
         with patch.object(sys, "argv", argv):
             with patch(
-                "scripts.evaluation.solve_problems_single_problem_multi_gpu",
+                "scripts.evaluation.solve_problems_vllm",
                 side_effect=_fake_solve,
             ):
                 eval_runner_module.main()
 
-        self.assertEqual(captured["visual_render_mode"], "legacy")
+        self.assertEqual(captured["agent_type"], "qwen3_vl")
 
-    def test_create_workers_wraps_visual_workers_with_trace_metadata(self):
-        created: list[tuple[str, int, int]] = []
-
-        class _FakeVisionModelWorker:
-            @classmethod
-            def remote(
-                cls, model_path: str, agent_type: str, torch_seed: int, worker_slot: int
-            ):
-                created.append((model_path, torch_seed, worker_slot))
-                return f"worker:{agent_type}:{worker_slot}"
-
-        fake_visual_actor = types.SimpleNamespace(
-            VisionModelWorker=_FakeVisionModelWorker
-        )
-
-        with patch.dict(
-            "sys.modules",
-            {"newclid.agent.runtime.vision_worker": fake_visual_actor},
-        ):
-            workers = eval_runner_module.create_workers(
-                agent_type="vlm",
-                model_path="/tmp/model",
-                num_gpus_for_eval=3,
-                torch_seed=42,
-            )
-
-        self.assertEqual(
-            created,
-            [("/tmp/model", 42, 0), ("/tmp/model", 42, 1), ("/tmp/model", 42, 2)],
-        )
-        self.assertEqual(len(workers), 3)
-        self.assertEqual(
-            [worker.handle for worker in workers],
-            ["worker:vlm:0", "worker:vlm:1", "worker:vlm:2"],
-        )
-        self.assertEqual(
-            [worker.worker_trace_id for worker in workers], ["gpu:0", "gpu:1", "gpu:2"]
-        )
-        self.assertEqual(
-            [worker.worker_device for worker in workers], ["cuda:0", "cuda:1", "cuda:2"]
-        )
-
-    def test_single_problem_eval_runner_writes_results_without_torch_seed_thread_arg(
-        self,
-    ):
+    def test_single_problem_eval_runner_writes_results_for_vllm(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             benchmark_path = tmp_path / "benchmarks.txt"
@@ -455,7 +396,6 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
             fake_workers = [_FakeWorker("w0")]
 
             def fake_solve_one_problem(**kwargs):
-                self.assertNotIn("torch_seed", kwargs)
                 return (
                     kwargs["problem_name"],
                     True,
@@ -473,18 +413,21 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
             ):
                 with patch("scripts.evaluation.ray.init"):
                     with patch(
-                        "scripts.evaluation.ray.available_resources",
-                        return_value={"GPU": 1},
+                        "scripts.evaluation.discover_served_model",
+                        return_value=(
+                            "served/checkpoint-7049",
+                            ["served/checkpoint-7049"],
+                        ),
                     ):
                         with patch(
-                            "scripts.evaluation.create_workers",
+                            "scripts.evaluation.create_vllm_workers",
                             return_value=fake_workers,
                         ):
                             with patch(
                                 "scripts.evaluation.ModelPool"
                             ) as mock_model_pool:
                                 mock_model_pool.return_value.warmup.return_value = [
-                                    {"device": "cuda:0"}
+                                    {"device": "http"}
                                 ]
                                 with patch(
                                     "scripts.evaluation.solve_one_problem",
@@ -499,37 +442,30 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                                             _FakeLive,
                                         ):
                                             with patch(
-                                                "scripts.evaluation.write_profiling_csv"
-                                            ) as mock_write_profiling_csv:
+                                                "scripts.evaluation.ray.cluster_resources",
+                                                return_value={"CPU": 4},
+                                            ):
                                                 with patch(
                                                     "scripts.evaluation.ray.shutdown"
                                                 ) as mock_ray_shutdown:
-                                                    eval_runner_module.solve_problems_single_problem_multi_gpu(
+                                                    eval_runner_module.solve_problems_vllm(
                                                         filepath=benchmark_path,
-                                                        model_path="/tmp/model",
-                                                        num_cpus=2,
-                                                        num_gpus_for_eval=1,
+                                                        vllm_base_url="http://127.0.0.1:8000",
+                                                        agent_type="qwen3_text",
                                                         decoding_size=32,
                                                         beam_size=512,
                                                         search_depth=4,
-                                                        gpu_batch_size=1,
-                                                        gpu_batch_timeout_ms=100,
-                                                        torch_seed=42,
+                                                        search_version="hybrid",
+                                                        ray_num_cpus=4,
                                                         timeout=3600,
-                                                        agent_type="vlm",
-                                                        search_version="v2",
-                                                        max_pending_ddar=2,
-                                                        prepare_request_workers=2,
-                                                        prepare_prefetch_limit=2,
                                                         log_dir=str(log_dir),
-                                                        enable_profiling=True,
+                                                        enable_trace=False,
                                                     )
                                                 mock_ray_shutdown.assert_called_once()
-                                                mock_write_profiling_csv.assert_called_once()
 
             csv_path = (
-                log_dir / "eval_single_problem_multi_gpu_vlm_benchmarks_tmp_model"
-                "_sv2_d32_b512_s4_gbs1_gbt100_seed42_20260410T120000Z.csv"
+                log_dir
+                / "eval_vllm_qwen3_text_benchmarks_checkpoint-7049_svhybrid_d32_b512_s4_20260410T120000Z.csv"
             )
             self.assertTrue(csv_path.exists())
             with csv_path.open(newline="", encoding="utf-8") as handle:
@@ -551,23 +487,30 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                 trace_writer = kwargs["trace_writer"]
                 self.assertIsNotNone(trace_writer)
                 trace_writer.log(
-                    "prepare_request_ready",
-                    depth=0,
-                    request_id="d0_proot",
-                    prepare_worker_id="prepare_0",
-                    prepare_started_at_unix_s=10.0,
-                    prepare_finished_at_unix_s=10.3,
-                )
-                trace_writer.log(
-                    "gpu_batch_done",
+                    "chat_submit",
                     depth=0,
                     request_ids=["d0_proot"],
                     batch_size=1,
-                    worker_batch_profile={
-                        "gpu_worker_id": "gpu:0",
-                        "worker_started_at_unix_s": 11.0,
-                        "worker_finished_at_unix_s": 11.5,
-                    },
+                )
+                trace_writer.log(
+                    "chat_complete",
+                    depth=0,
+                    request_ids=["d0_proot"],
+                    batch_size=1,
+                )
+                trace_writer.log(
+                    "candidate_parse",
+                    depth=0,
+                    request_id="d0_proot",
+                    candidate_rank=0,
+                    success=True,
+                )
+                trace_writer.log(
+                    "candidate_build",
+                    depth=0,
+                    request_id="d0_proot",
+                    candidate_rank=0,
+                    success=True,
                 )
                 trace_writer.log(
                     "ddar_result",
@@ -600,18 +543,21 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
             ):
                 with patch("scripts.evaluation.ray.init"):
                     with patch(
-                        "scripts.evaluation.ray.available_resources",
-                        return_value={"GPU": 1},
+                        "scripts.evaluation.discover_served_model",
+                        return_value=(
+                            "served/checkpoint-7049",
+                            ["served/checkpoint-7049"],
+                        ),
                     ):
                         with patch(
-                            "scripts.evaluation.create_workers",
+                            "scripts.evaluation.create_vllm_workers",
                             return_value=fake_workers,
                         ):
                             with patch(
                                 "scripts.evaluation.ModelPool"
                             ) as mock_model_pool:
                                 mock_model_pool.return_value.warmup.return_value = [
-                                    {"device": "cuda:0"}
+                                    {"device": "http"}
                                 ]
                                 with patch(
                                     "scripts.evaluation.solve_one_problem",
@@ -630,32 +576,29 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                                                 _FakeLive,
                                             ):
                                                 with patch(
-                                                    "scripts.evaluation.ray.shutdown"
+                                                    "scripts.evaluation.ray.cluster_resources",
+                                                    return_value={"CPU": 4},
                                                 ):
-                                                    eval_runner_module.solve_problems_single_problem_multi_gpu(
-                                                        filepath=benchmark_path,
-                                                        model_path="/tmp/model",
-                                                        num_cpus=2,
-                                                        num_gpus_for_eval=1,
-                                                        decoding_size=32,
-                                                        beam_size=512,
-                                                        search_depth=4,
-                                                        gpu_batch_size=1,
-                                                        gpu_batch_timeout_ms=100,
-                                                        torch_seed=42,
-                                                        timeout=3600,
-                                                        agent_type="vlm",
-                                                        search_version="v1",
-                                                        max_pending_ddar=2,
-                                                        prepare_request_workers=2,
-                                                        prepare_prefetch_limit=2,
-                                                        log_dir=str(log_dir),
-                                                        enable_trace=True,
-                                                    )
+                                                    with patch(
+                                                        "scripts.evaluation.ray.shutdown"
+                                                    ):
+                                                        eval_runner_module.solve_problems_vllm(
+                                                            filepath=benchmark_path,
+                                                            vllm_base_url="http://127.0.0.1:8000",
+                                                            agent_type="qwen3_vl",
+                                                            decoding_size=32,
+                                                            beam_size=512,
+                                                            search_depth=4,
+                                                            search_version="v1",
+                                                            ray_num_cpus=4,
+                                                            timeout=3600,
+                                                            log_dir=str(log_dir),
+                                                            enable_trace=True,
+                                                        )
 
             trace_run_dir = (
-                log_dir / "eval_single_problem_multi_gpu_vlm_benchmarks_tmp_model"
-                "_sv1_d32_b512_s4_gbs1_gbt100_seed42_20260410T120000Z"
+                log_dir
+                / "eval_vllm_qwen3_vl_benchmarks_checkpoint-7049_sv1_d32_b512_s4_20260410T120000Z"
             )
             self.assertTrue((trace_run_dir / "run_meta.json").exists())
             self.assertTrue(

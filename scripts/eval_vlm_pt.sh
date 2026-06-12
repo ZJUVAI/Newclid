@@ -49,41 +49,8 @@ echo ""
 echo "--- Step 2: Evaluation ---"
 echo "  Datasets: ${EVAL_DATASETS[@]}"
 echo "  Configs : ${EVAL_CONFIGS[@]}"
-
-for dataset in "${EVAL_DATASETS[@]}"; do
-    for config in "${EVAL_CONFIGS[@]}"; do
-        read -r decoding_size beam_size <<< "$config"
-
-        cmd="python $REPO_ROOT/scripts/evaluation.py \
-            --problems_path $REPO_ROOT/benchmarks/$dataset \
-            --model_path $CHECKPOINT_PATH \
-            --log_dir $LOG_DIR \
-            --max_workers $EVAL_MAX_WORKERS \
-            --decoding_size $decoding_size \
-            --beam_size $beam_size \
-            --search_depth $EVAL_SEARCH_DEPTH \
-            --timeout $EVAL_TIMEOUT \
-            --agent $EVAL_AGENT"
-
-        echo ""
-        echo "  Evaluating: $dataset (d${decoding_size}_b${beam_size})"
-        echo "----------------------------------"
-
-        eval "$cmd"
-
-        if [ $? -eq 0 ]; then
-            echo "Evaluation completed: $dataset (d${decoding_size}_b${beam_size})"
-        else
-            echo "Evaluation failed: $dataset"
-        fi
-        echo "=========================================="
-    done
-done
-
-echo ""
-echo "=========================================="
-echo "Evaluation completed"
-echo "  Model: $(basename "$MODEL_DIR")"
-echo "  Path : $CHECKPOINT_PATH"
-echo "  Logs : $LOG_DIR"
-echo "=========================================="
+echo "Automatic evaluation has been removed from this script."
+echo "Start a vLLM server for: $CHECKPOINT_PATH"
+echo "Then run:"
+echo "  AGENT=${EVAL_AGENT:-qwen3_text} DATASETS=$(IFS=,; echo "${EVAL_DATASETS[*]}") EVAL_CONFIGS=$(IFS=,; echo "${EVAL_CONFIGS[*]}") SEARCH_DEPTH=$EVAL_SEARCH_DEPTH TIMEOUT=$EVAL_TIMEOUT RAY_NUM_CPUS=$EVAL_MAX_WORKERS LOG_DIR=$LOG_DIR bash $REPO_ROOT/scripts/eval.sh"
+exit 0

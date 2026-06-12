@@ -3,63 +3,27 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-###############################################
-# Configuration
-###############################################
-
 export LOGLEVEL="${LOGLEVEL:-WARNING}"
 
-MODEL_NAME="${MODEL_NAME:-sft_simple}"
-MODEL_DIR="${MODEL_DIR:-$REPO_ROOT/models/$MODEL_NAME}"
-LOG_DIR="${LOG_DIR:-$REPO_ROOT/logs/$(date +%m%d_%H%M%S)_${MODEL_NAME}_eval}"
-
-DATASETS="${DATASETS:-benchmarks/dev_imo.txt benchmarks/imo_95.txt}"
+VLLM_BASE_URL="${VLLM_BASE_URL:-http://127.0.0.1:8000}"
+AGENT="${AGENT:-qwen3_text}"
+LOG_DIR="${LOG_DIR:-$REPO_ROOT/results}"
+DATASETS="${DATASETS:-benchmarks/dev_imo.txt}"
 EVAL_CONFIGS="${EVAL_CONFIGS:-32:512}"
-CHECKPOINTS="${CHECKPOINTS:-latest}"
-
-MAX_WORKERS="${MAX_WORKERS:-40}"
 SEARCH_DEPTH="${SEARCH_DEPTH:-4}"
-SEARCH_VERSION="${SEARCH_VERSION:-v1}"
-TIMEOUT="${TIMEOUT:-3600}"
-AGENT="${AGENT:-lm}"
-GPU_BATCH_SIZE="${GPU_BATCH_SIZE:-2}"
-GPU_BATCH_TIMEOUT_MS="${GPU_BATCH_TIMEOUT_MS:-100}"
+SEARCH_VERSION="${SEARCH_VERSION:-hybrid}"
+TIMEOUT="${TIMEOUT:-7200}"
+RAY_NUM_CPUS="${RAY_NUM_CPUS:-40}"
 ENABLE_TRACE="${ENABLE_TRACE:-false}"
-ENABLE_PROFILING="${ENABLE_PROFILING:-false}"
 
-CUDA_DEVICES="${CUDA_DEVICES:-0,1,2,3}"
-RAY_MEMORY_USAGE_THRESHOLD="${RAY_MEMORY_USAGE_THRESHOLD:-0.95}"
-
-REPORT_TO="${REPORT_TO:-}"
-SWANLAB_PROJECT="${SWANLAB_PROJECT:-GenesisGeo}"
-SWANLAB_WORKSPACE="${SWANLAB_WORKSPACE:-}"
-SWANLAB_EXP_NAME="${SWANLAB_EXP_NAME:-${MODEL_NAME}_eval}"
-SWANLAB_MODE="${SWANLAB_MODE:-cloud}"
-SWANLAB_TOKEN="${SWANLAB_TOKEN:-}"
-SWANLAB_RUN_ID="${SWANLAB_RUN_ID:-}"
-SWANLAB_RESUME="${SWANLAB_RESUME:-allow}"
-SWANLAB_LOG_TABLE="${SWANLAB_LOG_TABLE:-true}"
+BASELINE_CSV="${BASELINE_CSV:-$REPO_ROOT/results/eval_vllm_dev_imo_checkpoint-7049_svhybrid_d32_b512_s4_7823e3f.csv}"
+MIN_SOLVED="${MIN_SOLVED:-13}"
+MAX_TOTAL_TIME_S="${MAX_TOTAL_TIME_S:-400}"
 
 mkdir -p "$LOG_DIR"
 
-REPORT_TO_ENABLED=false
-SWANLAB_ENABLED=false
-SWANLAB_ACTIVE_RUN_ID="$SWANLAB_RUN_ID"
-
-if [ -n "$REPORT_TO" ]; then
-    REPORT_TO_ENABLED=true
-    read -r -a REPORT_TO_ITEMS <<< "$(printf '%s' "$REPORT_TO" | tr ',' ' ')"
-    for report_target in "${REPORT_TO_ITEMS[@]}"; do
-        if [ "$report_target" = "swanlab" ]; then
-            SWANLAB_ENABLED=true
-            break
-        fi
-    done
-fi
-
 read -r -a DATASET_ITEMS <<< "$(printf '%s' "$DATASETS" | tr ',' ' ')"
 read -r -a CONFIG_ITEMS <<< "$(printf '%s' "$EVAL_CONFIGS" | tr ',' ' ')"
-read -r -a CHECKPOINT_ITEMS <<< "$(printf '%s' "$CHECKPOINTS" | tr ',' ' ')"
 
 if [ "${#DATASET_ITEMS[@]}" -eq 0 ] || [ -z "${DATASET_ITEMS[0]}" ]; then
     echo "Error: DATASETS is empty." >&2
@@ -70,53 +34,6 @@ if [ "${#CONFIG_ITEMS[@]}" -eq 0 ] || [ -z "${CONFIG_ITEMS[0]}" ]; then
     echo "Error: EVAL_CONFIGS is empty." >&2
     exit 1
 fi
-
-if [ "${#CHECKPOINT_ITEMS[@]}" -eq 0 ] || [ -z "${CHECKPOINT_ITEMS[0]}" ]; then
-    echo "Error: CHECKPOINTS is empty." >&2
-    exit 1
-fi
-
-require_swanlab() {
-    python - <<'PY'
-import importlib.util
-import sys
-
-sys.exit(0 if importlib.util.find_spec("swanlab") is not None else 1)
-PY
-}
-
-resolve_model_path() {
-    local checkpoint="$1"
-    local latest_checkpoint
-
-    if [ "$checkpoint" = "latest" ]; then
-        latest_checkpoint="$(find "$MODEL_DIR" -maxdepth 1 -mindepth 1 -type d -name 'checkpoint-*' | sort -V | tail -1)"
-        if [ -n "$latest_checkpoint" ]; then
-            printf '%s\n' "$latest_checkpoint"
-        else
-            printf '%s\n' "$MODEL_DIR"
-        fi
-        return 0
-    fi
-
-    if [ "$checkpoint" = "final_model" ]; then
-        printf '%s\n' "$MODEL_DIR"
-        return 0
-    fi
-
-    if [ -d "$checkpoint" ]; then
-        printf '%s\n' "$checkpoint"
-        return 0
-    fi
-
-    if [ -d "$MODEL_DIR/$checkpoint" ]; then
-        printf '%s\n' "$MODEL_DIR/$checkpoint"
-        return 0
-    fi
-
-    echo "Error: checkpoint path not found for '$checkpoint'" >&2
-    return 1
-}
 
 resolve_dataset_path() {
     local dataset="$1"
@@ -140,14 +57,6 @@ resolve_dataset_path() {
     return 1
 }
 
-dataset_stem_from_arg() {
-    local dataset="$1"
-    local dataset_name
-
-    dataset_name="$(basename "$dataset")"
-    printf '%s\n' "${dataset_name%.txt}"
-}
-
 append_boolean_optional_arg() {
     local -n target_args_ref="$1"
     local flag_name="$2"
@@ -169,239 +78,139 @@ append_boolean_optional_arg() {
     esac
 }
 
-eval_output_stem() {
-    local dataset="$1"
-    local model_path="$2"
-    local decoding_size="$3"
-    local beam_size="$4"
-    python - "$dataset" "$model_path" "$decoding_size" "$beam_size" "$SEARCH_DEPTH" "$SEARCH_VERSION" "$AGENT" "$GPU_BATCH_SIZE" "$GPU_BATCH_TIMEOUT_MS" <<'PY'
-from pathlib import Path
-import sys
-
-from scripts.evaluation import build_eval_output_stem
-
-dataset, model_path, decoding_size, beam_size, search_depth, search_version, agent, gpu_batch_size, gpu_batch_timeout_ms = sys.argv[1:]
-print(
-    build_eval_output_stem(
-        agent_type=agent,
-        search_version=search_version,
-        problems_path=Path(dataset),
-        model_path=model_path,
-        decoding_size=int(decoding_size),
-        beam_size=int(beam_size),
-        search_depth=int(search_depth),
-        gpu_batch_size=int(gpu_batch_size),
-        gpu_batch_timeout_ms=int(gpu_batch_timeout_ms),
-        torch_seed=123,
-    )
-)
-PY
-}
-
 latest_eval_csv_path() {
-    local output_stem="$1"
-    python - "$LOG_DIR" "$output_stem" <<'PY'
+    local dataset_path="$1"
+    local decoding_size="$2"
+    local beam_size="$3"
+    python - "$LOG_DIR" "$dataset_path" "$AGENT" "$SEARCH_VERSION" "$decoding_size" "$beam_size" "$SEARCH_DEPTH" <<'PY'
 from pathlib import Path
 import sys
 
 log_dir = Path(sys.argv[1])
-stem = sys.argv[2]
-candidates = sorted(log_dir.glob(f"{stem}_*.csv"))
-csv_candidates = [path for path in candidates if not path.name.endswith("_profiling.csv")]
-if not csv_candidates:
-    raise SystemExit(f"no evaluation csv found for stem {stem}")
-print(csv_candidates[-1])
+dataset_path = Path(sys.argv[2])
+agent = sys.argv[3]
+search_version = sys.argv[4]
+decoding_size = sys.argv[5]
+beam_size = sys.argv[6]
+search_depth = sys.argv[7]
+pattern = (
+    f"eval_vllm_{agent}_{dataset_path.stem}_*_sv{search_version}"
+    f"_d{decoding_size}_b{beam_size}_s{search_depth}_*.csv"
+)
+candidates = sorted(log_dir.glob(pattern))
+if not candidates:
+    raise SystemExit(f"no evaluation csv found for pattern {pattern}")
+print(candidates[-1])
 PY
 }
 
-init_swanlab_run_if_needed() {
-    local output
-
-    if [ "$SWANLAB_ENABLED" != true ]; then
-        return 0
-    fi
-
-    if ! require_swanlab; then
-        echo "Error: REPORT_TO includes swanlab, but the 'swanlab' package is not installed." >&2
-        exit 1
-    fi
-
-    if [ -n "$SWANLAB_ACTIVE_RUN_ID" ]; then
-        return 0
-    fi
-
-    output="$(python "$REPO_ROOT/scripts/upload_eval_to_swanlab.py" init-run \
-        --project "$SWANLAB_PROJECT" \
-        --workspace "$SWANLAB_WORKSPACE" \
-        --experiment_name "$SWANLAB_EXP_NAME" \
-        --mode "$SWANLAB_MODE" \
-        --token "$SWANLAB_TOKEN" \
-        --model_name "$MODEL_NAME" \
-        --model_dir "$MODEL_DIR" \
-        --datasets "$DATASETS" \
-        --checkpoints "$CHECKPOINTS" \
-        --eval_configs "$EVAL_CONFIGS" \
-        --agent "$AGENT" \
-        --search_version "$SEARCH_VERSION" \
-        --max_workers "$MAX_WORKERS" \
-        --search_depth "$SEARCH_DEPTH" \
-        --timeout "$TIMEOUT")"
-
-    SWANLAB_ACTIVE_RUN_ID="$(printf '%s\n' "$output" | awk -F= '/^RUN_ID=/{print $2}' | tail -1)"
-
-    if [ -z "$SWANLAB_ACTIVE_RUN_ID" ]; then
-        echo "Error: failed to initialize a SwanLab run for evaluation uploads." >&2
-        printf '%s\n' "$output" >&2
-        exit 1
-    fi
-}
-
-upload_eval_to_swanlab() {
+compare_eval_csv() {
     local csv_path="$1"
-    local dataset="$2"
-    local checkpoint_label="$3"
-    local model_path="$4"
-    local decoding_size="$5"
-    local beam_size="$6"
+    python - "$csv_path" "$BASELINE_CSV" "$MIN_SOLVED" "$MAX_TOTAL_TIME_S" <<'PY'
+import csv
+import re
+import sys
+from pathlib import Path
 
-    if [ "$SWANLAB_ENABLED" != true ]; then
-        return 0
-    fi
+csv_path = Path(sys.argv[1])
+baseline_path = Path(sys.argv[2])
+min_solved = int(sys.argv[3])
+max_total_time_s = float(sys.argv[4])
 
-    if [ ! -f "$csv_path" ]; then
-        echo "Warning: evaluation CSV not found, skipping SwanLab upload: $csv_path" >&2
-        return 0
-    fi
+def parse_header(path: Path):
+    with path.open(newline="", encoding="utf-8") as handle:
+        header = next(csv.reader(handle))[0]
+    match = re.search(r"Solved: (\d+)/(\d+), Total Time: ([0-9.]+)s", header)
+    if match is None:
+        raise SystemExit(f"failed to parse summary header from {path}: {header}")
+    solved = int(match.group(1))
+    total = int(match.group(2))
+    total_time = float(match.group(3))
+    return solved, total, total_time
 
-    python "$REPO_ROOT/scripts/upload_eval_to_swanlab.py" upload \
-        --project "$SWANLAB_PROJECT" \
-        --workspace "$SWANLAB_WORKSPACE" \
-        --experiment_name "$SWANLAB_EXP_NAME" \
-        --mode "$SWANLAB_MODE" \
-        --token "$SWANLAB_TOKEN" \
-        --csv_path "$csv_path" \
-        --run_id "$SWANLAB_ACTIVE_RUN_ID" \
-        --resume "$SWANLAB_RESUME" \
-        --dataset_name "$dataset" \
-        --checkpoint_label "$checkpoint_label" \
-        --model_name "$MODEL_NAME" \
-        --model_path "$model_path" \
-        --agent "$AGENT" \
-        --search_version "$SEARCH_VERSION" \
-        --decoding_size "$decoding_size" \
-        --beam_size "$beam_size" \
-        --search_depth "$SEARCH_DEPTH" \
-        --timeout "$TIMEOUT" \
-        --max_workers "$MAX_WORKERS" \
-        --log_table="$SWANLAB_LOG_TABLE"
+solved, total, total_time = parse_header(csv_path)
+print(f"[summary] csv={csv_path} solved={solved}/{total} total_time_s={total_time:.2f}")
+
+if baseline_path.exists():
+    base_solved, base_total, base_total_time = parse_header(baseline_path)
+    print(
+        f"[baseline] csv={baseline_path} solved={base_solved}/{base_total} "
+        f"total_time_s={base_total_time:.2f}"
+    )
+else:
+    print(f"[baseline] missing={baseline_path}")
+
+if solved < min_solved:
+    raise SystemExit(
+        f"solved threshold failed: got {solved}, expected at least {min_solved}"
+    )
+if total_time > max_total_time_s:
+    raise SystemExit(
+        f"time threshold failed: got {total_time:.2f}s, expected at most {max_total_time_s:.2f}s"
+    )
+PY
 }
 
-init_swanlab_run_if_needed
-
 echo "=========================================="
-echo "Evaluation"
+echo "vLLM Evaluation"
 echo "=========================================="
-echo "Model Name : $MODEL_NAME"
-echo "Model Dir  : $MODEL_DIR"
+echo "Base URL   : $VLLM_BASE_URL"
+echo "Agent      : $AGENT"
 echo "Log Dir    : $LOG_DIR"
-echo "CUDA       : $CUDA_DEVICES"
 echo "Datasets   : $DATASETS"
 echo "Configs    : $EVAL_CONFIGS"
-echo "Checkpoints: $CHECKPOINTS"
-echo "Workers    : $MAX_WORKERS"
-echo "Agent      : $AGENT"
 echo "Search Ver : $SEARCH_VERSION"
-echo "GPU Batch  : size=$GPU_BATCH_SIZE timeout_ms=$GPU_BATCH_TIMEOUT_MS"
+echo "SearchDepth: $SEARCH_DEPTH"
+echo "Ray CPUs   : $RAY_NUM_CPUS"
 echo "Trace      : $ENABLE_TRACE"
-echo "Profiling  : $ENABLE_PROFILING"
-if [ "$REPORT_TO_ENABLED" = true ]; then
-    echo "Report To  : $REPORT_TO"
-fi
-if [ "$SWANLAB_ENABLED" = true ]; then
-    echo "SwanLab    : project=$SWANLAB_PROJECT exp=$SWANLAB_EXP_NAME mode=$SWANLAB_MODE run_id=${SWANLAB_ACTIVE_RUN_ID:-<new>}"
-fi
 echo "=========================================="
 
-total_commands=$((${#CHECKPOINT_ITEMS[@]} * ${#DATASET_ITEMS[@]} * ${#CONFIG_ITEMS[@]}))
-echo "Total commands to execute: $total_commands"
-echo ""
+for dataset in "${DATASET_ITEMS[@]}"; do
+    dataset_path="$(resolve_dataset_path "$dataset")"
+    dataset_name="$(basename "$dataset_path")"
 
-for checkpoint in "${CHECKPOINT_ITEMS[@]}"; do
-    model_path="$(resolve_model_path "$checkpoint")"
-    checkpoint_label="$(basename "$model_path")"
+    for config in "${CONFIG_ITEMS[@]}"; do
+        IFS=':' read -r decoding_size beam_size <<< "$config"
+        if [ -z "${decoding_size:-}" ] || [ -z "${beam_size:-}" ]; then
+            echo "Error: invalid config '$config'. Use decoding_size:beam_size." >&2
+            exit 1
+        fi
 
-    echo "Processing checkpoint: $checkpoint_label"
-    echo "Model path: $model_path"
-    echo "=========================================="
+        eval_log="$LOG_DIR/$(basename "$dataset_path" .txt)_${AGENT}_d${decoding_size}_b${beam_size}.log"
+        EVAL_ARGS=(
+            --vllm_base_url "$VLLM_BASE_URL"
+            --agent "$AGENT"
+            --problems_path "$dataset_path"
+            --decoding_size "$decoding_size"
+            --beam_size "$beam_size"
+            --search_depth "$SEARCH_DEPTH"
+            --search_version "$SEARCH_VERSION"
+            --ray_num_cpus "$RAY_NUM_CPUS"
+            --timeout "$TIMEOUT"
+            --log_dir "$LOG_DIR"
+        )
+        append_boolean_optional_arg EVAL_ARGS "enable_trace" "$ENABLE_TRACE"
 
-    for dataset in "${DATASET_ITEMS[@]}"; do
-        for config in "${CONFIG_ITEMS[@]}"; do
-            IFS=':' read -r decoding_size beam_size <<< "$config"
-            if [ -z "${decoding_size:-}" ] || [ -z "${beam_size:-}" ]; then
-                echo "Error: invalid config '$config'. Use the format decoding_size:beam_size." >&2
-                exit 1
-            fi
+        echo "Dataset    : $dataset_name"
+        echo "Config     : decoding_size=$decoding_size beam_size=$beam_size"
+        echo "Eval Log   : $eval_log"
+        echo "------------------------------------------"
 
-            dataset_path="$(resolve_dataset_path "$dataset")"
-            dataset_name="$(basename "$dataset_path")"
-            output_stem="$(eval_output_stem "$dataset_path" "$model_path" "$decoding_size" "$beam_size")"
-            eval_log="$LOG_DIR/${output_stem}.log"
+        set +e
+        python "$REPO_ROOT/scripts/evaluation.py" "${EVAL_ARGS[@]}" 2>&1 | tee "$eval_log"
+        status=${PIPESTATUS[0]}
+        set -e
 
-            EVAL_ARGS=(
-                --problems_path "$dataset_path"
-                --model_path "$model_path"
-                --log_dir "$LOG_DIR"
-                --max_workers "$MAX_WORKERS"
-                --decoding_size "$decoding_size"
-                --beam_size "$beam_size"
-                --search_depth "$SEARCH_DEPTH"
-                --gpu_batch_size "$GPU_BATCH_SIZE"
-                --gpu_batch_timeout_ms "$GPU_BATCH_TIMEOUT_MS"
-                --timeout "$TIMEOUT"
-                --agent "$AGENT"
-                --search_version "$SEARCH_VERSION"
-            )
-            append_boolean_optional_arg EVAL_ARGS "enable_trace" "$ENABLE_TRACE"
-            append_boolean_optional_arg EVAL_ARGS "enable_profiling" "$ENABLE_PROFILING"
+        if [ "$status" -ne 0 ]; then
+            echo "Evaluation failed with exit code $status" >&2
+            exit "$status"
+        fi
 
-            echo "Dataset    : $dataset_name"
-            echo "DatasetPath: $dataset_path"
-            echo "Config     : decoding_size=$decoding_size beam_size=$beam_size search_depth=$SEARCH_DEPTH"
-            echo "Search Ver : $SEARCH_VERSION"
-            echo "GPU Batch  : size=$GPU_BATCH_SIZE timeout_ms=$GPU_BATCH_TIMEOUT_MS"
-            echo "CSV Stem   : $output_stem"
-            echo "Eval Log   : $eval_log"
-            echo "------------------------------------------"
-
-            set +e
-            CUDA_VISIBLE_DEVICES="$CUDA_DEVICES" \
-            RAY_memory_usage_threshold="$RAY_MEMORY_USAGE_THRESHOLD" \
-            python "$REPO_ROOT/scripts/evaluation.py" \
-                "${EVAL_ARGS[@]}" \
-                2>&1 | tee "$eval_log"
-            status=${PIPESTATUS[0]}
-            set -e
-
-            if [ "$status" -eq 0 ]; then
-                csv_path="$(latest_eval_csv_path "$output_stem")"
-                echo "Evaluation completed successfully"
-                echo "CSV Output : $csv_path"
-                upload_eval_to_swanlab \
-                    "$csv_path" \
-                    "$dataset_name" \
-                    "$checkpoint_label" \
-                    "$model_path" \
-                    "$decoding_size" \
-                    "$beam_size"
-            else
-                echo "Evaluation failed with exit code $status" >&2
-            fi
-
-            echo "=========================================="
-        done
+        csv_path="$(latest_eval_csv_path "$dataset_path" "$decoding_size" "$beam_size")"
+        echo "CSV Output : $csv_path"
+        compare_eval_csv "$csv_path"
+        echo "=========================================="
     done
 done
 
-echo ""
 echo "All evaluation tasks completed."
-echo "Logs: $LOG_DIR"
