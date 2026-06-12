@@ -93,12 +93,12 @@ class ProxyRouter:
         backends: list[BackendInstance],
         request_timeout_s: float,
         *,
-        debug_log_completions: bool = False,
+        debug_log_requests: bool = False,
         debug_max_chars: int = 2000,
     ):
         self.backends = backends
         self.request_timeout_s = request_timeout_s
-        self.debug_log_completions = debug_log_completions
+        self.debug_log_requests = debug_log_requests
         self.debug_max_chars = max(200, int(debug_max_chars))
         self._lock = threading.Lock()
         self._next_index = 0
@@ -133,7 +133,7 @@ class ProxyRouter:
             return text
         return text[: self.debug_max_chars] + "...<truncated>"
 
-    def _log_completion_request(
+    def _log_chat_request(
         self, *, request_id: int, body: bytes, backend: BackendInstance
     ) -> None:
         try:
@@ -145,24 +145,28 @@ class ProxyRouter:
                 flush=True,
             )
             return
-        prompts = payload.get("prompt", [])
-        if isinstance(prompts, str):
-            prompts = [prompts]
-        if not isinstance(prompts, list):
-            prompts = [prompts]
+        messages = payload.get("messages", [])
+        if not isinstance(messages, list):
+            messages = [messages]
         print(
             f"[gateway-debug] request_id={request_id} backend_gpu={backend.gpu_id} "
-            f"backend_url={backend.url} prompt_count={len(prompts)}",
+            f"backend_url={backend.url} message_count={len(messages)}",
             flush=True,
         )
-        for index, prompt in enumerate(prompts):
+        for index, message in enumerate(messages):
+            if isinstance(message, dict):
+                role = message.get("role")
+                content = message.get("content")
+            else:
+                role = None
+                content = message
             print(
-                f"[gateway-debug] request_id={request_id} prompt[{index}]="
-                f"{self._truncate(prompt)}",
+                f"[gateway-debug] request_id={request_id} message[{index}] "
+                f"role={role} content={self._truncate(content)}",
                 flush=True,
             )
 
-    def _log_completion_response(
+    def _log_chat_response(
         self,
         *,
         request_id: int,
@@ -186,9 +190,11 @@ class ProxyRouter:
             flush=True,
         )
         for index, choice in enumerate(choices):
+            message = choice.get("message", {})
+            content = message.get("content", "") if isinstance(message, dict) else ""
             print(
                 f"[gateway-debug] request_id={request_id} output[{index}]="
-                f"{self._truncate(choice.get('text', ''))}",
+                f"{self._truncate(content)}",
                 flush=True,
             )
 
@@ -202,15 +208,15 @@ class ProxyRouter:
     ) -> tuple[int, bytes, str]:
         last_error: Exception | None = None
         debug_request_id = (
-            next(self._request_counter) if self.debug_log_completions else None
+            next(self._request_counter) if self.debug_log_requests else None
         )
         for backend in self._ordered_backends():
             if (
-                self.debug_log_completions
+                self.debug_log_requests
                 and method == "POST"
-                and path == "/v1/completions"
+                and path == "/v1/chat/completions"
             ):
-                self._log_completion_request(
+                self._log_chat_request(
                     request_id=int(debug_request_id),
                     body=body or b"",
                     backend=backend,
@@ -232,11 +238,11 @@ class ProxyRouter:
                 )
                 continue
             if (
-                self.debug_log_completions
+                self.debug_log_requests
                 and method == "POST"
-                and path == "/v1/completions"
+                and path == "/v1/chat/completions"
             ):
-                self._log_completion_response(
+                self._log_chat_response(
                     request_id=int(debug_request_id),
                     response=response,
                     backend=backend,
@@ -281,7 +287,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
         self._send_response(404, b'{"error":"not found"}', "application/json")
 
     def do_POST(self) -> None:
-        if self.path != "/v1/completions":
+        if self.path != "/v1/chat/completions":
             self._send_response(404, b'{"error":"not found"}', "application/json")
             return
         content_length = int(self.headers.get("content-length", "0"))
@@ -327,7 +333,12 @@ def main() -> None:
     parser.add_argument("--max_logprobs", type=int, default=64)
     parser.add_argument("--healthcheck_timeout_s", type=float, default=120.0)
     parser.add_argument("--startup_timeout_s", type=float, default=600.0)
-    parser.add_argument("--debug_log_completions", action="store_true")
+    parser.add_argument("--debug_log_requests", action="store_true")
+    parser.add_argument(
+        "--debug_log_completions",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
     parser.add_argument("--debug_max_chars", type=int, default=2000)
     args = parser.parse_args()
 
@@ -384,7 +395,7 @@ def main() -> None:
         router = ProxyRouter(
             backends,
             request_timeout_s=args.healthcheck_timeout_s,
-            debug_log_completions=args.debug_log_completions,
+            debug_log_requests=args.debug_log_requests or args.debug_log_completions,
             debug_max_chars=args.debug_max_chars,
         )
         server = create_gateway_server(

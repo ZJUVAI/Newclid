@@ -34,18 +34,17 @@ def _load_tokenizer(tokenizer_name: str):
     return AutoTokenizer.from_pretrained(tokenizer_name, trust_remote_code=True)
 
 
-def build_lm_prompt(
-    tokenizer, *, query: str, response_prefix: str, new_point_name: str
-) -> str:
-    base = tokenizer.apply_chat_template(
-        [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": query},
-        ],
-        tokenize=False,
-        add_generation_prompt=True,
-    )
-    return base + "<think>\n\n</think>\n\n" + response_prefix + " " + new_point_name
+def build_chat_messages(
+    *, query: str, response_prefix: str, new_point_name: str
+) -> list[dict[str, str]]:
+    return [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": query},
+        {
+            "role": "assistant",
+            "content": f"<think>\n\n</think>\n\n{response_prefix} {new_point_name}",
+        },
+    ]
 
 
 def _sequence_score(token_logprobs: list[float | None]) -> float:
@@ -181,7 +180,7 @@ class VLLMLMAgent(DeductiveAgent):
 
             with ThreadPoolExecutor(max_workers=HTTP_WORKERS) as executor:
                 future_to_request = {
-                    executor.submit(self._request_completions, request): request
+                    executor.submit(self._request_chat_completions, request): request
                     for request in requests_list
                 }
                 for future in as_completed(future_to_request):
@@ -342,8 +341,9 @@ class VLLMLMAgent(DeductiveAgent):
             new_point_name = get_new_point_name(problem)
             request = {
                 "request_id": request_id,
-                "prompt": build_lm_prompt(
-                    self.tokenizer,
+                "search_mode": mode,
+                "depth": depth,
+                "messages": build_chat_messages(
                     query=query,
                     response_prefix=response_prefix,
                     new_point_name=new_point_name,
@@ -360,10 +360,12 @@ class VLLMLMAgent(DeductiveAgent):
             }
         return requests_list, context
 
-    def _request_completions(self, request: dict[str, Any]) -> dict[str, Any]:
+    def _request_chat_completions(self, request: dict[str, Any]) -> dict[str, Any]:
         payload = {
             "model": self.served_model_name,
-            "prompt": request["prompt"],
+            "messages": request["messages"],
+            "continue_final_message": True,
+            "add_generation_prompt": False,
             "max_tokens": MAX_NEW_TOKENS,
             "n": self.decoding_size,
             "temperature": 1.0,
@@ -371,7 +373,8 @@ class VLLMLMAgent(DeductiveAgent):
             "top_k": -1,
             "min_p": 0.0,
             "repetition_penalty": 1.0,
-            "logprobs": 1,
+            "logprobs": True,
+            "top_logprobs": 1,
             "return_token_ids": True,
             "stream": False,
             "include_stop_str_in_output": False,
@@ -379,11 +382,11 @@ class VLLMLMAgent(DeductiveAgent):
             "stop_token_ids": self.stop_token_ids,
         }
         resp = self.session.post(
-            f"{self.base_url}/v1/completions", json=payload, timeout=120.0
+            f"{self.base_url}/v1/chat/completions", json=payload, timeout=120.0
         )
         if not resp.ok:
             raise requests.HTTPError(
-                f"vLLM completion failed status={resp.status_code}: {resp.text}",
+                f"vLLM chat completion failed status={resp.status_code}: {resp.text}",
                 response=resp,
             )
         choices = list(resp.json().get("choices", []))
@@ -405,12 +408,17 @@ class VLLMLMAgent(DeductiveAgent):
         stop_set = {int(t) for t in self.stop_token_ids}
         aux_dsl_dict: dict[str, float] = {}
         for choice in choices:
-            text = str(choice.get("text", ""))
+            message = choice.get("message") or {}
+            text = str(message.get("content", "")) if isinstance(message, dict) else ""
             idx_stop = text.find(AUX_STOP)
             continuation = (text[:idx_stop] if idx_stop >= 0 else text).rstrip()
             logprobs = choice.get("logprobs") or {}
             token_ids = [int(t) for t in choice.get("token_ids", [])]
-            token_logprobs = list(logprobs.get("token_logprobs", []))
+            raw_content_logprobs = logprobs.get("content", [])
+            token_logprobs = [
+                item.get("logprob") if isinstance(item, dict) else item
+                for item in raw_content_logprobs
+            ]
             limit = next(
                 (j + 1 for j, token_id in enumerate(token_ids) if token_id in stop_set),
                 min(len(token_ids), len(token_logprobs)),
