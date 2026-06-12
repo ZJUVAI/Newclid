@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from collections import defaultdict
-from fractions import Fraction
 import os
 import re
 import string
 import time
+from collections import defaultdict
+from fractions import Fraction
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -13,8 +13,9 @@ import ray
 
 from newclid.DDAR.build import DDAR
 from newclid.algebraic_reasoning.algebraic_manipulator import AlgebraicManipulator
+from newclid.configs import load_solver_config
 from newclid.dependencies.dependency_graph import DependencyGraph
-from newclid.formulations.clause import translate_sentence
+from newclid.formulations.clause import Clause, translate_sentence
 from newclid.formulations.definition import DefinitionJGEX
 from newclid.formulations.problem import ProblemJGEX
 from newclid.ddar_build_input import build_ddar_input
@@ -34,8 +35,13 @@ if TYPE_CHECKING:
     from newclid.formulations.rule import Rule
 
 
+DEFAULT_DDAR_CONFIG = load_solver_config()
+
+
 def classify_build_exception(exc: Exception) -> str:
     message = str(exc)
+    if "already used" in message:
+        return "build_reused_point_error"
     if "InvalidIntersectError" in message:
         return "build_numerical_error"
     if "InvalidReduceError" in message:
@@ -59,7 +65,10 @@ def get_new_point_name(problem: ProblemJGEX) -> str:
 
 
 def try_dsl_to_constructions(content: str) -> str | None:
-    points, premises = content.split(";")[0].split(" : ")
+    try:
+        points, premises = content.split(";")[0].split(" : ")
+    except ValueError:
+        return None
     point_names = points.strip().split()
     if len(point_names) != 1:
         return None
@@ -79,11 +88,26 @@ def try_dsl_to_constructions(content: str) -> str | None:
         parts = premise.split()
         if not parts or not parts[0].isalpha():
             return None
-        constructions.append(translate_dsl_to_construction(point, parts[0], parts[1:]))
-    return f"{point} = {', '.join(constructions)}"
+        try:
+            result = translate_dsl_to_construction(point, parts[0], parts[1:])
+        except (ValueError, TypeError):
+            return None
+        if result is None:
+            return None
+        constructions.append(result)
+    construction = f"{point} = {', '.join(constructions)}"
+    try:
+        Clause.parse_line(construction)
+    except ValueError:
+        return None
+    return construction
 
 
-def translate_dsl_to_construction(point: str, predicate: str, args: list[str]) -> str:
+def translate_dsl_to_construction(
+    point: str, predicate: str, args: list[str]
+) -> str | None:
+    if point not in args:
+        return None
     if predicate == "perp":
         return Perp.to_constructive(point, tuple(args))
     if predicate == "para":
@@ -247,8 +271,7 @@ def run_ddar_on_proof(proof: ProofState) -> bool:
         extract_premises(proof),
         extract_goals(proof),
         500,
-        True,
-        True,
+        DEFAULT_DDAR_CONFIG,
     )
     return solved
 
@@ -311,8 +334,7 @@ def build_problem_proof(problem, defs, *, max_attempts: int = 100) -> ProofState
     )
 
 
-@ray.remote(num_cpus=1)
-def run_ddar_remote(
+def run_ddar_task(
     problem,
     defs,
     rules: list["Rule"],
@@ -363,7 +385,7 @@ def run_ddar_remote(
     try:
         ddar_start = time.time()
         del rules, start_time, timeout
-        solved, _ = DDAR.run_ddar("", points, premises, goals, 500, True, True)
+        solved, _ = DDAR.run_ddar("", points, premises, goals, 500, DEFAULT_DDAR_CONFIG)
         ddar_engine_finished_at_unix_s = time.time()
         ddar_engine_work_time_s = ddar_engine_finished_at_unix_s - ddar_start
     except Exception as exc:
@@ -404,3 +426,99 @@ def run_ddar_remote(
     if return_proof:
         result["proof"] = build_problem_proof(problem, defs)
     return result
+
+
+def run_aux_ddar_task(
+    problem,
+    defs,
+    aux_content: str,
+    *,
+    content_is_construction: bool = False,
+    return_problem: bool = False,
+):
+    parse_start = time.time()
+    aux_construction = (
+        aux_content if content_is_construction else try_dsl_to_constructions(aux_content)
+    )
+    parse_finished = time.time()
+    if aux_construction is None:
+        return {
+            "status": "invalid",
+            "candidate_valid": False,
+        }
+
+    try:
+        new_problem = problem.with_more_construction(aux_construction)
+    except Exception:
+        return {
+            "status": "invalid",
+            "candidate_valid": False,
+        }
+
+    try:
+        points, premises, goals = build_ddar_input(
+            new_problem,
+            defs,
+            np.random.default_rng(998244353),
+            max_attempts=100,
+            only_useful_points=False,
+        )
+    except Exception:
+        return {
+            "status": "invalid",
+            "candidate_valid": False,
+        }
+
+    try:
+        solved, _ = DDAR.run_ddar("", points, premises, goals, 500, DEFAULT_DDAR_CONFIG)
+    except Exception:
+        return {
+            "status": "invalid",
+            "candidate_valid": False,
+        }
+
+    result = {
+        "status": "solved" if solved else "unsolved",
+        "candidate_valid": True,
+    }
+    if return_problem and not solved:
+        result["problem"] = new_problem
+    return result
+
+
+@ray.remote(num_cpus=1)
+def run_ddar_remote(
+    problem,
+    defs,
+    rules: list["Rule"],
+    start_time: float,
+    timeout: int = 3600,
+    *,
+    return_proof: bool = False,
+):
+    return run_ddar_task(
+        problem,
+        defs,
+        rules,
+        start_time,
+        timeout,
+        return_proof=return_proof,
+    )
+
+
+@ray.remote(num_cpus=1)
+def run_aux_ddar_remote(
+    problem,
+    defs,
+    aux_content: str,
+    *,
+    content_is_construction: bool = False,
+    return_problem: bool = False,
+):
+    return run_aux_ddar_task(
+        problem,
+        defs,
+        aux_content,
+        content_is_construction=content_is_construction,
+        return_problem=return_problem,
+    )
