@@ -13,6 +13,7 @@ try:
         build_aux_direct_consequences,
         build_public_problem_text,
         extract_aux_new_points,
+        extract_point_mentions,
         normalize_relation_surface,
         relations_semantically_match,
     )
@@ -21,6 +22,7 @@ except ImportError:  # pragma: no cover - script execution path
         build_aux_direct_consequences,
         build_public_problem_text,
         extract_aux_new_points,
+        extract_point_mentions,
         normalize_relation_surface,
         relations_semantically_match,
     )
@@ -220,6 +222,10 @@ def collect_backtrace_writer_issues(
     ]
     hidden_relations = [normalize_relation_surface(relation) for relation in hidden_relations if relation]
     for relation in hidden_relations:
+        relation_aux_points = sorted(extract_point_mentions(relation, aux_points))
+        pre_aux_points = sorted(extract_point_mentions(pre_aux_text, aux_points))
+        if relation_aux_points and not set(relation_aux_points).intersection(pre_aux_points):
+            continue
         if aux_construction_nl and relations_semantically_match(relation, aux_construction_nl, point_pool):
             continue
         if _relation_mentioned_in_text(pre_aux_text, relation, point_pool):

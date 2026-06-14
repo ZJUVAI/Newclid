@@ -6,6 +6,7 @@
 
 - 默认：`insight_image_v1`
 - text-only sibling：`insight_text_v1`
+- text-only backtrace：`backtrace_text_v1`
 - legacy：`dossier_v1`
 - fallback compatibility：`model_evidence_legacy`
 
@@ -23,17 +24,23 @@
 
 - `insight_image_v1` generation style 已落地并成为 CLI 默认值
 - `insight_text_v1` generation style 已作为 sibling mainline 落地
+- `backtrace_text_v1` generation style 已作为独立 text-only writer-only mainline 落地
 - proof DAG -> `InsightSlots` 的脚本抽取已落地
+- proof DAG -> `BacktraceSlots` / `WriterHandoff` 的脚本抽取已落地
 - `InsightPlan` planner / writer contract 已落地
 - `item_records.jsonl` 已保存：
   - `insight_slots`
   - `insight_plan_parsed`
+  - `backtrace_slots`
+  - `writer_handoff`
+  - `writer_validation_issues`
 - 最终训练样本仍保持：
   - `thinking`
   - `aux`
   - `output = thinking + "\n" + aux`
 - `insight_image_v1` 最终样本保留 `image_path`
 - `insight_text_v1` 最终样本省略 `image_path`
+- `backtrace_text_v1` 最终样本同样省略 `image_path`
 - `dossier_v1` 已明确降级为：
   - legacy
   - benchmark
@@ -43,11 +50,23 @@
 
 当前新增与受影响测试已覆盖并通过：
 
+- `tests/test_cot_sft_backtrace_pipeline.py`
 - `tests/test_cot_sft_insight_pipeline.py`
 - `tests/test_cot_sft_writer_contracts.py`
 - `tests/test_cot_sft_review_artifacts.py`
 - `tests/test_cot_sft_replay_artifact_checks.py`
 - `tests/test_cot_sft_audits.py`
+
+额外运行级验证已经做过一轮 deterministic writer stub：
+
+- `quality_review_v1` 前 `5` 条 smoke：`3/5` 通过
+  - 失败类型：`writer_validation_failed: early_hidden_relation`
+- 默认大库顺序前 `20` 条含 aux 样本：`16/20` 通过
+  - 失败类型：`writer_validation_failed: early_hidden_relation`
+- 对这 `16` 条中的前 `10` 条通过样本做离线人工抽查：
+  - 结构上都遵守了 `goal -> backtrace -> frontier -> support insufficiency -> aux`
+  - `frontier` 和 `supporting_c1` 都来自落盘的 `backtrace_slots`
+  - 但文本明显仍偏模板化、偏保守；这证明链路和 hard checks 已工作，不代表真实 teacher writer 已经达到最终语义质量目标
 
 ## 当前风险
 
@@ -68,6 +87,26 @@ proof DAG 已经是强监督源，但 `required_aux_effect`、`first_bridge_chec
 ### 3. multi-point aux 数据格式还不够统一
 
 当前代码已经强制 multi-point aux 提供 `stage_order`，但原始 `<aux>` 记录格式本身仍有历史不一致，后续还需要继续清理。
+
+### 4. `backtrace_text_v1` 的 hard check 还在收敛期
+
+当前 deterministic run 的主要失败都集中在 `early_hidden_relation`。
+
+这说明：
+
+- 新链路已经能稳定把失败收敛到少数可读问题码
+- 但 `early_hidden_relation` 的精度还需要继续用真实 teacher 输出和人工审读去校准
+
+### 5. `backtrace_text_v1` 目前验证的是结构合同，不是最终文风质量
+
+当前离线抽查已经确认：
+
+- `V_core -> frontier -> supporting_c1 -> aux` 的主结构可落盘、可回放、可检查
+
+但同一轮抽查也确认：
+
+- 通过 hard checks 的样本仍然可能过于模板化
+- 这条路线还没有经过真实 teacher writer 的 10 条以上语义通过样本抽查
 
 ## Benchmark 口径
 
