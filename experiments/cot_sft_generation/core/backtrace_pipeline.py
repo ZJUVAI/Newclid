@@ -13,7 +13,6 @@ try:
         build_aux_direct_consequences,
         build_public_problem_text,
         extract_aux_new_points,
-        extract_point_mentions,
         normalize_relation_surface,
         relations_semantically_match,
     )
@@ -22,7 +21,6 @@ except ImportError:  # pragma: no cover - script execution path
         build_aux_direct_consequences,
         build_public_problem_text,
         extract_aux_new_points,
-        extract_point_mentions,
         normalize_relation_surface,
         relations_semantically_match,
     )
@@ -42,7 +40,7 @@ _INSUFFICIENCY_RE = re.compile(
     r"\b(?:still|not enough|not yet|alone|by itself|cannot|can't|without|so we need|need a|need to|this is why)\b",
     re.IGNORECASE,
 )
-_POINT_RE = re.compile(r"\b([a-z]\w*)\b", re.IGNORECASE)
+_POINT_RE = re.compile(r"\b([a-z][a-z0-9]*)\b", re.IGNORECASE)
 
 
 def _split_into_sentences(text: str) -> list[str]:

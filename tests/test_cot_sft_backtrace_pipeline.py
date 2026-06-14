@@ -16,6 +16,7 @@ from experiments.cot_sft_generation.core.backtrace_pipeline import (
 from experiments.cot_sft_generation.core.backtrace_schema import BACKTRACE_TEXT_V1
 from experiments.cot_sft_generation.core.proof_dag import parse_proof_dag
 from experiments.cot_sft_generation.generate_cot_sft import process_and_generate_sft
+from experiments.cot_sft_generation.replay_artifact_checks import recheck_item_record
 
 
 def _build_backtrace_record():
@@ -326,6 +327,48 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
         self.assertEqual(result["summary"]["surface_fail_items"], 1)
         self.assertEqual(output_records, [])
         self.assertIn("narrative_order_violation", item_records[0]["writer_validation_issues"])
+
+    def test_replay_artifact_checks_revalidates_backtrace_item_record(self):
+        record = _build_backtrace_record()
+        body = (
+            "The target is ratio ab to bc equals ratio be to ce. "
+            "Working backward, that would be available once angle ab/bc equals angle be/ce is secured. "
+            "But that backtrace stalls there, because angle ab/ac equals angle bc/bd is still not enough by itself to connect the e-side. "
+            "So we need a new helper: construct point f such that f is the midpoint of ad."
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_dir_path = Path(temp_dir)
+            input_path = temp_dir_path / "input.jsonl"
+            output_path = temp_dir_path / "out.jsonl"
+            run_dir = temp_dir_path / "artifacts"
+            input_path.write_text(json.dumps(record, ensure_ascii=False) + "\n", encoding="utf-8")
+
+            with patch(
+                "experiments.cot_sft_generation.generate_cot_sft.call_model",
+                side_effect=[body],
+            ):
+                process_and_generate_sft(
+                    input_jsonl=str(input_path),
+                    output_jsonl=str(output_path),
+                    sample_size=1,
+                    num_workers=1,
+                    model_name="fixture-model",
+                    verbose=True,
+                    random_sample=False,
+                    process_all=False,
+                    max_retries=1,
+                    generation_style=BACKTRACE_TEXT_V1,
+                    run_dir=run_dir,
+                )
+
+            item_record = json.loads((run_dir / "item_records.jsonl").read_text(encoding="utf-8").splitlines()[0])
+
+        rechecked = recheck_item_record(item_record)
+        self.assertTrue(rechecked["revalidated_plan_ok"])
+        self.assertTrue(rechecked["writer_valid"])
+        self.assertTrue(rechecked["thinking_valid"])
+        self.assertTrue(rechecked["current_all_checks_pass"])
 
 
 if __name__ == "__main__":

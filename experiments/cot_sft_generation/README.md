@@ -11,6 +11,7 @@
 2. 最终导出的训练样本只保留学生模型在训练和评估时应当看到的输入：
    - `insight_image_v1`：图片 + 题目文本
    - `insight_text_v1`：题目文本
+   - `backtrace_text_v1`：题目文本，writer-only backtrace 合同
 
 因此，这个脚本做的是“full-information teacher -> visible-only student target”的数据蒸馏，而不是把完整证明直接暴露给训练模型。
 
@@ -21,6 +22,7 @@
 - [docs/immutable/DATA_QUALITY_REQUIREMENTS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/immutable/DATA_QUALITY_REQUIREMENTS.md)：不可改的数据质量要求镜像。
 - [docs/current/INSIGHT_IMAGE_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/INSIGHT_IMAGE_V1_MAINLINE.md)：默认主线，先看这份。
 - [docs/current/INSIGHT_TEXT_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/INSIGHT_TEXT_V1_MAINLINE.md)：text-only sibling mainline。
+- [docs/current/BACKTRACE_TEXT_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/BACKTRACE_TEXT_V1_MAINLINE.md)：text-only writer-only backtrace mainline。
 - [docs/current/DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/DOSSIER_V1_MAINLINE.md)：legacy / benchmark 路线说明。
 - [benchmarks/quality_review_v1/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/quality_review_v1/README.md)：当前主线默认使用的 review-oriented benchmark。
 
@@ -110,6 +112,7 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
    - 最终训练样本暴露给学生模型的只有当前 style 对应的可见输入。
    - `insight_image_v1` 暴露图片和题目文本。
    - `insight_text_v1` 只暴露题目文本。
+   - `backtrace_text_v1` 只暴露题目文本。
    - `thinking` 不得泄露 `<problem>...</problem>` 之后的 hidden proof、proof IDs、规则名、数值检查字段、坐标表来源等生成期信息。
 
 2. `thinking` 必须像是从图和题面观察得到的
@@ -126,6 +129,7 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
    - 坐标的作用应当是帮助教师模型确认哪些平行、垂直、等长、中点、共线等关系值得进一步追踪，而且这些判断不应只围着少数点打转。
    - 当前实现允许 `insight_image_v1` 的最终 `thinking` 显式写出可见点坐标、向量/长度/面积残差这类 plain-text 计算，但这些计算必须服务于后续 bridge 或 goal，而不是装饰性堆算式。
    - `insight_text_v1` 的 planner、writer、validation 和最终训练样本都不应出现图片或点坐标输入，也不应在正文里泄露坐标。
+   - `backtrace_text_v1` 同样是 text-only；writer prompt、validation、artifacts 和最终训练样本都不应出现图片或点坐标输入。
    - 文本里必须区分：
      - 题面直接给出的 visible text facts
      - 从图片和可见点坐标中观察或计算出的 image / coordinate facts（仅 `insight_image_v1`）
@@ -246,26 +250,30 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 先区分两层文档角色：
 
 - `docs/immutable/` 代表最终质量标准，不随当前实验主线收窄而改变。
-- `docs/current/` 代表当前默认实现与阶段性策略，其中 `insight_image_v1` 是默认主线，`insight_text_v1` 是 text-only sibling mainline，`dossier_v1` 是 legacy / benchmark 路线。
+- `docs/current/` 代表当前默认实现与阶段性策略，其中 `insight_image_v1` 是默认主线，`insight_text_v1` 是 text-only sibling mainline，`backtrace_text_v1` 是 text-only writer-only backtrace mainline，`dossier_v1` 是 legacy / benchmark 路线。
 
 当前默认主链已经切到 `insight_image_v1`，并新增显式 text-only 变体：
 
 - 默认：`--generation-style insight_image_v1`
 - text-only sibling：`--generation-style insight_text_v1`
+- text-only backtrace：`--generation-style backtrace_text_v1`
 - legacy / benchmark：`--generation-style dossier_v1`
 - 兼容 fallback：`--generation-style model_evidence_legacy`
 
 `insight_image_v1` / `insight_text_v1` 的核心思想是：阶段性把默认主线收窄到 “观察缺口 -> 说明 helper effect -> 提出 aux”，而不是默认要求完整 closure。这里的“收窄”只针对当前主线，不重写最终质量目标；[DATA_QUALITY_REQUIREMENTS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/immutable/DATA_QUALITY_REQUIREMENTS.md) 中第 5 点仍然是长期标准。
 
+`backtrace_text_v1` 则是另一条独立 text-only 路线：它不走 planner，只做 `Proof DAG -> BacktraceSlots -> WriterHandoff -> writer -> hard checks`，要求正文按 `goal -> backtrace -> frontier -> support insufficiency -> aux` 的顺序写出。
+
 同时要避免两个误读：
 
 - 这不是要求压缩所有前段 reasoning。只要不泄露 hidden source，`pre-aux` 的 visible-only reasoning 仍然可以更丰富。
-- 这也不是在两个 variant 上都允许显式使用 visible-point coordinates。当前 `insight_image_v1` 允许并且在需要时可以鼓励把可见点坐标用于前段 visible-only reasoning；`insight_text_v1` 则要求 generation、validation、artifacts 和最终训练样本都避免图片与点坐标输入。
+- 这也不是在两个 variant 上都允许显式使用 visible-point coordinates。当前 `insight_image_v1` 允许并且在需要时可以鼓励把可见点坐标用于前段 visible-only reasoning；`insight_text_v1` 和 `backtrace_text_v1` 则要求 generation、validation、artifacts 和最终训练样本都避免图片与点坐标输入。
 
 1. `source audit`
    - 先检查图片、题面、`<aux>`、proof、坐标字段是否缺失或明显冲突。
    - 对 `insight_image_v1`，图片路径和 visible coordinates 仍是常规 source audit 输入。
    - 对 `insight_text_v1`，不会再把缺图或缺 visible coordinates 当作 source-audit 硬问题。
+   - 对 `backtrace_text_v1`，同样不会再把缺图或缺 visible coordinates 当作 source-audit 硬问题。
    - 发现异常先记录，不为了通过率强行硬写。
 
 2. `insight slots + plan`
@@ -369,6 +377,8 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 
 `insight_text_v1` 的最终数据集记录与上面相同，但不包含 `image_path`。
 
+`backtrace_text_v1` 的最终数据集记录同样不包含 `image_path`。
+
 这里的 `input` 就是最终训练/评估时应暴露给学生模型的文本输入；隐藏证明和坐标索引不会写进训练输入。
 
 ## 使用方法
@@ -395,6 +405,18 @@ python experiments/cot_sft_generation/generate_cot_sft.py \
   -v
 ```
 
+text-only writer-only backtrace 版本：
+
+```bash
+python experiments/cot_sft_generation/generate_cot_sft.py \
+  -n 100 \
+  -w 8 \
+  --generation-style backtrace_text_v1 \
+  --model-name qwen/qwen3.5-plus-02-15 \
+  -o experiments/cot_sft_generation/generated/run_backtrace.jsonl \
+  -v
+```
+
 处理全量数据：
 
 ```bash
@@ -416,7 +438,7 @@ python experiments/cot_sft_generation/generate_cot_sft.py \
 | `--process-all` | 关闭 | 处理全部含 `<aux>` 的样本 |
 | `-w, --num-workers` | `4` | 并发 worker 数 |
 | `--model-name` | `qwen/qwen3.5-plus-02-15` | 教师模型 |
-| `--generation-style` | `insight_image_v1` | 当前 generation style；也可显式指定 `insight_text_v1` / `dossier_v1` / `model_evidence_legacy` |
+| `--generation-style` | `insight_image_v1` | 当前 generation style；也可显式指定 `insight_text_v1` / `backtrace_text_v1` / `dossier_v1` / `model_evidence_legacy` |
 | `-r, --max-retries` | `3` | 每个阶段的最大重试次数 |
 | `--sequential` | 关闭 | 顺序取前 N 条，而不是随机抽样 |
 | `-v, --verbose` | 关闭 | 记录样本级 prompt / plan / body / final thinking |

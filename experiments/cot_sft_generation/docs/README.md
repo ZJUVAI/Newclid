@@ -19,6 +19,8 @@
   - 默认主线，对应 `insight_image_v1`
 - [current/INSIGHT_TEXT_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/INSIGHT_TEXT_V1_MAINLINE.md)
   - text-only sibling mainline，对应 `insight_text_v1`
+- [current/BACKTRACE_TEXT_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/BACKTRACE_TEXT_V1_MAINLINE.md)
+  - text-only backtrace writer-only mainline，对应 `backtrace_text_v1`
 - [current/DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/DOSSIER_V1_MAINLINE.md)
   - `dossier_v1` 的 legacy / benchmark / fallback 说明
 - [current/CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/CURRENT_DESIGN.md)
@@ -48,7 +50,8 @@
 2. [immutable/DATA_QUALITY_REQUIREMENTS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/immutable/DATA_QUALITY_REQUIREMENTS.md)
 3. [current/INSIGHT_IMAGE_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/INSIGHT_IMAGE_V1_MAINLINE.md)
 4. [current/INSIGHT_TEXT_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/INSIGHT_TEXT_V1_MAINLINE.md)
-5. [benchmarks/quality_review_v1/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/quality_review_v1/README.md)
+5. [current/BACKTRACE_TEXT_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/BACKTRACE_TEXT_V1_MAINLINE.md)
+6. [benchmarks/quality_review_v1/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/quality_review_v1/README.md)
 
 ### 更新实现或 schema
 

@@ -33,6 +33,8 @@ try:
         extract_problem_goal,
         parse_goal_expression,
     )
+    from .core.backtrace_pipeline import validate_backtrace_writer_body
+    from .core.backtrace_schema import BACKTRACE_TEXT_V1
     from .core.insight_extractor import extract_insight_slots
     from .core.insight_pipeline import (
         INSIGHT_TEXT_V1,
@@ -65,6 +67,8 @@ except ImportError:  # pragma: no cover - script execution path
         extract_problem_goal,
         parse_goal_expression,
     )
+    from core.backtrace_pipeline import validate_backtrace_writer_body  # type: ignore[no-redef]
+    from core.backtrace_schema import BACKTRACE_TEXT_V1  # type: ignore[no-redef]
     from core.insight_extractor import extract_insight_slots  # type: ignore[no-redef]
     from core.insight_pipeline import (  # type: ignore[no-redef]
         INSIGHT_TEXT_V1,
@@ -135,7 +139,11 @@ def recheck_item_record(item_record: Dict[str, Any]) -> Dict[str, Any]:
     raw_plan = item_record.get("plan_output")
     if not raw_plan:
         raw_plan = item_record.get("insight_plan_parsed") or item_record.get("plan_parsed") or {}
-    if is_insight_generation_style(generation_style):
+    if generation_style == BACKTRACE_TEXT_V1:
+        revalidated_plan = item_record.get("writer_handoff") or {}
+        plan_ok = isinstance(item_record.get("backtrace_slots"), dict) and isinstance(revalidated_plan, dict) and bool(revalidated_plan)
+        plan_message = "ok" if plan_ok else "missing_backtrace_slots_or_writer_handoff"
+    elif is_insight_generation_style(generation_style):
         insight_slots = item_record.get("insight_slots")
         if not isinstance(insight_slots, dict):
             insight_slots = extract_insight_slots(
@@ -170,7 +178,14 @@ def recheck_item_record(item_record: Dict[str, Any]) -> Dict[str, Any]:
     writer_ok = False
     writer_message = "missing_write_output"
     if plan_ok and revalidated_plan and write_output:
-        if is_insight_generation_style(generation_style):
+        if generation_style == BACKTRACE_TEXT_V1:
+            writer_ok, writer_message = validate_backtrace_writer_body(
+                write_output,
+                writer_handoff=item_record.get("writer_handoff") or {},
+                backtrace_slots=item_record.get("backtrace_slots") or {},
+                aux_part=aux_part,
+            )
+        elif is_insight_generation_style(generation_style):
             writer_ok, writer_message = validate_insight_writer_body(
                 write_output,
                 visible_goal=visible_goal,
@@ -191,14 +206,14 @@ def recheck_item_record(item_record: Dict[str, Any]) -> Dict[str, Any]:
     thinking_ok = False
     thinking_message = "missing_thinking"
     if thinking:
-        thinking_budget = None if is_insight_generation_style(generation_style) else compute_thinking_total_budget(plan_for_checks)
+        thinking_budget = None if (is_insight_generation_style(generation_style) or generation_style == BACKTRACE_TEXT_V1) else compute_thinking_total_budget(plan_for_checks)
         thinking_ok, thinking_message = validate_thinking_response(
             thinking,
-            point_coords={} if generation_style == INSIGHT_TEXT_V1 else point_coords,
+            point_coords={} if generation_style in {INSIGHT_TEXT_V1, BACKTRACE_TEXT_V1} else point_coords,
             require_coord_tags=False,
             max_total_len=thinking_budget,
         )
-        if thinking_ok and generation_style == INSIGHT_TEXT_V1:
+        if thinking_ok and generation_style in {INSIGHT_TEXT_V1, BACKTRACE_TEXT_V1}:
             thinking_ok, thinking_message = validate_text_only_thinking_surface(thinking)
 
     generation = {
