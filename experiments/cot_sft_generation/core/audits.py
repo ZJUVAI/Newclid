@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable
 
 try:
+    from .backtrace_schema import BACKTRACE_TEXT_V1
     from .geometry_text import (
         PROBLEM_BODY_RE,
         build_aux_direct_consequences,
@@ -36,6 +37,7 @@ try:
     )
     from .insight_schema import INSIGHT_GENERATION_STYLES, INSIGHT_IMAGE_V1, INSIGHT_TEXT_V1
 except ImportError:  # pragma: no cover - script execution path
+    from backtrace_schema import BACKTRACE_TEXT_V1  # type: ignore
     from geometry_text import (
         PROBLEM_BODY_RE,
         build_aux_direct_consequences,
@@ -1240,16 +1242,17 @@ def audit_source_record(
     point_coords = get_point_coords(record)
     goal_spec = parse_goal_expression(visible_goal)
     goal_points = set(goal_spec["points"])
-    if generation_style == INSIGHT_TEXT_V1:
+    is_text_only_style = generation_style in {INSIGHT_TEXT_V1, BACKTRACE_TEXT_V1}
+    if is_text_only_style:
         visible_points = _derive_visible_points_from_record_text(record, visible_goal=visible_goal)
     else:
         visible_points = set(extract_visible_point_names(point_coords))
     aux_scope = extract_aux_point_scope(aux_part)
     aux_direct = build_aux_direct_consequences(aux_part)
 
-    if generation_style != INSIGHT_TEXT_V1 and not image_path.exists():
+    if not is_text_only_style and not image_path.exists():
         issues.append("missing_image")
-    if generation_style != INSIGHT_TEXT_V1 and not point_coords:
+    if not is_text_only_style and not point_coords:
         issues.append("missing_point_coords")
     if not visible_goal:
         issues.append("missing_visible_goal")
@@ -1262,7 +1265,7 @@ def audit_source_record(
     relation_conflicts = detect_visible_premise_relation_conflicts(record)
     if relation_conflicts:
         issues.extend(relation_conflicts[:8])
-    if generation_style != INSIGHT_TEXT_V1 and point_coords:
+    if not is_text_only_style and point_coords:
         visible_fact_conflicts = []
         for fact in extract_visible_formal_facts(record):
             conflict = _visible_fact_coordinate_conflict(fact, point_coords)

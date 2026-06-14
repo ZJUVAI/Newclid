@@ -119,6 +119,17 @@ try:
         join_natural_list,
         render_coordinate_derivation_snippet,
     )
+    from .core.backtrace_extractor import (
+        build_backtrace_writer_handoff,
+        extract_backtrace_slots,
+    )
+    from .core.backtrace_pipeline import (
+        build_backtrace_write_prompt,
+        build_backtrace_writer_retry_feedback,
+        collect_backtrace_writer_issues,
+        validate_backtrace_writer_body,
+    )
+    from .core.backtrace_schema import BACKTRACE_TEXT_V1
     from .core.insight_extractor import extract_insight_slots
     from .core.insight_pipeline import (
         build_insight_plan_prompt,
@@ -227,6 +238,17 @@ except ImportError:  # pragma: no cover - script execution path
         join_natural_list,
         render_coordinate_derivation_snippet,
     )
+    from core.backtrace_extractor import (  # type: ignore[no-redef]
+        build_backtrace_writer_handoff,
+        extract_backtrace_slots,
+    )
+    from core.backtrace_pipeline import (  # type: ignore[no-redef]
+        build_backtrace_write_prompt,
+        build_backtrace_writer_retry_feedback,
+        collect_backtrace_writer_issues,
+        validate_backtrace_writer_body,
+    )
+    from core.backtrace_schema import BACKTRACE_TEXT_V1  # type: ignore[no-redef]
     from core.insight_extractor import extract_insight_slots  # type: ignore[no-redef]
     from core.insight_pipeline import (  # type: ignore[no-redef]
         build_insight_plan_prompt,
@@ -459,7 +481,7 @@ def is_insight_generation_style(generation_style: str | None) -> bool:
 
 
 def requires_image_input(generation_style: str | None) -> bool:
-    return generation_style != INSIGHT_TEXT_V1
+    return generation_style not in {INSIGHT_TEXT_V1, BACKTRACE_TEXT_V1}
 
 
 def build_visibility_contract_message(
@@ -9822,6 +9844,183 @@ def generate_insight_thinking(
     }
 
 
+def generate_backtrace_thinking(
+    record,
+    image_path: Path | None,
+    aux_part,
+    sanitized_rest,
+    model_name,
+    max_retries,
+    verbose,
+    plan_mode=None,
+    fallback_model_names=None,
+    source_audit=None,
+    generation_style: str = BACKTRACE_TEXT_V1,
+):
+    del image_path, sanitized_rest, source_audit
+    visible_goal = extract_problem_goal(record)
+    dag = parse_proof_dag(record.get("llm_output_renamed", ""))
+    backtrace_slots = extract_backtrace_slots(dag, visible_goal=visible_goal, aux_part=aux_part)
+    if not backtrace_slots:
+        return {
+            "success": False,
+            "thinking": None,
+            "plan_prompt": None,
+            "write_prompt": None,
+            "plan_output": None,
+            "plan_parsed": None,
+            "insight_slots": None,
+            "insight_plan_parsed": None,
+            "backtrace_slots": None,
+            "writer_handoff": None,
+            "writer_validation_issues": [],
+            "attempts_used": 0,
+            "elapsed_seconds": 0.0,
+            "error": "backtrace_slots_unavailable",
+            "write_output": None,
+            "generation_style": generation_style,
+        }
+
+    writer_handoff = build_backtrace_writer_handoff(backtrace_slots)
+    if plan_mode == "plan_only":
+        return {
+            "success": True,
+            "thinking": None,
+            "plan_prompt": None,
+            "write_prompt": None,
+            "plan_output": None,
+            "plan_parsed": None,
+            "insight_slots": None,
+            "insight_plan_parsed": None,
+            "backtrace_slots": backtrace_slots,
+            "writer_handoff": writer_handoff,
+            "writer_validation_issues": [],
+            "attempts_used": 0,
+            "elapsed_seconds": 0.0,
+            "error": None,
+            "write_output": None,
+            "generation_style": generation_style,
+        }
+
+    write_prompt = build_backtrace_write_prompt(record, writer_handoff)
+    write_messages = build_visibility_contract_message(
+        write_prompt,
+        generation_style=generation_style,
+        image_path=None,
+    )
+    write_result = run_writer_stage(
+        "backtrace_write",
+        write_messages,
+        model_name=model_name,
+        fallback_model_names=fallback_model_names,
+        visible_goal=visible_goal,
+        injected_prefix="",
+        plan=writer_handoff,
+        max_retries=max_retries,
+        validator_fn=partial(
+            validate_backtrace_writer_body,
+            writer_handoff=writer_handoff,
+            backtrace_slots=backtrace_slots,
+            aux_part=aux_part,
+        ),
+        retry_feedback_builder=build_backtrace_writer_retry_feedback,
+    )
+
+    writer_validation_issues: list[str] = []
+    assembled_thinking = None
+    if write_result["output"]:
+        writer_validation_issues = collect_backtrace_writer_issues(
+            write_result["output"],
+            writer_handoff=writer_handoff,
+            backtrace_slots=backtrace_slots,
+            aux_part=aux_part,
+        )
+        if writer_validation_issues:
+            return {
+                "success": False,
+                "thinking": None,
+                "plan_prompt": None,
+                "write_prompt": write_prompt if verbose else None,
+                "plan_output": None,
+                "plan_parsed": None,
+                "insight_slots": None,
+                "insight_plan_parsed": None,
+                "backtrace_slots": backtrace_slots,
+                "writer_handoff": writer_handoff,
+                "writer_validation_issues": writer_validation_issues,
+                "attempts_used": write_result["attempts_used"],
+                "elapsed_seconds": write_result["elapsed_seconds"],
+                "error": f"writer_validation_failed: {'; '.join(writer_validation_issues)}",
+                "write_output": write_result["output"],
+                "generation_style": generation_style,
+            }
+        assembled_thinking = f"<thinking>{write_result['output'].strip()}</thinking>"
+        ok, message = validate_text_only_thinking_surface(assembled_thinking)
+        if not ok:
+            return {
+                "success": False,
+                "thinking": assembled_thinking,
+                "plan_prompt": None,
+                "write_prompt": write_prompt if verbose else None,
+                "plan_output": None,
+                "plan_parsed": None,
+                "insight_slots": None,
+                "insight_plan_parsed": None,
+                "backtrace_slots": backtrace_slots,
+                "writer_handoff": writer_handoff,
+                "writer_validation_issues": [message],
+                "attempts_used": write_result["attempts_used"],
+                "elapsed_seconds": write_result["elapsed_seconds"],
+                "error": f"Final assembly validation failed: {message}",
+                "write_output": write_result["output"],
+                "generation_style": generation_style,
+            }
+        is_valid, message = validate_thinking_response(
+            assembled_thinking,
+            point_coords={},
+            require_coord_tags=False,
+            max_total_len=None,
+        )
+        if not is_valid:
+            return {
+                "success": False,
+                "thinking": assembled_thinking,
+                "plan_prompt": None,
+                "write_prompt": write_prompt if verbose else None,
+                "plan_output": None,
+                "plan_parsed": None,
+                "insight_slots": None,
+                "insight_plan_parsed": None,
+                "backtrace_slots": backtrace_slots,
+                "writer_handoff": writer_handoff,
+                "writer_validation_issues": [message],
+                "attempts_used": write_result["attempts_used"],
+                "elapsed_seconds": write_result["elapsed_seconds"],
+                "error": f"Final assembly validation failed: {message}",
+                "write_output": write_result["output"],
+                "generation_style": generation_style,
+            }
+
+    return {
+        "success": write_result["success"],
+        "thinking": assembled_thinking,
+        "plan_prompt": None,
+        "write_prompt": write_prompt if verbose else None,
+        "plan_output": None,
+        "plan_parsed": None,
+        "insight_slots": None,
+        "insight_plan_parsed": None,
+        "backtrace_slots": backtrace_slots,
+        "writer_handoff": writer_handoff,
+        "writer_validation_issues": writer_validation_issues,
+        "elapsed_seconds": write_result["elapsed_seconds"],
+        "attempts_used": write_result["attempts_used"],
+        "error": write_result["error"],
+        "write_output": write_result["output"],
+        "generation_style": generation_style,
+    }
+
+
 def generate_proof_dag_thinking(
     record,
     image_path: Path,
@@ -11144,6 +11343,20 @@ def process_and_generate_sft(
                     source_audit=source_audit,
                     generation_style=generation_style,
                 )
+            elif generation_style == BACKTRACE_TEXT_V1:
+                generation = generate_backtrace_thinking(
+                    record,
+                    image_path=image_path,
+                    aux_part=aux_part,
+                    sanitized_rest=record["_sanitized_rest"],
+                    model_name=model_name,
+                    max_retries=max_retries,
+                    verbose=verbose,
+                    plan_mode=plan_mode,
+                    fallback_model_names=fallback_model_names,
+                    source_audit=source_audit,
+                    generation_style=generation_style,
+                )
             elif generation_style == "dossier_v1":
                 generation = generate_proof_dag_thinking(
                     record,
@@ -11431,7 +11644,7 @@ def parse_args():
         "--generation-style",
         type=str,
         default=INSIGHT_IMAGE_V1,
-        choices=[INSIGHT_IMAGE_V1, INSIGHT_TEXT_V1, "dossier_v1", "model_evidence_legacy"],
+        choices=[INSIGHT_IMAGE_V1, INSIGHT_TEXT_V1, BACKTRACE_TEXT_V1, "dossier_v1", "model_evidence_legacy"],
         help=f"Generation pipeline style. Default: {INSIGHT_IMAGE_V1}.",
     )
     parser.add_argument(
