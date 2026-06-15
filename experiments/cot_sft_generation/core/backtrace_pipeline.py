@@ -49,6 +49,39 @@ def _split_into_sentences(text: str) -> list[str]:
     return [part.strip() for part in re.split(r"(?<=[.!?])\s+", str(text or "").strip()) if part.strip()]
 
 
+def _extract_relation_candidates(text: str) -> list[str]:
+    sentence = str(text or "").strip()
+    if not sentence:
+        return []
+    patterns = [
+        r"(?:the\s+)?ratio(?:\s+of)?\s+(?:segment\s+)?[a-z]{2}\s+to\s+(?:segment\s+)?[a-z]{2}\s+(?:equals|is\s+equal\s+to)\s+(?:the\s+)?ratio(?:\s+of)?\s+(?:segment\s+)?[a-z]{2}\s+to\s+(?:segment\s+)?[a-z]{2}",
+        r"(?:points?\s+)?[a-z]\w*\s*,\s*[a-z]\w*\s*,\s*(?:and\s+)?[a-z]\w*\s+(?:lie\s+on|are\s+on)\s+(?:the\s+)?same\s+line",
+        r"(?:points?\s+)?[a-z]\w*\s*,\s*[a-z]\w*\s*,\s*(?:and\s+)?[a-z]\w*\s+are\s+collinear",
+        r"line\s+[a-z]{2}\s+is\s+parallel\s+to\s+line\s+[a-z]{2}",
+        r"line\s+[a-z]{2}\s+is\s+perpendicular\s+to\s+line\s+[a-z]{2}",
+        r"angle\s+[a-z]{2}/[a-z]{2}\s+equals\s+angle\s+[a-z]{2}/[a-z]{2}",
+        r"triangles\s+[a-z]{3}\s+and\s+[a-z]{3}\s+are\s+(?:similar|congruent)",
+        r"[a-z]{2}\s+equals\s+[a-z]{2}",
+        r"equality\s+of\s+[a-z]{2}\s+and\s+[a-z]{2}",
+    ]
+    candidates = [normalize_relation_surface(sentence)]
+    for pattern in patterns:
+        for match in re.finditer(pattern, sentence, flags=re.IGNORECASE):
+            candidates.append(normalize_relation_surface(match.group(0)))
+    # Convert "equality of bf and cf" into the same surface as "bf equals cf".
+    for match in re.finditer(r"equality\s+of\s+([a-z]{2})\s+and\s+([a-z]{2})", sentence, flags=re.IGNORECASE):
+        candidates.append(f"{match.group(1).lower()} equals {match.group(2).lower()}")
+    deduped: list[str] = []
+    seen = set()
+    for candidate in candidates:
+        normalized_candidate = str(candidate or "").strip()
+        if not normalized_candidate or normalized_candidate in seen:
+            continue
+        deduped.append(normalized_candidate)
+        seen.add(normalized_candidate)
+    return deduped
+
+
 def _relation_mentioned_in_text(text: str, relation: str, point_names: list[str]) -> bool:
     normalized_text = normalize_relation_surface(text or "")
     normalized_relation = normalize_relation_surface(relation or "")
@@ -58,6 +91,13 @@ def _relation_mentioned_in_text(text: str, relation: str, point_names: list[str]
         return True
     if relations_semantically_match(text, relation, point_names):
         return True
+    for candidate in _extract_relation_candidates(text):
+        if candidate.lower() == normalized_relation.lower():
+            return True
+        if normalized_relation.lower() in candidate.lower():
+            return True
+        if relations_semantically_match(candidate, relation, point_names):
+            return True
     return any(
         relations_semantically_match(sentence, relation, point_names)
         or normalize_relation_surface(sentence).lower().find(normalized_relation.lower()) >= 0
@@ -75,23 +115,44 @@ def build_backtrace_write_prompt(record, writer_handoff: dict[str, object]) -> s
         f"{json.dumps(writer_handoff, ensure_ascii=False, indent=2)}\n\n"
         "[Writing Contract]\n"
         "- Output plain text only, without tags.\n"
-        "- Follow this order: goal -> backtrace -> frontier -> support insufficiency -> aux.\n"
+        "- Start from the visible goal, then walk through the staged backtrace in order.\n"
+        "- For each stage, explain the current claim, which visible support already helps, and which visible subgoal(s) still remain.\n"
+        "- When a stage reaches the visible limit, explain that the current visible route is not enough before introducing the auxiliary construction.\n"
         "- Stay text-only: do not mention any image, diagram, coordinates, or coordinate table.\n"
         "- Do not mention proof step ids, rule ids, hidden proofs, or internal schema names.\n"
         "- Avoid theorem-catalog or proof-style phrasing when a direct geometric description is enough.\n"
         "- Before the auxiliary construction appears, do not reveal later hidden-route conclusions.\n"
         "- Keep the auxiliary construction geometrically faithful to the approved construction.\n"
-        "- The body should motivate why the visible goal is not already reachable, where the backtrace gets stuck, why the current C1 support is insufficient, and then introduce the auxiliary construction.\n"
+        "- The body should show how each visible claim reduces to deeper visible subgoals until the visible route reaches its limit, and only then introduce the auxiliary construction.\n"
     )
 
 
 def build_backtrace_writer_retry_feedback(message: str, writer_handoff: dict | None = None) -> str:
     del writer_handoff
     return (
-        "Rewrite the body so it follows goal -> backtrace -> frontier -> support insufficiency -> aux.\n"
+        "Rewrite the body so it follows the staged backtrace: current claim -> visible support -> remaining subgoal(s) -> visible boundary -> aux.\n"
         f"Validator feedback: {message}\n"
         "Keep it text-only, do not leak proof metadata, and keep the auxiliary construction faithful."
     )
+
+
+def _first_sentence_idx_for_relation(sentences: list[str], relation: str, point_pool: list[str]) -> int | None:
+    if not relation:
+        return None
+    for idx, sentence in enumerate(sentences):
+        if _relation_mentioned_in_text(sentence, relation, point_pool):
+            return idx
+    return None
+
+
+def _first_sentence_idx_for_any_relation(sentences: list[str], relations: list[str], point_pool: list[str]) -> int | None:
+    relation_list = [relation for relation in relations if relation]
+    if not relation_list:
+        return None
+    for idx, sentence in enumerate(sentences):
+        if any(_relation_mentioned_in_text(sentence, relation, point_pool) for relation in relation_list):
+            return idx
+    return None
 
 
 def collect_backtrace_writer_issues(
@@ -143,41 +204,10 @@ def collect_backtrace_writer_issues(
 
     sentences = _split_into_sentences(body)
     goal_nl = str(handoff.get("goal_nl") or "")
-    backtrace_chain_nl = [
-        str(item).strip()
-        for item in (handoff.get("backtrace_chain_nl") or [])
-        if isinstance(item, str) and item.strip()
+    backtrace_stages = [
+        stage for stage in (handoff.get("backtrace_stages") or []) if isinstance(stage, dict)
     ]
-    frontier_nodes_nl = [
-        str(item).strip()
-        for item in (handoff.get("frontier_nodes_nl") or [])
-        if isinstance(item, str) and item.strip()
-    ]
-    goal_idx = next(
-        (idx for idx, sentence in enumerate(sentences) if _relation_mentioned_in_text(sentence, goal_nl, point_pool)),
-        None,
-    )
-    backtrace_candidates = [
-        relation
-        for relation in backtrace_chain_nl
-        if relation and not relations_semantically_match(relation, goal_nl, point_pool)
-    ]
-    backtrace_idx = next(
-        (
-            idx
-            for idx, sentence in enumerate(sentences)
-            if any(_relation_mentioned_in_text(sentence, relation, point_pool) for relation in backtrace_candidates)
-        ),
-        None,
-    )
-    frontier_idx = next(
-        (
-            idx
-            for idx, sentence in enumerate(sentences)
-            if any(_relation_mentioned_in_text(sentence, relation, point_pool) for relation in frontier_nodes_nl)
-        ),
-        None,
-    )
+    goal_idx = _first_sentence_idx_for_relation(sentences, goal_nl, point_pool)
     aux_idx = next(
         (
             idx
@@ -195,23 +225,67 @@ def collect_backtrace_writer_issues(
 
     if goal_nl and goal_idx is None:
         issues.append("missing_goal_reference")
-    if backtrace_candidates and backtrace_idx is None:
-        issues.append("missing_backtrace_reference")
-    if frontier_nodes_nl and frontier_idx is None:
-        issues.append("missing_frontier_reference")
     if aux_construction_nl and aux_idx is None:
         issues.append("missing_aux_reference")
 
-    if goal_idx is not None and backtrace_idx is not None and backtrace_idx < goal_idx:
+    last_stage_claim_idx = goal_idx if goal_idx is not None else -1
+    first_terminal_claim_idx = None
+    saw_terminal_boundary = False
+    for stage in backtrace_stages:
+        claim_nl = str(stage.get("claim_nl") or "").strip()
+        visible_support_nl = [
+            str(item).strip()
+            for item in (stage.get("visible_support_nl") or [])
+            if isinstance(item, str) and item.strip()
+        ]
+        subgoal_claims_nl = [
+            str(item).strip()
+            for item in (stage.get("subgoal_claims_nl") or [])
+            if isinstance(item, str) and item.strip()
+        ]
+        is_terminal = bool(stage.get("stops_at_aux_boundary"))
+
+        claim_idx = _first_sentence_idx_for_relation(sentences, claim_nl, point_pool)
+        if claim_nl and claim_idx is None:
+            issues.append("missing_stage_reference")
+            continue
+        if claim_idx is not None and claim_idx < last_stage_claim_idx:
+            issues.append("narrative_order_violation")
+        if claim_idx is not None:
+            last_stage_claim_idx = claim_idx
+
+        support_idx = _first_sentence_idx_for_any_relation(sentences, visible_support_nl, point_pool)
+        if visible_support_nl and support_idx is None:
+            issues.append("missing_stage_support_reference")
+        if claim_idx is not None and support_idx is not None and support_idx < claim_idx:
+            issues.append("narrative_order_violation")
+
+        if is_terminal:
+            if first_terminal_claim_idx is None:
+                first_terminal_claim_idx = claim_idx
+            if claim_idx is not None and aux_idx is not None and aux_idx < claim_idx:
+                issues.append("narrative_order_violation")
+            window_start = claim_idx if claim_idx is not None else 0
+            window_end = aux_idx + 1 if aux_idx is not None else len(sentences)
+            insufficiency_window = " ".join(sentences[window_start:window_end])
+            if not _INSUFFICIENCY_RE.search(insufficiency_window):
+                issues.append("support_insufficiency_missing")
+            else:
+                saw_terminal_boundary = True
+            continue
+
+        for subgoal_nl in subgoal_claims_nl:
+            subgoal_idx = _first_sentence_idx_for_relation(sentences, subgoal_nl, point_pool)
+            if subgoal_idx is None:
+                issues.append("missing_stage_subgoal_reference")
+                continue
+            if claim_idx is not None and subgoal_idx < claim_idx:
+                issues.append("narrative_order_violation")
+
+    if first_terminal_claim_idx is not None and aux_idx is not None and aux_idx < first_terminal_claim_idx:
         issues.append("narrative_order_violation")
-    if backtrace_idx is not None and frontier_idx is not None and frontier_idx < backtrace_idx:
-        issues.append("narrative_order_violation")
-    if frontier_idx is not None and aux_idx is not None and aux_idx < frontier_idx:
-        issues.append("narrative_order_violation")
-    if frontier_idx is not None and aux_idx is not None:
-        insufficiency_window = " ".join(sentences[frontier_idx:aux_idx + 1])
-        if not _INSUFFICIENCY_RE.search(insufficiency_window):
-            issues.append("support_insufficiency_missing")
+    if first_terminal_claim_idx is not None and aux_idx is not None and not saw_terminal_boundary:
+        issues.append("missing_terminal_boundary")
     elif insufficiency_idx is not None and aux_idx is not None and insufficiency_idx > aux_idx:
         issues.append("narrative_order_violation")
 

@@ -187,6 +187,15 @@ def normalize_relation_surface(text):
         return cleaned
     normalized = re.sub(r"\[\d{3}\]", "", cleaned).strip(" ;")
     normalized = re.sub(r"^(?:then|thus|therefore|hence|so)\s+", "", normalized, flags=re.IGNORECASE)
+    verbal_ratio_match = re.fullmatch(
+        r"(?:the\s+)?ratio(?:\s+of)?\s+(?:segment\s+)?([a-z]{2})\s+to\s+(?:segment\s+)?([a-z]{2})\s+"
+        r"(?:equals|is\s+equal\s+to)\s+(?:the\s+)?ratio(?:\s+of)?\s+(?:segment\s+)?([a-z]{2})\s+to\s+(?:segment\s+)?([a-z]{2})\.?",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    if verbal_ratio_match:
+        left_num, left_den, right_num, right_den = [group.lower() for group in verbal_ratio_match.groups()]
+        return f"ratio {left_num} to {left_den} equals ratio {right_num} to {right_den}"
     coincide_match = re.fullmatch(
         r"(?:point\s+)?([a-z]\w*)\s+coincides\s+with\s+(?:point\s+)?([a-z]\w*)\.?",
         normalized,
@@ -219,6 +228,8 @@ def normalize_relation_surface(text):
         r"(?:points?\s+)?([a-z]\w*)\s*,\s*([a-z]\w*)\s*,\s*(?:and\s+)?([a-z]\w*)\s+lie\s+on\s+(?:a|the)\s+straight\s+line\.?",
         r"(?:points?\s+)?([a-z]\w*)\s*,\s*([a-z]\w*)\s*,\s*(?:and\s+)?([a-z]\w*)\s+"
         r"(?:look|looks|seem|seems|appear|appears)\s+to\s+lie\s+on\s+(?:a|the)\s+straight\s+line\.?",
+        r"(?:points?\s+)?([a-z]\w*)\s*,\s*([a-z]\w*)\s*,\s*(?:and\s+)?([a-z]\w*)\s+lie\s+on\s+(?:the\s+)?same\s+line\.?",
+        r"(?:points?\s+)?([a-z]\w*)\s*,\s*([a-z]\w*)\s*,\s*(?:and\s+)?([a-z]\w*)\s+are\s+on\s+(?:the\s+)?same\s+line\.?",
     ]
     for pattern in straight_line_patterns:
         straight_line_match = re.fullmatch(

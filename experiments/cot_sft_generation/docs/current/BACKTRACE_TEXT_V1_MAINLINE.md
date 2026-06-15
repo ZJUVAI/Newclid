@@ -2,7 +2,7 @@
 
 `backtrace_text_v1` is a text-only writer-only mainline.
 
-Its design goal is narrower than the insight family: instead of asking for an insight-first helper pitch, it starts from the visible goal, backtraces only through the non-aux visible portion of the hidden proof DAG, stops at the first frontier that cannot be expanded inside that visible backtrace core, and then motivates the approved auxiliary construction.
+Its design goal is narrower than the insight family: instead of asking for an insight-first helper pitch, it starts from the visible goal, backtraces only through the non-aux visible portion of the hidden proof DAG, organizes that route into ordered visible stages, stops when a visible stage already has direct aux-point dependencies, and then motivates the approved auxiliary construction.
 
 ## Definitions
 
@@ -23,13 +23,21 @@ Its design goal is narrower than the insight family: instead of asking for an in
   - 不属于 premise-only，且结论本身含 aux 点的结论
 - `V_core`
   - 从 `goal` 出发，只沿 `dep ∈ V` 的边反向回溯所能到达的那部分 `V`
+- `backtrace_stage`
+  - `V_core` 中 writer 会显式叙述的一层可见 claim
+  - 每层保留三类 direct 依赖：
+    - 已可见支持 `visible_support = deps ∩ C1`
+    - 仍需继续回溯的可见子目标 `next_v = deps ∩ V_core`
+    - 已经触到 aux 路线的阻塞 `blocking_h = deps ∩ H`
 - `U`
   - `U = V \ V_core`
   - `backtrace_text_v1` 第一版忽略
 - `frontier_nodes`
-  - 属于 `V_core`，但再往前不能继续只靠 `V_core` 展开；往前依赖会落到 `C1` 或 `H`
+  - 兼容字段
+  - 在当前版本里等于 direct deps 已经触到 `H` 的 terminal `backtrace_stage`
 - `supporting_c1_by_frontier`
-  - 每个 frontier 节点的直接 `C1` 前驱；只作已有支持，不继续主回溯展开
+  - 兼容字段
+  - 每个 terminal stage 的直接 `C1` 支持；只作已有支持，不继续主回溯展开
 
 ## Flow
 
@@ -60,6 +68,10 @@ Its design goal is narrower than the insight family: instead of asking for an in
 - `V_step_ids`
 - `H_step_ids`
 - `V_core_step_ids`
+- `backtrace_root_step_id`
+- `backtrace_stage_order_step_ids`
+- `backtrace_stages`
+- `terminal_stage_ids`
 - `backtrace_chain_step_ids`
 - `frontier_node_ids`
 - `supporting_c1_by_frontier`
@@ -77,16 +89,15 @@ Its design goal is narrower than the insight family: instead of asking for an in
 `WriterHandoff` 的固定最小字段是：
 
 - `goal_nl`
-- `backtrace_chain_nl`
-- `frontier_nodes_nl`
-- `supporting_c1_facts_nl`
+- `backtrace_stages`
+- `terminal_claims_nl`
 - `aux_construction_nl`
 
 ## Writer Contract
 
 writer prompt 不把这些规则塞进 handoff，而是直接写死：
 
-- 顺序：`goal -> backtrace -> frontier -> support insufficiency -> aux`
+- 顺序：`goal -> current claim -> visible support -> remaining visible subgoal(s) -> visible boundary -> aux`
 - 不提图片、不提坐标
 - 不提 proof step id / rule id / hidden proof / internal schema name
 - theorem / proof-style phrasing 只作软提醒，不作硬拒绝
@@ -111,7 +122,7 @@ writer prompt 不把这些规则塞进 handoff，而是直接写死：
 离线 Codex / 人工抽样负责：
 
 - 是否真的沿 `V_core` 回溯
-- 是否在 `frontier` 停住
+- 是否在 direct-`H` 的 visible boundary 停住
 - 是否只把 `C1` 当支持而不继续主回溯
 - aux 引入是否自然
 - 是否虽过 hard checks 但仍空泛、偷渡 hidden route、逻辑断裂

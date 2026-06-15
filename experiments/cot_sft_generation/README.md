@@ -262,7 +262,7 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 
 `insight_image_v1` / `insight_text_v1` 的核心思想是：阶段性把默认主线收窄到 “观察缺口 -> 说明 helper effect -> 提出 aux”，而不是默认要求完整 closure。这里的“收窄”只针对当前主线，不重写最终质量目标；[DATA_QUALITY_REQUIREMENTS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/immutable/DATA_QUALITY_REQUIREMENTS.md) 中第 5 点仍然是长期标准。
 
-`backtrace_text_v1` 则是另一条独立 text-only 路线：它不走 planner，只做 `Proof DAG -> BacktraceSlots -> WriterHandoff -> writer -> hard checks`，要求正文按 `goal -> backtrace -> frontier -> support insufficiency -> aux` 的顺序写出。
+`backtrace_text_v1` 则是另一条独立 text-only 路线：它不走 planner，只做 `Proof DAG -> BacktraceSlots -> WriterHandoff -> writer -> hard checks`，要求正文按 staged visible backtrace 的顺序写出：从 goal 开始，逐层说明当前 claim、已有 visible support、仍需的 visible subgoal，直到 visible route 触到 aux boundary，再引入 aux。
 
 同时要避免两个误读：
 

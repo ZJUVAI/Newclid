@@ -64,8 +64,8 @@
 - 默认大库顺序前 `20` 条含 aux 样本：`16/20` 通过
   - 失败类型：`writer_validation_failed: early_hidden_relation`
 - 对这 `16` 条中的前 `10` 条通过样本做离线人工抽查：
-  - 结构上都遵守了 `goal -> backtrace -> frontier -> support insufficiency -> aux`
-  - `frontier` 和 `supporting_c1` 都来自落盘的 `backtrace_slots`
+  - 结构上都遵守了 staged visible backtrace 合同：`goal -> current claim -> visible support -> remaining visible subgoal(s) -> visible boundary -> aux`
+  - terminal visible boundary 和 supporting C1 都来自落盘的 `backtrace_slots`
   - 但文本明显仍偏模板化、偏保守；这证明链路和 hard checks 已工作，不代表真实 teacher writer 已经达到最终语义质量目标
 
 ## 当前风险
@@ -101,7 +101,7 @@ proof DAG 已经是强监督源，但 `required_aux_effect`、`first_bridge_chec
 
 当前离线抽查已经确认：
 
-- `V_core -> frontier -> supporting_c1 -> aux` 的主结构可落盘、可回放、可检查
+- `V_core -> backtrace_stages -> terminal visible boundary -> aux` 的主结构可落盘、可回放、可检查
 
 但同一轮抽查也确认：
 

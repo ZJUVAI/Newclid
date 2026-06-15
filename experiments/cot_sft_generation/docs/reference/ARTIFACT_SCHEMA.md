@@ -138,6 +138,8 @@ style 差异：
   - `plan_parsed = null`
   - `insight_plan_parsed = null`
   - `write_prompt` / `write_output` / `thinking` 保留
+- `backtrace_text_v1` 当前 canonical 结构是 `backtrace_slots.backtrace_stages` 与 `writer_handoff.backtrace_stages`
+- `backtrace_chain_nl` / `frontier_nodes_nl` / `supporting_c1_facts_nl` 仍保留在 `backtrace_slots` 中，但主要作为兼容视图
 - 当前整个 insight family 都会被 generation-audit 的硬问题拦导出，硬问题范围为：
   - `no_proof_echo`
   - `visible_only_boundary`
