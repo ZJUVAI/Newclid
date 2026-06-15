@@ -428,7 +428,9 @@ class CSolver:
         return solved
 
     def possible_goals(self) -> List[str]:
-        return DDAR.get_possible_goals(self.problem_name, self.points, self.premises)
+        return DDAR.get_possible_goals(
+            self.problem_name, self.points, self.premises, self.config
+        )
 
     # -------------------- 辅助输出 -------------------- #
     def print_info(self):
