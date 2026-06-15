@@ -25,7 +25,7 @@ for path in (str(REPO_ROOT), str(SRC_ROOT)):
 from newclid.agent.vllm import Qwen3Agent, Qwen3VLAgent, discover_served_model
 from newclid.api import GeometricSolverBuilder
 from newclid.configs import load_solver_config
-from newclid.search_trace import TraceRun, timestamp_slug
+from newclid.search_trace import TraceRun, get_git_commit, timestamp_slug
 
 
 LOGLEVEL = os.environ.get("LOGLEVEL", "WARNING").upper()
@@ -66,12 +66,13 @@ def build_eval_output_stem(
     beam_size: int,
     search_depth: int,
     timestamp: str,
+    commit_short: str,
 ) -> str:
     search_slug = search_version[1:] if search_version.startswith("v") else search_version
     model_slug, checkpoint_slug = served_model_slugs(served_model_name)
     return (
-        f"eval_vllm_{agent_type}_{problems_path.stem}_{model_slug}_{checkpoint_slug}"
-        f"_sv{search_slug}_d{decoding_size}_b{beam_size}_s{search_depth}_{timestamp}"
+        f"eval_vllm_{agent_type}_{model_slug}_{checkpoint_slug}_{problems_path.stem}"
+        f"_sv{search_slug}_d{decoding_size}_b{beam_size}_s{search_depth}_{timestamp}_{commit_short}"
     )
 
 
@@ -216,6 +217,7 @@ def solve_problems_vllm(
     render_root = output_dir / "_rendered"
     render_root.mkdir(parents=True, exist_ok=True)
     run_timestamp = timestamp_slug()
+    commit_short = get_git_commit(REPO_ROOT)[:7]
     output_stem = build_eval_output_stem(
         agent_type=agent_type,
         search_version=search_version,
@@ -225,6 +227,7 @@ def solve_problems_vllm(
         beam_size=beam_size,
         search_depth=search_depth,
         timestamp=run_timestamp,
+        commit_short=commit_short,
     )
     model_slug, checkpoint_slug = served_model_slugs(served_model_name)
 
