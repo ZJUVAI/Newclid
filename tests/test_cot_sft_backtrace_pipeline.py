@@ -170,6 +170,32 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
 
         self.assertTrue(ok, msg=message)
 
+    def test_validate_backtrace_writer_body_allows_theorem_phrasing_without_proof_ids(self):
+        record = _build_backtrace_record()
+        dag = parse_proof_dag(record["llm_output_renamed"])
+        slots = extract_backtrace_slots(
+            dag,
+            visible_goal="eqratio a b b c b e c e",
+            aux_part="<aux>x00 f : midp f a d [100] ; </aux>",
+        )
+        handoff = build_backtrace_writer_handoff(slots)
+        body = (
+            "The target is ratio ab to bc equals ratio be to ce. "
+            "Working backward, that would be available once angle ab/bc equals angle be/ce is secured. "
+            "But that backtrace stalls there, because angle ab/ac equals angle bc/bd is still not enough by itself to connect the e-side. "
+            "So we need a new helper: construct point f such that f is the midpoint of ad. "
+            "Then the midpoint theorem gives one local balance on ad that the current visible support still lacks."
+        )
+
+        issues = collect_backtrace_writer_issues(
+            body,
+            writer_handoff=handoff,
+            backtrace_slots=slots,
+            aux_part="<aux>x00 f : midp f a d [100] ; </aux>",
+        )
+
+        self.assertNotIn("proof_marker_leak", issues)
+
     def test_process_and_generate_sft_runs_backtrace_text_v1_without_image_inputs(self):
         record = _build_backtrace_record()
 

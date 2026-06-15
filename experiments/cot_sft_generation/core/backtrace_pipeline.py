@@ -28,7 +28,7 @@ except ImportError:  # pragma: no cover - script execution path
     )
 
 
-_RULE_LEAK_RE = re.compile(r"(?:\[\d{3}\]|\bAR\b|\br\d+\b|\bproof\b|\brule\s+id\b|\btheorem\b|\bcatalog\b)", re.IGNORECASE)
+_RULE_LEAK_RE = re.compile(r"(?:\[\d{3}\]|\bAR\b|\br\d+\b|\brule\s+id\b)", re.IGNORECASE)
 _HIDDEN_META_RE = re.compile(
     r"\b(?:hidden|supervisor|planner|writer|handoff|artifact|proof dag|step id|frontier node|v_core|c1|c2|c3)\b",
     re.IGNORECASE,
@@ -77,7 +77,8 @@ def build_backtrace_write_prompt(record, writer_handoff: dict[str, object]) -> s
         "- Output plain text only, without tags.\n"
         "- Follow this order: goal -> backtrace -> frontier -> support insufficiency -> aux.\n"
         "- Stay text-only: do not mention any image, diagram, coordinates, or coordinate table.\n"
-        "- Do not mention proof step ids, rule ids, theorem catalogs, hidden proofs, or internal schema names.\n"
+        "- Do not mention proof step ids, rule ids, hidden proofs, or internal schema names.\n"
+        "- Avoid theorem-catalog or proof-style phrasing when a direct geometric description is enough.\n"
         "- Before the auxiliary construction appears, do not reveal later hidden-route conclusions.\n"
         "- Keep the auxiliary construction geometrically faithful to the approved construction.\n"
         "- The body should motivate why the visible goal is not already reachable, where the backtrace gets stuck, why the current C1 support is insufficient, and then introduce the auxiliary construction.\n"

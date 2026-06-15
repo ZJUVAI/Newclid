@@ -88,7 +88,8 @@ writer prompt 不把这些规则塞进 handoff，而是直接写死：
 
 - 顺序：`goal -> backtrace -> frontier -> support insufficiency -> aux`
 - 不提图片、不提坐标
-- 不提 proof step id / rule id / theorem catalog / hidden proof
+- 不提 proof step id / rule id / hidden proof / internal schema name
+- theorem / proof-style phrasing 只作软提醒，不作硬拒绝
 - aux 之前不得提前说 hidden route 结论
 - 不改变真实 aux 构造的几何语义
 - 输出只返回 plain-text body；脚本再包 `<thinking>...</thinking>`
