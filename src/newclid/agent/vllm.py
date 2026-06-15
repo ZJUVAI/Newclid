@@ -171,6 +171,7 @@ class _BaseQwen3Agent(BaseAgent):
         *,
         search_version: str = "v1",
         max_pending_ddar: int = 1,
+        ddar_config: dict[str, bool] | None = None,
         trace_writer=None,
     ):
         if search_version not in {"v1", "v2", "hybrid"}:
@@ -187,6 +188,7 @@ class _BaseQwen3Agent(BaseAgent):
             prepare_request_workers=1,
             prepare_prefetch_limit=max(1, 2 * beam_size),
             ddar_returns_proof=False,
+            ddar_config=ddar_config,
             trace_writer=trace_writer,
         )
         self.search_version = search_version
@@ -267,13 +269,13 @@ class _BaseQwen3Agent(BaseAgent):
         timeout: int = 3600,
     ) -> bool:
         del rules, start_time, timeout
-        return run_ddar_on_proof(proof)
+        return run_ddar_on_proof(proof, self.ddar_config)
 
 
 class Qwen3Agent(_BaseQwen3Agent):
     agent_name = "qwen3_text"
 
-    def __init__(self, model_pool, decoding_size: int, beam_size: int, search_depth: int, *, search_version: str = "v1", max_pending_ddar: int = 1, trace_writer=None):
+    def __init__(self, model_pool, decoding_size: int, beam_size: int, search_depth: int, *, search_version: str = "v1", max_pending_ddar: int = 1, ddar_config: dict[str, bool] | None = None, trace_writer=None):
         super().__init__(
             model_pool,
             decoding_size,
@@ -281,6 +283,7 @@ class Qwen3Agent(_BaseQwen3Agent):
             search_depth,
             search_version=search_version,
             max_pending_ddar=max_pending_ddar,
+            ddar_config=ddar_config,
             trace_writer=trace_writer,
         )
         self._root_problem_dsl: str | None = None
@@ -339,6 +342,7 @@ class Qwen3VLAgent(_BaseQwen3Agent):
         search_version: str = "v1",
         render_root: str | Path = "temp/eval_rendered_images",
         max_pending_ddar: int = 1,
+        ddar_config: dict[str, bool] | None = None,
         trace_writer=None,
     ):
         super().__init__(
@@ -348,6 +352,7 @@ class Qwen3VLAgent(_BaseQwen3Agent):
             search_depth,
             search_version=search_version,
             max_pending_ddar=max_pending_ddar,
+            ddar_config=ddar_config,
             trace_writer=trace_writer,
         )
         self.render_root = Path(render_root)

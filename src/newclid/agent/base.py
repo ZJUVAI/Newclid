@@ -51,6 +51,7 @@ class BaseAgent(DeductiveAgent, ABC):
         prepare_request_workers: int = 1,
         prepare_prefetch_limit: int = 1,
         ddar_returns_proof: bool = False,
+        ddar_config: dict[str, bool] | None = None,
         trace_writer=None,
     ):
         self.any_new_statement_has_been_added = True
@@ -66,6 +67,7 @@ class BaseAgent(DeductiveAgent, ABC):
         self.prepare_request_workers = prepare_request_workers
         self.prepare_prefetch_limit = prepare_prefetch_limit
         self.ddar_returns_proof = ddar_returns_proof
+        self.ddar_config = ddar_config
         self.trace_writer = trace_writer
         self._scheduler_trace_interval_s = 0.5
         self._last_scheduler_trace_at = 0.0
@@ -121,7 +123,13 @@ class BaseAgent(DeductiveAgent, ABC):
         start_time: float,
         timeout: int = 3600,
     ) -> bool:
-        return run_ddar_c(proof, rules, start_time, timeout)
+        return run_ddar_c(
+            proof,
+            rules,
+            start_time,
+            timeout,
+            ddar_config=self.ddar_config,
+        )
 
     def finalize_next_queue(
         self,
@@ -999,6 +1007,7 @@ class BaseAgent(DeductiveAgent, ABC):
                 t0,
                 timeout,
                 return_proof=self.ddar_returns_proof,
+                ddar_config=self.ddar_config,
             )
             logger.debug(
                 "Search depth=%d request=%s queued DDAR future; pending_ddar=%d queued_ddar=%d",

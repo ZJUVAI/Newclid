@@ -264,14 +264,18 @@ def extract_goals(proof: ProofState) -> list[tuple[str, list[str]]]:
     return goals
 
 
-def run_ddar_on_proof(proof: ProofState) -> bool:
+def run_ddar_on_proof(
+    proof: ProofState,
+    ddar_config: dict[str, bool] | None = None,
+) -> bool:
+    config = DEFAULT_DDAR_CONFIG if ddar_config is None else ddar_config
     solved, _ = DDAR.run_ddar(
         "",
         extract_points(proof),
         extract_premises(proof),
         extract_goals(proof),
         500,
-        DEFAULT_DDAR_CONFIG,
+        config,
     )
     return solved
 
@@ -318,10 +322,14 @@ class BeamQueue:
 
 
 def run_ddar_c(
-    proof: ProofState, rules: list["Rule"], start_time: float, timeout: int = 3600
+    proof: ProofState,
+    rules: list["Rule"],
+    start_time: float,
+    timeout: int = 3600,
+    ddar_config: dict[str, bool] | None = None,
 ) -> bool:
     del rules, start_time, timeout
-    return run_ddar_on_proof(proof)
+    return run_ddar_on_proof(proof, ddar_config)
 
 
 def build_problem_proof(problem, defs, *, max_attempts: int = 100) -> ProofState:
@@ -342,6 +350,7 @@ def run_ddar_task(
     timeout: int = 3600,
     *,
     return_proof: bool = False,
+    ddar_config: dict[str, bool] | None = None,
 ):
     # These timings describe work performed inside one remote DDAR task. They
     # are not main-thread wall-clock timings and can legitimately sum to more
@@ -385,7 +394,8 @@ def run_ddar_task(
     try:
         ddar_start = time.time()
         del rules, start_time, timeout
-        solved, _ = DDAR.run_ddar("", points, premises, goals, 500, DEFAULT_DDAR_CONFIG)
+        config = DEFAULT_DDAR_CONFIG if ddar_config is None else ddar_config
+        solved, _ = DDAR.run_ddar("", points, premises, goals, 500, config)
         ddar_engine_finished_at_unix_s = time.time()
         ddar_engine_work_time_s = ddar_engine_finished_at_unix_s - ddar_start
     except Exception as exc:
@@ -435,6 +445,7 @@ def run_aux_ddar_task(
     *,
     content_is_construction: bool = False,
     return_problem: bool = False,
+    ddar_config: dict[str, bool] | None = None,
 ):
     parse_start = time.time()
     aux_construction = (
@@ -470,7 +481,8 @@ def run_aux_ddar_task(
         }
 
     try:
-        solved, _ = DDAR.run_ddar("", points, premises, goals, 500, DEFAULT_DDAR_CONFIG)
+        config = DEFAULT_DDAR_CONFIG if ddar_config is None else ddar_config
+        solved, _ = DDAR.run_ddar("", points, premises, goals, 500, config)
     except Exception:
         return {
             "status": "invalid",
@@ -495,6 +507,7 @@ def run_ddar_remote(
     timeout: int = 3600,
     *,
     return_proof: bool = False,
+    ddar_config: dict[str, bool] | None = None,
 ):
     return run_ddar_task(
         problem,
@@ -503,6 +516,7 @@ def run_ddar_remote(
         start_time,
         timeout,
         return_proof=return_proof,
+        ddar_config=ddar_config,
     )
 
 
@@ -514,6 +528,7 @@ def run_aux_ddar_remote(
     *,
     content_is_construction: bool = False,
     return_problem: bool = False,
+    ddar_config: dict[str, bool] | None = None,
 ):
     return run_aux_ddar_task(
         problem,
@@ -521,4 +536,5 @@ def run_aux_ddar_remote(
         aux_content,
         content_is_construction=content_is_construction,
         return_problem=return_problem,
+        ddar_config=ddar_config,
     )

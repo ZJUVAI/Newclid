@@ -57,11 +57,23 @@ from newclid.agent.vllm import (
     discover_served_model,
 )
 from newclid.api import GeometricSolverBuilder
+from newclid.configs import load_solver_config
 from newclid.profiling import PROFILE_ROW_FIELDS
 from newclid.search_trace import TraceRun, timestamp_slug
 
 
 LOGLEVEL = os.environ.get("LOGLEVEL", "WARNING").upper()
+
+
+def parse_bool_arg(value: str) -> bool:
+    normalized = value.strip().lower()
+    if normalized in {"true", "1", "yes", "y", "on"}:
+        return True
+    if normalized in {"false", "0", "no", "n", "off"}:
+        return False
+    raise argparse.ArgumentTypeError(
+        f"Invalid boolean value: {value!r}. Expected true/false."
+    )
 
 
 def sanitize_problem_name(problem_name: str) -> str:
@@ -132,6 +144,7 @@ def create_agent(
     search_depth: int,
     max_pending_ddar: int,
     render_root: Path,
+    ddar_config: dict[str, bool],
     trace_writer=None,
 ):
     if agent_type == "qwen3_text":
@@ -142,6 +155,7 @@ def create_agent(
             search_depth=search_depth,
             search_version=search_version,
             max_pending_ddar=max_pending_ddar,
+            ddar_config=ddar_config,
             trace_writer=trace_writer,
         )
     if agent_type == "qwen3_vl":
@@ -153,6 +167,7 @@ def create_agent(
             search_version=search_version,
             render_root=render_root,
             max_pending_ddar=max_pending_ddar,
+            ddar_config=ddar_config,
             trace_writer=trace_writer,
         )
     raise ValueError(f"Unsupported agent type: {agent_type}")
@@ -171,6 +186,7 @@ def solve_one_problem(
     timeout: int,
     max_pending_ddar: int,
     render_root: Path,
+    ddar_config: dict[str, bool],
     trace_writer=None,
 ):
     start_perf = time.perf_counter()
@@ -186,6 +202,7 @@ def solve_one_problem(
         search_depth=search_depth,
         max_pending_ddar=max_pending_ddar,
         render_root=render_root,
+        ddar_config=ddar_config,
         trace_writer=trace_writer,
     )
     solver = builder.with_deductive_agent(agent).build()
@@ -211,12 +228,14 @@ def solve_problems_vllm(
     timeout: int,
     log_dir: str | None,
     enable_trace: bool,
+    using_exp: bool = True,
 ):
     if not filepath.exists():
         raise FileNotFoundError(f"File {filepath} not found.")
 
     lines = filepath.read_text(encoding="utf-8").splitlines()
     problem_names = [lines[index].strip() for index in range(0, len(lines), 2) if lines[index].strip()]
+    ddar_config = load_solver_config(using_exp=using_exp)
 
     served_model_name, server_models = discover_served_model(vllm_base_url)
     try:
@@ -275,6 +294,7 @@ def solve_problems_vllm(
                     "search_depth": search_depth,
                     "timeout": timeout,
                     "search_version": search_version,
+                    "using_exp": ddar_config.get("using_exp"),
                     "ray_num_cpus": ray_num_cpus,
                     "max_pending_ddar": max_pending_ddar,
                 },
@@ -286,6 +306,7 @@ def solve_problems_vllm(
         print(f"Using search_version={search_version}")
         print(f"Using served_model_name={served_model_name}")
         print(f"Using vllm_base_url={vllm_base_url}")
+        print(f"Using using_exp={ddar_config.get('using_exp')}")
         print(f"Using ray_num_cpus={ray_num_cpus}")
         print(f"Using max_pending_ddar={max_pending_ddar}")
         print(f"Worker warmup: {warmup_infos}")
@@ -332,6 +353,7 @@ def solve_problems_vllm(
                             timeout=timeout,
                             max_pending_ddar=max_pending_ddar,
                             render_root=problem_render_root,
+                            ddar_config=ddar_config,
                             trace_writer=trace_writer,
                         )
                         while True:
@@ -424,6 +446,7 @@ def main():
     parser.add_argument("--ray_num_cpus", type=int, default=None)
     parser.add_argument("--timeout", type=int, default=7200)
     parser.add_argument("--log_dir", type=str, default=None)
+    parser.add_argument("--using_exp", type=parse_bool_arg, default=True)
     parser.add_argument(
         "--enable_trace",
         action=argparse.BooleanOptionalAction,
@@ -443,6 +466,7 @@ def main():
         timeout=args.timeout,
         log_dir=args.log_dir,
         enable_trace=args.enable_trace,
+        using_exp=args.using_exp,
     )
 
 

@@ -315,9 +315,11 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                 search_depth=2,
                 max_pending_ddar=4,
                 render_root=Path("/tmp/render-root"),
+                ddar_config={"using_exp": True},
             )
 
         self.assertEqual(mock_text_agent.call_args.kwargs["search_version"], "hybrid")
+        self.assertTrue(mock_text_agent.call_args.kwargs["ddar_config"]["using_exp"])
 
     def test_create_agent_passes_search_version_to_visual_agent(self):
         with patch("scripts.evaluation.Qwen3VLAgent") as mock_vl_agent:
@@ -330,9 +332,11 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                 search_depth=2,
                 max_pending_ddar=4,
                 render_root=Path("/tmp/render-root"),
+                ddar_config={"using_exp": False},
             )
 
         self.assertEqual(mock_vl_agent.call_args.kwargs["search_version"], "v2")
+        self.assertFalse(mock_vl_agent.call_args.kwargs["ddar_config"]["using_exp"])
 
     def test_main_parses_vllm_cli(self):
         captured = {}
@@ -359,6 +363,7 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
 
         self.assertEqual(captured["vllm_base_url"], "http://127.0.0.1:8000")
         self.assertEqual(captured["agent_type"], "qwen3_text")
+        self.assertTrue(captured["using_exp"])
 
     def test_main_allows_qwen3_vl(self):
         captured = {}
@@ -384,6 +389,60 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                 eval_runner_module.main()
 
         self.assertEqual(captured["agent_type"], "qwen3_vl")
+
+    def test_main_parses_using_exp_cli(self):
+        captured = {}
+
+        def _fake_solve(**kwargs):
+            captured.update(kwargs)
+
+        argv = [
+            "evaluation.py",
+            "--vllm_base_url",
+            "http://127.0.0.1:8000",
+            "--agent",
+            "qwen3_text",
+            "--problems_path",
+            "benchmarks/dev_imo.txt",
+            "--using_exp",
+            "true",
+        ]
+
+        with patch.object(sys, "argv", argv):
+            with patch(
+                "scripts.evaluation.solve_problems_vllm",
+                side_effect=_fake_solve,
+            ):
+                eval_runner_module.main()
+
+        self.assertTrue(captured["using_exp"])
+
+    def test_main_parses_false_using_exp_cli(self):
+        captured = {}
+
+        def _fake_solve(**kwargs):
+            captured.update(kwargs)
+
+        argv = [
+            "evaluation.py",
+            "--vllm_base_url",
+            "http://127.0.0.1:8000",
+            "--agent",
+            "qwen3_text",
+            "--problems_path",
+            "benchmarks/dev_imo.txt",
+            "--using_exp",
+            "false",
+        ]
+
+        with patch.object(sys, "argv", argv):
+            with patch(
+                "scripts.evaluation.solve_problems_vllm",
+                side_effect=_fake_solve,
+            ):
+                eval_runner_module.main()
+
+        self.assertFalse(captured["using_exp"])
 
     def test_single_problem_eval_runner_writes_results_for_vllm(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -460,6 +519,7 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                                                         timeout=3600,
                                                         log_dir=str(log_dir),
                                                         enable_trace=False,
+                                                        using_exp=True,
                                                     )
                                                 mock_ray_shutdown.assert_called_once()
 
