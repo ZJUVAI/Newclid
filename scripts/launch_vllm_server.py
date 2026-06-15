@@ -23,7 +23,7 @@ def ensure_startup_patch() -> None:
     startup_line = (
         f"import sys; p={str(repo_root)!r}; "
         "sys.path.insert(0, p) if p not in sys.path else None; "
-        "import sitecustomize"
+        "import scripts.qwen_tokenizer_compat"
     )
     for site_packages_dir in site.getsitepackages():
         pth_path = Path(site_packages_dir) / "zz_genesisgeo_qwen_patch.pth"

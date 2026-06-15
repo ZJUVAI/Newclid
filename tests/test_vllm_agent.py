@@ -15,9 +15,20 @@ from newclid.agent.vllm import (
 )
 
 
-class _DummyPool:
-    def get_worker_stats(self):
-        return []
+class _FakeTokenizer:
+    def encode(self, text, add_special_tokens=False):
+        del text, add_special_tokens
+        return [99]
+
+
+def _agent_kwargs():
+    return {
+        "base_url": "http://localhost:8000",
+        "served_model_name": "Qwen/Qwen3",
+        "decoding_size": 2,
+        "beam_size": 4,
+        "search_depth": 1,
+    }
 
 
 class VLLMHelperTests(unittest.TestCase):
@@ -55,46 +66,90 @@ class VLLMHelperTests(unittest.TestCase):
 
 
 class Qwen3AgentTests(unittest.TestCase):
-    def test_hybrid_search_falls_back_to_v2_after_v1_failure(self):
-        agent = Qwen3Agent(
-            model_pool=_DummyPool(),
-            decoding_size=2,
-            beam_size=4,
-            search_depth=1,
-            search_version="hybrid",
-        )
-        calls: list[tuple[str, int]] = []
+    def test_request_completions_uses_chat_endpoint_not_completions(self):
+        with patch("newclid.agent.vllm._load_tokenizer", return_value=_FakeTokenizer()):
+            agent = Qwen3Agent(**_agent_kwargs())
 
-        def fake_base_run(self, proof, rules, timeout):
-            calls.append((self._active_search_mode, timeout))
-            if self._active_search_mode == "v1":
-                return {"success": False, "error": "Tried but failed."}
-            return {"success": True}
+        class _Response:
+            def raise_for_status(self):
+                pass
 
-        with patch.object(BaseAgent, "run", new=fake_base_run):
-            result = agent.run(proof=object(), rules=[], timeout=30)
+            def json(self):
+                return {
+                    "choices": [
+                        {
+                            "message": {"content": " = free a"},
+                            "token_ids": [17],
+                            "logprobs": {"content": [{"logprob": -0.2}]},
+                        },
+                        {
+                            "message": {"content": " = free b"},
+                            "token_ids": [18],
+                            "logprobs": {"content": [{"logprob": -0.3}]},
+                        },
+                    ]
+                }
 
-        self.assertEqual(calls[0][0], "v1")
-        self.assertEqual(calls[1][0], "v2")
+        with patch.object(agent.session, "post", return_value=_Response()) as mock_post:
+            result = agent.request_completions(
+                {
+                    "request_id": "r0",
+                    "messages": [],
+                    "response_prefix": "<aux> x00",
+                    "new_point_name": "a",
+                }
+            )
+
+        self.assertIn("/v1/chat/completions", mock_post.call_args.args[0])
+        self.assertNotIn("/v1/completions", mock_post.call_args.args[0])
+        self.assertEqual(result["request_id"], "r0")
+        self.assertEqual(len(result["aux_dsl_scores"]), 2)
+
+    def test_hybrid_search_falls_back_to_v2_after_v1_failure_with_cumulative_counts(self):
+        with patch("newclid.agent.vllm._load_tokenizer", return_value=_FakeTokenizer()):
+            agent = Qwen3Agent(**_agent_kwargs(), search_version="hybrid")
+        agent.problemJGEX = object()
+        calls: list[str] = []
+
+        def fake_search(self, mode, proof, deadline):
+            del proof, deadline
+            calls.append(mode)
+            self._llm_calls += 1
+            self._ddar_calls += 2
+            return (mode == "v2"), "Tried but failed."
+
+        with patch("newclid.agent.base.run_ddar_c", return_value=False):
+            with patch.object(agent, "prepare_search"):
+                with patch.object(BaseAgent, "_search", new=fake_search):
+                    with patch.object(BaseAgent, "_trace"):
+                        with patch("newclid.agent.base.ray.put", return_value="ref"):
+                            result = agent.run(
+                                proof=types.SimpleNamespace(
+                                    goals=[],
+                                    defs={},
+                                ),
+                                rules=[],
+                                timeout=30,
+                            )
+
+        self.assertEqual(calls, ["v1", "v2"])
         self.assertTrue(result["success"])
+        self.assertEqual(result["llm_calls"], 2)
+        self.assertEqual(result["ddar_calls"], 5)
 
     def test_prepare_request_v2_reuses_root_problem_with_separator(self):
-        agent = Qwen3Agent(
-            model_pool=_DummyPool(),
-            decoding_size=2,
-            beam_size=4,
-            search_depth=1,
-            search_version="v2",
-        )
+        with patch("newclid.agent.vllm._load_tokenizer", return_value=_FakeTokenizer()):
+            agent = Qwen3Agent(**_agent_kwargs(), search_version="v2")
         agent.problemJGEX = object()
-        agent._active_search_mode = "v2"
         agent._root_problem_dsl = "<problem> root </problem>"
-        with patch.object(agent, "get_new_point_name", return_value="b"):
-            request = agent.prepare_request(
-                request_id="d0_proot",
-                state=(object(), " x00 a = free a"),
-                proof=types.SimpleNamespace(defs={}),
+        with patch("newclid.agent.vllm.get_new_point_name", return_value="b"):
+            request = agent.build_request(
+                mode="v2",
                 depth=0,
+                request_id="d0_proot",
+                problem=object(),
+                aux_prefix=" x00 a = free a",
+                proof=types.SimpleNamespace(defs={}),
             )
 
         self.assertEqual(request["query"], "<problem> root </problem>")
@@ -102,34 +157,44 @@ class Qwen3AgentTests(unittest.TestCase):
 
 
 class Qwen3VLAgentTests(unittest.TestCase):
-    def test_prepare_request_embeds_png_as_base64_data_url(self):
+    def test_prepare_request_rebuilds_proof_and_embeds_png_as_data_url(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             render_root = Path(tmpdir)
-            agent = Qwen3VLAgent(
-                model_pool=_DummyPool(),
-                decoding_size=2,
-                beam_size=4,
-                search_depth=1,
-                search_version="v1",
-                render_root=render_root,
-            )
+            with patch("newclid.agent.vllm._load_tokenizer", return_value=_FakeTokenizer()):
+                agent = Qwen3VLAgent(
+                    **_agent_kwargs(),
+                    search_version="v1",
+                    render_root=render_root,
+                )
             agent.problemJGEX = object()
-            agent._active_search_mode = "v1"
-            current_proof = types.SimpleNamespace(defs={}, rng=object())
+            rebuilt_proof = types.SimpleNamespace(defs={}, rng=object())
             problem = object()
             with patch.object(agent, "problem_to_dsl", return_value="<problem> visual </problem>"):
-                with patch.object(agent, "get_new_point_name", return_value="c"):
-                    with patch("newclid.agent.vllm.draw_clause_figure", return_value=object()):
-                        with patch("newclid.agent.vllm.save_figure_as_png") as mock_save:
-                            def _write_png(fig, png_path, img_pixels, direct_png):
-                                Path(png_path).write_bytes(b"\x89PNG\r\n\x1a\nfake")
-                            mock_save.side_effect = _write_png
-                            request = agent.prepare_request(
-                                request_id="d0_proot",
-                                state=(problem, current_proof),
-                                proof=current_proof,
-                                depth=0,
-                            )
+                with patch("newclid.agent.vllm.get_new_point_name", return_value="c"):
+                    with patch(
+                        "newclid.agent.vllm.build_problem_proof",
+                        return_value=rebuilt_proof,
+                    ) as mock_build_proof:
+                        with patch("newclid.agent.vllm.draw_clause_figure", return_value=object()):
+                            with patch("newclid.agent.vllm.save_figure_as_png") as mock_save:
+                                def _write_png(fig, png_path, img_pixels, direct_png):
+                                    del fig, img_pixels, direct_png
+                                    Path(png_path).write_bytes(b"\x89PNG\r\n\x1a\nfake")
 
+                                mock_save.side_effect = _write_png
+                                request = agent.build_request(
+                                    mode="v1",
+                                    depth=0,
+                                    request_id="d0_proot",
+                                    problem=problem,
+                                    aux_prefix="",
+                                    proof=types.SimpleNamespace(defs={}),
+                                )
+
+        mock_build_proof.assert_called_once_with(problem, {})
         self.assertTrue(request["image_data_url"].startswith("data:image/png;base64,"))
         self.assertEqual(request["messages"][1]["content"][0]["type"], "image_url")
+
+
+if __name__ == "__main__":
+    unittest.main()

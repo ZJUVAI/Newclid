@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from newclid.agent.runtime.search_runtime import (
     BeamQueue,
     build_problem_proof,

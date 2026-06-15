@@ -355,7 +355,7 @@ class TraceRun:
             "model_path": model_path,
             "git_commit": get_git_commit(repo_root),
             "argv": sys.argv,
-            "trace_outputs": ["raw_events", "attempts"],
+            "trace_outputs": ["raw_events"],
             **params,
         }
         with open(self.run_dir / "run_meta.json", "w", encoding="utf-8") as fp:
@@ -380,5 +380,5 @@ class TraceRun:
             problem_name=problem_name,
             problem_index=problem_index,
             start_time=start_time,
-            attempts_path=self.attempts_dir / filename,
+            attempts_path=None,
         )

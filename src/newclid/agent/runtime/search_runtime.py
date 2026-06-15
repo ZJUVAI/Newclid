@@ -264,7 +264,7 @@ def extract_goals(proof: ProofState) -> list[tuple[str, list[str]]]:
     return goals
 
 
-def run_ddar_on_proof(
+def run_ddar_c(
     proof: ProofState,
     ddar_config: dict[str, bool] | None = None,
 ) -> bool:
@@ -321,17 +321,6 @@ class BeamQueue:
         ]
 
 
-def run_ddar_c(
-    proof: ProofState,
-    rules: list["Rule"],
-    start_time: float,
-    timeout: int = 3600,
-    ddar_config: dict[str, bool] | None = None,
-) -> bool:
-    del rules, start_time, timeout
-    return run_ddar_on_proof(proof, ddar_config)
-
-
 def build_problem_proof(problem, defs, *, max_attempts: int = 100) -> ProofState:
     return ProofState.build_problemJGEX(
         problemJGEX=problem,
@@ -345,9 +334,7 @@ def build_problem_proof(problem, defs, *, max_attempts: int = 100) -> ProofState
 def run_ddar_task(
     problem,
     defs,
-    rules: list["Rule"],
-    start_time: float,
-    timeout: int = 3600,
+    rules: list["Rule"] | None = None,
     *,
     return_proof: bool = False,
     ddar_config: dict[str, bool] | None = None,
@@ -393,7 +380,6 @@ def run_ddar_task(
 
     try:
         ddar_start = time.time()
-        del rules, start_time, timeout
         config = DEFAULT_DDAR_CONFIG if ddar_config is None else ddar_config
         solved, _ = DDAR.run_ddar("", points, premises, goals, 500, config)
         ddar_engine_finished_at_unix_s = time.time()
@@ -438,73 +424,11 @@ def run_ddar_task(
     return result
 
 
-def run_aux_ddar_task(
-    problem,
-    defs,
-    aux_content: str,
-    *,
-    content_is_construction: bool = False,
-    return_problem: bool = False,
-    ddar_config: dict[str, bool] | None = None,
-):
-    parse_start = time.time()
-    aux_construction = (
-        aux_content if content_is_construction else try_dsl_to_constructions(aux_content)
-    )
-    parse_finished = time.time()
-    if aux_construction is None:
-        return {
-            "status": "invalid",
-            "candidate_valid": False,
-        }
-
-    try:
-        new_problem = problem.with_more_construction(aux_construction)
-    except Exception:
-        return {
-            "status": "invalid",
-            "candidate_valid": False,
-        }
-
-    try:
-        points, premises, goals = build_ddar_input(
-            new_problem,
-            defs,
-            np.random.default_rng(998244353),
-            max_attempts=100,
-            only_useful_points=False,
-        )
-    except Exception:
-        return {
-            "status": "invalid",
-            "candidate_valid": False,
-        }
-
-    try:
-        config = DEFAULT_DDAR_CONFIG if ddar_config is None else ddar_config
-        solved, _ = DDAR.run_ddar("", points, premises, goals, 500, config)
-    except Exception:
-        return {
-            "status": "invalid",
-            "candidate_valid": False,
-        }
-
-    result = {
-        "status": "solved" if solved else "unsolved",
-        "candidate_valid": True,
-    }
-    if return_problem and not solved:
-        result["problem"] = new_problem
-    return result
-
-
 @ray.remote(num_cpus=1)
 def run_ddar_remote(
     problem,
     defs,
-    rules: list["Rule"],
-    start_time: float,
-    timeout: int = 3600,
+    rules: list["Rule"] | None = None,
     *,
     return_proof: bool = False,
     ddar_config: dict[str, bool] | None = None,
@@ -513,28 +437,6 @@ def run_ddar_remote(
         problem,
         defs,
         rules,
-        start_time,
-        timeout,
         return_proof=return_proof,
-        ddar_config=ddar_config,
-    )
-
-
-@ray.remote(num_cpus=1)
-def run_aux_ddar_remote(
-    problem,
-    defs,
-    aux_content: str,
-    *,
-    content_is_construction: bool = False,
-    return_problem: bool = False,
-    ddar_config: dict[str, bool] | None = None,
-):
-    return run_aux_ddar_task(
-        problem,
-        defs,
-        aux_content,
-        content_is_construction=content_is_construction,
-        return_problem=return_problem,
         ddar_config=ddar_config,
     )
