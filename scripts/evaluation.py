@@ -439,7 +439,7 @@ def main() -> None:
     )
     parser.add_argument("--agent", type=str, required=True, choices=["qwen3_text", "qwen3_vl"])
     parser.add_argument("--problems_path", type=str, required=True)
-    parser.add_argument("--vllm_base_url", type=str, required=True)
+    parser.add_argument("--vllm_base_url", type=str, default="http://127.0.0.1:8000")
     parser.add_argument("--decoding_size", type=int, default=8)
     parser.add_argument("--beam_size", type=int, default=64)
     parser.add_argument("--search_depth", type=int, default=4)
