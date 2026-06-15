@@ -118,16 +118,19 @@ class BaseAgent(DeductiveAgent, ABC):
 
         modes = ("v1", "v2") if self.search_version == "hybrid" else (self.search_version,)
         error = "Tried but failed."
-        for mode in modes:
-            self._trace("search_mode", mode=mode)
+        try:
+            for mode in modes:
+                self._trace("search_mode", mode=mode)
+                if time.time() >= deadline:
+                    return self._infos(t0, False, "Timeout")
+                solved, error = self._search(mode, base_proof, deadline)
+                if solved:
+                    return self._infos(t0, True)
             if time.time() >= deadline:
                 return self._infos(t0, False, "Timeout")
-            solved, error = self._search(mode, base_proof, deadline)
-            if solved:
-                return self._infos(t0, True)
-        if time.time() >= deadline:
-            return self._infos(t0, False, "Timeout")
-        return self._infos(t0, False, error)
+            return self._infos(t0, False, error)
+        except Exception as exc:
+            return self._infos(t0, False, f"{type(exc).__name__}: {exc}")
 
     def _search(
         self, mode: str, proof: ProofState, deadline: float
@@ -247,14 +250,25 @@ class BaseAgent(DeductiveAgent, ABC):
         for prev_score, (path_key, problem, aux_prefix) in frontier:
             suffix = "root" if not path_key else "-".join(map(str, path_key))
             request_id = f"d{depth}_p{suffix}"
-            request = self.build_request(
-                mode=mode,
-                depth=depth,
-                request_id=request_id,
-                problem=problem,
-                aux_prefix=aux_prefix,
-                proof=proof,
-            )
+            try:
+                request = self.build_request(
+                    mode=mode,
+                    depth=depth,
+                    request_id=request_id,
+                    problem=problem,
+                    aux_prefix=aux_prefix,
+                    proof=proof,
+                )
+            except Exception as exc:
+                self._trace(
+                    "request_build_error",
+                    mode=mode,
+                    depth=depth,
+                    request_id=request_id,
+                    error_type=type(exc).__name__,
+                    error_message=str(exc),
+                )
+                continue
             requests_list.append(request)
             context[request_id] = {
                 "prev_score": prev_score,

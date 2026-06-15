@@ -137,6 +137,33 @@ class Qwen3AgentTests(unittest.TestCase):
         self.assertEqual(result["llm_calls"], 2)
         self.assertEqual(result["ddar_calls"], 5)
 
+    def test_search_exception_returns_cumulative_counts(self):
+        with patch("newclid.agent.vllm._load_tokenizer", return_value=_FakeTokenizer()):
+            agent = Qwen3Agent(**_agent_kwargs())
+        agent.problemJGEX = object()
+
+        def fake_search(self, mode, proof, deadline):
+            del mode, proof, deadline
+            self._llm_calls += 3
+            self._ddar_calls += 7
+            raise RuntimeError("render failed")
+
+        with patch("newclid.agent.base.run_ddar_c", return_value=False):
+            with patch.object(agent, "prepare_search"):
+                with patch.object(BaseAgent, "_search", new=fake_search):
+                    with patch.object(BaseAgent, "_trace"):
+                        with patch("newclid.agent.base.ray.put", return_value="ref"):
+                            result = agent.run(
+                                proof=types.SimpleNamespace(goals=[], defs={}),
+                                rules=[],
+                                timeout=30,
+                            )
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["llm_calls"], 3)
+        self.assertEqual(result["ddar_calls"], 8)
+        self.assertEqual(result["error"], "RuntimeError: render failed")
+
     def test_prepare_request_v2_reuses_root_problem_with_separator(self):
         with patch("newclid.agent.vllm._load_tokenizer", return_value=_FakeTokenizer()):
             agent = Qwen3Agent(**_agent_kwargs(), search_version="v2")
@@ -157,6 +184,45 @@ class Qwen3AgentTests(unittest.TestCase):
 
 
 class Qwen3VLAgentTests(unittest.TestCase):
+    def test_build_requests_skips_frontier_entries_that_fail_to_render(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch("newclid.agent.vllm._load_tokenizer", return_value=_FakeTokenizer()):
+                agent = Qwen3VLAgent(
+                    **_agent_kwargs(),
+                    search_version="v1",
+                    render_root=Path(tmpdir),
+                )
+            traces = []
+            with patch.object(agent, "_trace", side_effect=lambda event, **kw: traces.append((event, kw))):
+                with patch.object(
+                    agent,
+                    "build_request",
+                    side_effect=[
+                        RuntimeError("bad geometry"),
+                        {
+                            "request_id": "d1_p1",
+                            "response_prefix": "<aux> x00",
+                            "new_point_name": "b",
+                        },
+                    ],
+                ):
+                    requests, context = agent._build_requests(
+                        mode="v1",
+                        depth=1,
+                        frontier=[
+                            (0.0, ((0,), object(), "")),
+                            (1.0, ((1,), object(), " x00 a = free a")),
+                        ],
+                        proof=types.SimpleNamespace(defs={}),
+                    )
+
+        self.assertEqual(len(requests), 1)
+        self.assertEqual(requests[0]["request_id"], "d1_p1")
+        self.assertEqual(list(context), ["d1_p1"])
+        self.assertEqual(traces[0][0], "request_build_error")
+        self.assertEqual(traces[0][1]["error_message"], "bad geometry")
+        self.assertEqual(traces[1][0], "lm_request")
+
     def test_prepare_request_rebuilds_proof_and_embeds_png_as_data_url(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             render_root = Path(tmpdir)
