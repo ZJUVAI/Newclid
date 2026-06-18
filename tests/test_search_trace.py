@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from newclid.search_trace import AttemptAggregator, AttemptWriter
+from newclid.evaluation.search_trace import AttemptAggregator, AttemptWriter
 
 
 def _load_attempts(path):

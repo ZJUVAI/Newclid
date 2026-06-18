@@ -2,70 +2,45 @@ from __future__ import annotations
 
 import argparse
 import csv
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 import logging
 import os
+import re
 import sys
 import time
 import traceback
+from dataclasses import dataclass
 from pathlib import Path
-import re
 
 import ray
-
-try:
-    from rich.live import Live
-    from rich.table import Table
-except ImportError:
-    class Table:  # type: ignore[no-redef]
-        def __init__(self):
-            self.columns: list[tuple[str, str | None, bool]] = []
-            self.rows: list[tuple[str, ...]] = []
-
-        def add_column(self, header: str, justify: str | None = None, no_wrap: bool = False):
-            self.columns.append((header, justify, no_wrap))
-
-        def add_row(self, *values: str):
-            self.rows.append(tuple(values))
-
-    class Live:  # type: ignore[no-redef]
-        def __init__(self, *args, **kwargs):
-            self.renderable = None
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb):
-            return False
-
-        def update(self, renderable):
-            self.renderable = renderable
+from rich.live import Live
+from rich.table import Table
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SRC_ROOT = REPO_ROOT / "src"
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-if str(SRC_ROOT) not in sys.path:
-    sys.path.insert(0, str(SRC_ROOT))
+for path in (str(REPO_ROOT), str(SRC_ROOT)):
+    if path not in sys.path:
+        sys.path.insert(0, path)
 
-from newclid.agent.lm import LMAgent
-from newclid.agent.vlm import VLMAgent
+from newclid.agent.vllm import Qwen3Agent, Qwen3VLAgent, discover_served_model
 from newclid.api import GeometricSolverBuilder
-from newclid.agent.runtime.model_pool import ModelPool, WorkerHandleWrapper
-from newclid.profiling import (
-    PROFILE_ROW_FIELDS,
-    create_profiling_payload,
-    finalize_profiling,
-    write_profiling_csv,
-)
-from newclid.search_trace import TraceRun, timestamp_slug
+from newclid.configs import load_solver_config
+from newclid.evaluation.search_trace import TraceRun, get_git_commit, timestamp_slug
+
 
 LOGLEVEL = os.environ.get("LOGLEVEL", "WARNING").upper()
 
 
-def sanitize_problem_name(problem_name: str) -> str:
-    return re.sub(r"[^A-Za-z0-9._-]+", "_", problem_name).strip("_") or "problem"
+def slugify(value: str, default: str = "item") -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", str(value).strip().rstrip("/"))
+    return cleaned.strip("._") or default
+
+
+def served_model_slugs(served_model_name: str) -> tuple[str, str]:
+    path = Path(served_model_name.rstrip("/"))
+    checkpoint_slug = slugify(path.name or served_model_name)
+    model_part = path.parent.name or path.name or served_model_name
+    return slugify(model_part), checkpoint_slug
 
 
 def build_eval_output_stem(
@@ -73,697 +48,371 @@ def build_eval_output_stem(
     agent_type: str,
     search_version: str,
     problems_path: Path,
-    model_path: str,
+    served_model_name: str,
     decoding_size: int,
     beam_size: int,
     search_depth: int,
-    gpu_batch_size: int,
-    gpu_batch_timeout_ms: int,
-    torch_seed: int = 123,
+    timestamp: str,
+    commit_short: str,
 ) -> str:
-    problems_name = problems_path.stem
-    path_obj = Path(model_path)
-    deepest_folder = path_obj.name
-    parent_folder = path_obj.parent.name
-    model_name = f"{parent_folder}_{deepest_folder}" if parent_folder else deepest_folder
+    search_slug = search_version[1:] if search_version.startswith("v") else search_version
+    model_slug, checkpoint_slug = served_model_slugs(served_model_name)
     return (
-        f"eval_single_problem_multi_gpu_{agent_type}_{problems_name}_{model_name}"
-        f"_sv{search_version[-1]}"
-        f"_d{decoding_size}_b{beam_size}_s{search_depth}"
-        f"_gbs{gpu_batch_size}_gbt{gpu_batch_timeout_ms}_seed{torch_seed}"
+        f"eval_vllm_{agent_type}_{model_slug}_{checkpoint_slug}_{problems_path.stem}"
+        f"_sv{search_slug}_d{decoding_size}_b{beam_size}_s{search_depth}_{timestamp}_{commit_short}"
     )
 
 
-def build_timestamped_output_stem(output_name_stem: str, timestamp: str) -> str:
-    return f"{output_name_stem}_{timestamp}"
+@dataclass(frozen=True)
+class EvalConfig:
+    problems_path: Path
+    vllm_base_url: str
+    agent_type: str
+    served_model_name: str
+    decoding_size: int
+    beam_size: int
+    search_depth: int
+    search_version: str
+    timeout: int
+    render_root: Path
+    ddar_config: dict[str, bool]
 
 
-def configure_logging(*, force: bool = False) -> None:
-    logging.basicConfig(
-        level=getattr(logging, LOGLEVEL, logging.INFO),
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-        force=force,
+
+@dataclass(frozen=True)
+class SolveOutcome:
+    solved: bool
+    elapsed_s: float
+    run_infos: dict[str, object]
+
+
+def create_agent(config: EvalConfig, *, trace_writer=None):
+    common = {
+        "base_url": config.vllm_base_url,
+        "served_model_name": config.served_model_name,
+        "decoding_size": config.decoding_size,
+        "beam_size": config.beam_size,
+        "search_depth": config.search_depth,
+        "search_version": config.search_version,
+        "ddar_config": config.ddar_config,
+        "trace_writer": trace_writer,
+    }
+    if config.agent_type == "qwen3_text":
+        return Qwen3Agent(**common)
+    if config.agent_type == "qwen3_vl":
+        return Qwen3VLAgent(**common, render_root=config.render_root)
+    raise ValueError(f"Unsupported agent type: {config.agent_type}")
+
+
+def solve_one_problem(
+    *, problem_name: str, config: EvalConfig, trace_writer=None
+) -> SolveOutcome:
+    t0 = time.perf_counter()
+    builder = GeometricSolverBuilder().load_problem_from_file(
+        config.problems_path, problem_name, rename=True
+    )
+    agent = create_agent(config, trace_writer=trace_writer)
+    solver = builder.with_deductive_agent(agent).build()
+    solved = solver.run(timeout=config.timeout)
+    return SolveOutcome(
+        solved=solved,
+        elapsed_s=time.perf_counter() - t0,
+        run_infos=solver.run_infos,
     )
 
 
-def render_table(all_tasks_info, start_time, reorder: bool):
-    total_problems = len(all_tasks_info)
-    solved_count = sum(status == "Success" for _, status, _ in all_tasks_info)
-    processed_count = sum(status != "Pending" for _, status, _ in all_tasks_info)
+# (name, status, elapsed, llm_calls, ddar_calls, llm_wall, ddar_wall)
+TaskRow = tuple[str, str, float, int, int, float, float]
 
+
+def render_table(tasks: list[TaskRow], start_time: float) -> Table:
+    solved = sum(status == "Success" for _, status, *_ in tasks)
+    done = sum(status != "Pending" for _, status, *_ in tasks)
     table = Table()
     table.add_column(
-        f"Problem Names ({solved_count} Solved /{processed_count} Processed /{total_problems} Total)",
+        f"Problem Names ({solved} Solved / {done} Processed / {len(tasks)} Total)",
         justify="left",
         no_wrap=True,
     )
     table.add_column("Status", justify="center")
-    table.add_column(f"Time ({time.time()-start_time:.2f}s)", justify="right")
-    if reorder:
-        priority = {"Failed": 0, "Pending": 1, "Success": 2}
-        all_tasks_info = sorted(all_tasks_info, key=lambda x: priority.get(x[1], 99))
-    for problem_name, status, elapsed_time in all_tasks_info:
-        elapsed = "-" if status == "Pending" else f"{elapsed_time:.2f}"
-        table.add_row(problem_name, status, elapsed)
+    table.add_column("Calls (LM/DDAR)", justify="right")
+    table.add_column(f"Time (LM/DDAR) ({time.time() - start_time:.2f}s)", justify="right")
+    priority = {"Failed": 0, "Pending": 1, "Success": 2}
+    for name, status, elapsed, llm_calls, ddar_calls, llm_wall, ddar_wall in sorted(
+        tasks, key=lambda item: priority.get(item[1], 99)
+    ):
+        if status == "Pending":
+            table.add_row(name, status, "-", "-")
+        else:
+            table.add_row(
+                name,
+                status,
+                f"{llm_calls} / {ddar_calls}",
+                f"{elapsed:.2f}s ({llm_wall:.2f}/{ddar_wall:.2f})",
+            )
     return table
 
-def create_workers(
-    *,
-    agent_type: str,
-    model_path: str,
-    num_gpus_for_eval: int,
-    torch_seed: int,
-):
-    if agent_type in {"lm", "qwen35_text"}:
-        from newclid.agent.runtime.text_worker import ModelWorker
 
-        return [
-            WorkerHandleWrapper(
-                ModelWorker.remote(model_path, agent_type, torch_seed, worker_slot),
-                worker_trace_id=f"gpu:{worker_slot}",
-                worker_device=f"cuda:{worker_slot}",
-            )
-            for worker_slot in range(num_gpus_for_eval)
-        ]
-    if agent_type in {"vlm", "qwen35_vl"}:
-        from newclid.agent.runtime.vision_worker import VisionModelWorker
-
-        return [
-            WorkerHandleWrapper(
-                VisionModelWorker.remote(model_path, agent_type, torch_seed, worker_slot),
-                worker_trace_id=f"gpu:{worker_slot}",
-                worker_device=f"cuda:{worker_slot}",
-            )
-            for worker_slot in range(num_gpus_for_eval)
-        ]
-    raise ValueError(f"Unsupported agent type: {agent_type}")
-
-
-def create_agent(
-    *,
-    agent_type: str,
-    search_version: str,
-    visual_render_mode: str,
-    model_pool: ModelPool,
-    decoding_size: int,
-    beam_size: int,
-    search_depth: int,
-    gpu_batch_size: int,
-    gpu_batch_timeout_ms: int,
-    max_pending_ddar: int,
-    prepare_request_workers: int,
-    prepare_prefetch_limit: int,
-    render_root: Path,
-    trace_writer=None,
-):
-    if agent_type in {"lm", "qwen35_text"}:
-        return LMAgent(
-            model_pool=model_pool,
-            decoding_size=decoding_size,
-            beam_size=beam_size,
-            search_depth=search_depth,
-            gpu_batch_size=gpu_batch_size,
-            gpu_batch_timeout_ms=gpu_batch_timeout_ms,
-            agent_type=f"{agent_type}_parallel",
-            max_pending_ddar=max_pending_ddar,
-            prepare_request_workers=prepare_request_workers,
-            prepare_prefetch_limit=prepare_prefetch_limit,
-            search_version=search_version,
-            trace_writer=trace_writer,
-        )
-    if agent_type in {"vlm", "qwen35_vl"}:
-        return VLMAgent(
-            model_pool=model_pool,
-            decoding_size=decoding_size,
-            beam_size=beam_size,
-            search_depth=search_depth,
-            gpu_batch_size=gpu_batch_size,
-            gpu_batch_timeout_ms=gpu_batch_timeout_ms,
-            agent_type=f"{agent_type}_parallel",
-            max_pending_ddar=max_pending_ddar,
-            prepare_request_workers=prepare_request_workers,
-            prepare_prefetch_limit=prepare_prefetch_limit,
-            search_version=search_version,
-            render_root=render_root,
-            visual_render_mode=visual_render_mode,
-            trace_writer=trace_writer,
-        )
-    raise ValueError(f"Unsupported agent type: {agent_type}")
-
-
-def solve_one_problem(
-    *,
-    problem_name: str,
-    problems_path: Path,
-    model_pool: ModelPool,
-    agent_type: str,
-    search_version: str,
-    visual_render_mode: str,
-    decoding_size: int,
-    beam_size: int,
-    search_depth: int,
-    gpu_batch_size: int,
-    gpu_batch_timeout_ms: int,
-    timeout: int,
-    max_pending_ddar: int,
-    prepare_request_workers: int,
-    prepare_prefetch_limit: int,
-    render_root: Path,
-    trace_writer=None,
-):
-    start_perf = time.perf_counter()
-    logging.getLogger(__name__).info(
-        "solve_one_problem start: problem=%s agent=%s problems_path=%s",
+def _outcome_to_row(problem_name: str, outcome: SolveOutcome) -> TaskRow:
+    info = outcome.run_infos
+    return (
         problem_name,
-        agent_type,
-        problems_path,
+        "Success" if outcome.solved else "Failed",
+        outcome.elapsed_s,
+        int(info.get("llm_calls", 0)),
+        int(info.get("ddar_calls", 0)),
+        float(info.get("llm_real_time_s", 0.0)),
+        float(info.get("ddar_real_time_s", 0.0)),
     )
-    build_start = time.perf_counter()
-    builder = GeometricSolverBuilder().load_problem_from_file(problems_path, problem_name, rename=True)
 
-    agent = create_agent(
+
+def solve_problems_vllm(
+    *,
+    filepath: Path,
+    vllm_base_url: str,
+    agent_type: str,
+    decoding_size: int,
+    beam_size: int,
+    search_depth: int,
+    search_version: str,
+    ray_num_cpus: int | None,
+    timeout: int,
+    log_dir: str | None,
+    enable_trace: bool,
+    using_exp: bool = True,
+):
+    main_t0 = time.perf_counter()
+    if not filepath.exists():
+        raise FileNotFoundError(f"Problems file not found: {filepath}")
+
+    problem_names = [
+        line.strip()
+        for line in filepath.read_text(encoding="utf-8").splitlines()[::2]
+        if line.strip()
+    ]
+    served_model_name, server_models = discover_served_model(vllm_base_url)
+    ddar_config = load_solver_config(using_exp=using_exp)
+
+    if not ray.is_initialized():
+        ray.init(num_cpus=ray_num_cpus, include_dashboard=False, ignore_reinit_error=True)
+
+    output_dir = Path(log_dir) if log_dir else Path("results")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    render_root = output_dir / "_rendered"
+    render_root.mkdir(parents=True, exist_ok=True)
+
+    run_timestamp = timestamp_slug()
+    commit_short = get_git_commit(REPO_ROOT)[:7]
+    output_stem = build_eval_output_stem(
         agent_type=agent_type,
         search_version=search_version,
-        visual_render_mode=visual_render_mode,
-        model_pool=model_pool,
+        problems_path=filepath,
+        served_model_name=served_model_name,
         decoding_size=decoding_size,
         beam_size=beam_size,
         search_depth=search_depth,
-        gpu_batch_size=gpu_batch_size,
-        gpu_batch_timeout_ms=gpu_batch_timeout_ms,
-        max_pending_ddar=max_pending_ddar,
-        prepare_request_workers=prepare_request_workers,
-        prepare_prefetch_limit=prepare_prefetch_limit,
+        timestamp=run_timestamp,
+        commit_short=commit_short,
+    )
+    model_slug, checkpoint_slug = served_model_slugs(served_model_name)
+
+    trace_run = None
+    if enable_trace:
+        trace_run = TraceRun(
+            output_dir,
+            route="evaluation_vllm",
+            agent=agent_type,
+            dataset_path=filepath,
+            model_path=served_model_name,
+            run_name=output_stem,
+            run_timestamp=run_timestamp,
+            params={
+                "vllm_base_url": vllm_base_url,
+                "served_model_name": served_model_name,
+                "server_models": server_models,
+                "decoding_size": decoding_size,
+                "beam_size": beam_size,
+                "search_depth": search_depth,
+                "timeout": timeout,
+                "search_version": search_version,
+                "using_exp": using_exp,
+                "ray_num_cpus": ray_num_cpus,
+            },
+            repo_root=REPO_ROOT,
+        )
+
+    config = EvalConfig(
+        problems_path=filepath,
+        vllm_base_url=vllm_base_url,
+        agent_type=agent_type,
+        served_model_name=served_model_name,
+        decoding_size=decoding_size,
+        beam_size=beam_size,
+        search_depth=search_depth,
+        search_version=search_version,
+        timeout=timeout,
         render_root=render_root,
-        trace_writer=trace_writer,
-    )
-    solver = builder.with_deductive_agent(agent).build()
-    entry_setup_wall_time_s = time.perf_counter() - build_start
-    is_solved = solver.run(timeout=timeout)
-    elapsed_time = time.perf_counter() - start_perf
-    profiling = solver.run_infos.get("profiling") or create_profiling_payload()
-    profiling["entry_setup_wall_time_s"] = float(profiling.get("entry_setup_wall_time_s", 0.0)) + entry_setup_wall_time_s
-    profiling = finalize_profiling(profiling, elapsed_time)
-    solver.run_infos["profiling"] = profiling
-    logging.getLogger(__name__).info(
-        "solve_one_problem done: problem=%s solved=%s elapsed=%.2fs",
-        problem_name,
-        is_solved,
-        elapsed_time,
-    )
-    return (
-        problem_name,
-        is_solved,
-        elapsed_time,
-        solver.run_infos,
+        ddar_config=ddar_config,
     )
 
+    print(
+        f"Total problems: {len(problem_names)}\n"
+        f"agent={agent_type}\n"
+        f"served_model_name={served_model_name}\n"
+        f"model_slug={model_slug}\n"
+        f"checkpoint_slug={checkpoint_slug}\n"
+        f"vllm_base_url={vllm_base_url}\n"
+        f"search_version={search_version}\n"
+        f"ray_n_cpus={ray.available_resources().get('CPU')}\n"
+        f"using_exp={using_exp}",
+        flush=True,
+    )
+    if trace_run is not None:
+        print(f"Trace run directory: {trace_run.run_dir}", flush=True)
 
-def solve_problems_single_problem_multi_gpu(
-    *,
-    filepath: Path,
-    model_path: str,
-    num_cpus: int,
-    num_gpus_for_eval: int,
-    decoding_size: int,
-    beam_size: int,
-    search_depth: int,
-    gpu_batch_size: int,
-    gpu_batch_timeout_ms: int,
-    torch_seed: int,
-    timeout: int,
-    agent_type: str,
-    search_version: str,
-    visual_render_mode: str = "new",
-    max_pending_ddar: int | None,
-    prepare_request_workers: int | None,
-    prepare_prefetch_limit: int | None,
-    log_dir: str | None,
-    render_root: str | None = None,
-    ray_address: str = "local",
-    enable_trace: bool = False,
-    enable_profiling: bool = False,
-):
-    if not filepath.exists():
-        raise FileNotFoundError(f"File {filepath} not found.")
-
-    with open(filepath, "r", encoding="utf-8") as file:
-        lines = file.readlines()
-    problem_names = [lines[i].strip() for i in range(0, len(lines), 2)]
+    tasks: list[TaskRow] = [(name, "Pending", 0.0, 0, 0, 0.0, 0.0) for name in problem_names]
+    start_time = time.time()
 
     try:
-        if max_pending_ddar is None:
-            max_pending_ddar = 2 * num_cpus
-        elif max_pending_ddar <= 0:
-            raise ValueError(f"max_pending_ddar must be positive, got {max_pending_ddar}.")
-
-        if not ray.is_initialized():
-            init_kwargs = {
-                "address": ray_address,
-                "dashboard_host": "0.0.0.0",
-                "ignore_reinit_error": True,
-            }
-            if ray_address == "local":
-                init_kwargs["num_cpus"] = num_cpus
-            ray.init(**init_kwargs)
-
-        available_gpus = int(ray.available_resources().get("GPU", 0))
-        if available_gpus <= 0:
-            raise RuntimeError("No GPU resource is visible to Ray.")
-        if num_gpus_for_eval <= 0:
-            num_gpus_for_eval = available_gpus
-        if num_gpus_for_eval > available_gpus:
-            raise ValueError(
-                f"Requested {num_gpus_for_eval} GPUs, but Ray only reports {available_gpus} GPUs."
-            )
-        if prepare_request_workers is None:
-            prepare_request_workers = (
-                max(1, max(2 * num_gpus_for_eval, num_gpus_for_eval * gpu_batch_size))
-                if num_gpus_for_eval > 0
-                else max(2, gpu_batch_size)
-            )
-        if prepare_request_workers <= 0:
-            raise ValueError(
-                f"prepare_request_workers must be positive, got {prepare_request_workers}."
-            )
-        if prepare_prefetch_limit is None:
-            prepare_prefetch_limit = max(
-                prepare_request_workers,
-                2 * num_gpus_for_eval * gpu_batch_size if num_gpus_for_eval > 0 else gpu_batch_size,
-            )
-        if prepare_prefetch_limit <= 0:
-            raise ValueError(
-                f"prepare_prefetch_limit must be positive, got {prepare_prefetch_limit}."
-            )
-        if gpu_batch_size <= 0:
-            raise ValueError(f"gpu_batch_size must be positive, got {gpu_batch_size}.")
-        if gpu_batch_timeout_ms < 0:
-            raise ValueError(f"gpu_batch_timeout_ms must be non-negative, got {gpu_batch_timeout_ms}.")
-
-        workers = create_workers(
-            agent_type=agent_type,
-            model_path=model_path,
-            num_gpus_for_eval=num_gpus_for_eval,
-            torch_seed=torch_seed,
-        )
-        logging.getLogger(__name__).info(
-            "Created workers: agent=%s requested_gpus=%d visible_gpus=%d",
-            agent_type,
-            num_gpus_for_eval,
-            available_gpus,
-        )
-        model_pool = ModelPool(workers)
-        warmup_infos = model_pool.warmup()
-
-        output_dir = Path(log_dir) if log_dir else Path("results")
-        output_dir.mkdir(parents=True, exist_ok=True)
-        visual_render_root = Path(render_root) if render_root else output_dir / "_rendered"
-        visual_render_root.mkdir(parents=True, exist_ok=True)
-        output_name_stem = build_eval_output_stem(
-            agent_type=agent_type,
-            search_version=search_version,
-            problems_path=filepath,
-            model_path=model_path,
-            decoding_size=decoding_size,
-            beam_size=beam_size,
-            search_depth=search_depth,
-            gpu_batch_size=gpu_batch_size,
-            gpu_batch_timeout_ms=gpu_batch_timeout_ms,
-            torch_seed=torch_seed,
-        )
-        run_timestamp = timestamp_slug()
-        timestamped_output_stem = build_timestamped_output_stem(output_name_stem, run_timestamp)
-        trace_run = None
-        if enable_trace:
-            trace_run = TraceRun(
-                output_dir,
-                route="evaluation_single_problem_multi_gpu",
-                agent=agent_type,
-                dataset_path=filepath,
-                model_path=model_path,
-                run_name=output_name_stem,
-                run_timestamp=run_timestamp,
-                params={
-                    "output_name_stem": output_name_stem,
-                    "timestamped_output_name_stem": timestamped_output_stem,
-                    "decoding_size": decoding_size,
-                    "beam_size": beam_size,
-                    "search_depth": search_depth,
-                    "gpu_batch_size": gpu_batch_size,
-                    "gpu_batch_timeout_ms": gpu_batch_timeout_ms,
-                    "torch_seed": torch_seed,
-                    "timeout": timeout,
-                    "search_version": search_version,
-                    "visual_render_mode": visual_render_mode,
-                    "max_pending_ddar": max_pending_ddar,
-                    "num_gpus_for_eval": num_gpus_for_eval,
-                    "prepare_request_workers": prepare_request_workers,
-                    "prepare_prefetch_limit": prepare_prefetch_limit,
-                },
-                repo_root=Path.cwd(),
-            )
-
-        print(f"Total problems to solve: {len(problem_names)}")
-        print(f"Using agent: {agent_type}")
-        print(f"Using search_version={search_version}")
-        print(f"Using visual_render_mode={visual_render_mode}")
-        print(f"Using {num_gpus_for_eval} GPU workers")
-        print(f"Using gpu_batch_size={gpu_batch_size}")
-        print(f"Using gpu_batch_timeout_ms={gpu_batch_timeout_ms}")
-        print(f"Using torch_seed={torch_seed}")
-        print(f"Using max_pending_ddar={max_pending_ddar}")
-        print(f"Using prepare_request_workers={prepare_request_workers}")
-        print(f"Using prepare_prefetch_limit={prepare_prefetch_limit}")
-        print(f"Worker warmup: {warmup_infos}")
-        if trace_run is not None:
-            print(f"Trace run directory: {trace_run.run_dir}")
-
-        all_tasks_info = [(problem_name, "Pending", 0.0) for problem_name in problem_names]
-        profiling_rows: list[dict[str, object]] = []
-        start_time = time.time()
-
         with Live(refresh_per_second=1) as live:
-            with ThreadPoolExecutor(max_workers=1) as executor:
-                for idx, problem_name in enumerate(problem_names):
-                    try:
-                        logging.getLogger(__name__).info(
-                            "Problem loop start: idx=%d/%d problem=%s",
-                            idx + 1,
-                            len(problem_names),
-                            problem_name,
-                        )
-                        problem_start_wall = time.time()
-                        problem_start_perf = time.perf_counter()
-                        problem_render_root = visual_render_root / sanitize_problem_name(problem_name)
-                        problem_render_root.mkdir(parents=True, exist_ok=True)
-                        trace_writer = None
-                        if trace_run is not None:
-                            trace_writer = trace_run.create_problem_writer(
-                                problem_index=idx,
-                                problem_name=problem_name,
-                                route="evaluation_single_problem_multi_gpu",
-                                agent=agent_type,
-                                start_time=problem_start_wall,
-                            )
-                            trace_writer.log(
-                                "problem_start",
-                                dataset_path=str(filepath),
-                                model_path=model_path,
-                            )
+            for idx, problem_name in enumerate(problem_names):
+                print(f"[start] problem={problem_name}", flush=True)
+                problem_t0 = time.time()
 
-                        # Run the actual solve in a background thread so the
-                        # main thread can keep rebuilding the Live table while
-                        # a single problem is being processed.
-                        problem_future = executor.submit(
-                            solve_one_problem,
-                            problem_name=problem_name,
-                            problems_path=filepath,
-                            model_pool=model_pool,
-                            agent_type=agent_type,
-                            search_version=search_version,
-                            visual_render_mode=visual_render_mode,
-                            decoding_size=decoding_size,
-                            beam_size=beam_size,
-                            search_depth=search_depth,
-                            gpu_batch_size=gpu_batch_size,
-                            gpu_batch_timeout_ms=gpu_batch_timeout_ms,
-                            timeout=timeout,
-                            max_pending_ddar=max_pending_ddar,
-                            prepare_request_workers=prepare_request_workers,
-                            prepare_prefetch_limit=prepare_prefetch_limit,
-                            render_root=problem_render_root,
-                            trace_writer=trace_writer,
-                        )
-                        while True:
-                            try:
-                                problem_name, is_solved, elapsed_time, run_infos = problem_future.result(timeout=5.0)
-                                break
-                            except FuturesTimeoutError:
-                                live.update(render_table(all_tasks_info, start_time, True))
+                problem_render_root = render_root / slugify(problem_name, "problem")
+                problem_render_root.mkdir(parents=True, exist_ok=True)
+                problem_config = EvalConfig(**{**config.__dict__, "render_root": problem_render_root})
 
-                        if trace_writer is not None:
-                            trace_writer.log(
-                                "problem_end",
-                                success=is_solved,
-                                runtime=run_infos.get("runtime"),
-                                final_error=run_infos.get("error"),
-                                final_node_id=run_infos.get("final_node_id"),
-                            )
-                            trace_writer.close()
-                    except Exception as exc:
-                        traceback.print_exc()
-                        print(f"Warning: experimental solver crashed on problem '{problem_name}' : ({type(exc)}) {exc}")
-                        elapsed_time = time.perf_counter() - problem_start_perf
-                        is_solved = False
-                        run_infos = {
-                            "profiling": finalize_profiling(
-                                {
-                                    **create_profiling_payload(),
-                                    "entry_setup_wall_time_s": elapsed_time,
-                                },
-                                elapsed_time,
-                            )
-                        }
-                        if trace_writer is not None:
-                            trace_writer.log(
-                                "problem_end",
-                                success=False,
-                                runtime=time.time() - problem_start_wall,
-                                final_error=f"{type(exc).__name__}: {exc}",
-                                final_node_id=None,
-                            )
-                            trace_writer.close()
-
-                    all_tasks_info[idx] = (
-                        problem_name,
-                        "Success" if is_solved else "Failed",
-                        elapsed_time,
+                trace_writer = None
+                if trace_run is not None:
+                    trace_writer = trace_run.create_problem_writer(
+                        problem_index=idx,
+                        problem_name=problem_name,
+                        route="evaluation_vllm",
+                        agent=agent_type,
+                        start_time=problem_t0,
                     )
-                    profiling = run_infos.get("profiling")
-                    if profiling is not None:
-                        row = {
-                            "problem_name": problem_name,
-                            "solved": "√" if is_solved else "x",
-                        }
-                        for field in PROFILE_ROW_FIELDS + ("avg_gpu_batch_size",):
-                            row[field] = profiling.get(field, 0.0)
-                        profiling_rows.append(row)
-                    gpu_worker_stats = run_infos.get("gpu_worker_stats")
-                    if gpu_worker_stats is not None:
-                        print(f"[gpu_worker_stats] problem={problem_name} stats={gpu_worker_stats}")
-                    logging.getLogger(__name__).info(
-                        "Problem loop done: idx=%d/%d problem=%s status=%s elapsed=%.2fs",
-                        idx + 1,
-                        len(problem_names),
-                        problem_name,
-                        "Success" if is_solved else "Failed",
-                        elapsed_time,
+                    trace_writer.log(
+                        "problem_start",
+                        dataset_path=str(filepath),
+                        model_path=served_model_name,
                     )
-                    live.update(render_table(all_tasks_info, start_time, True))
-                live.update(render_table(all_tasks_info, start_time, False))
 
-        csv_filename = f"{timestamped_output_stem}.csv"
+                try:
+                    outcome = solve_one_problem(
+                        problem_name=problem_name,
+                        config=problem_config,
+                        trace_writer=trace_writer,
+                    )
+                except Exception as exc:
+                    traceback.print_exc()
+                    print(
+                        f"Warning: solver crashed on '{problem_name}': {type(exc).__name__}: {exc}",
+                        flush=True,
+                    )
+                    outcome = SolveOutcome(
+                        solved=False,
+                        elapsed_s=time.time() - problem_t0,
+                        run_infos={"error": f"{type(exc).__name__}: {exc}"},
+                    )
 
-        csv_filepath = output_dir / csv_filename
-        total_problems = len(all_tasks_info)
-        solved_count = sum(1 for _, status, _ in all_tasks_info if status == "Success")
-        total_time = sum(elapsed for _, _, elapsed in all_tasks_info)
+                tasks[idx] = _outcome_to_row(problem_name, outcome)
+                _, status, elapsed, llm_calls, ddar_calls, llm_wall, ddar_wall = tasks[idx]
 
-        with open(csv_filepath, "w", newline="", encoding="utf-8") as csvfile:
+                if trace_writer is not None:
+                    trace_writer.log(
+                        "problem_end",
+                        success=outcome.solved,
+                        runtime=outcome.run_infos.get("runtime"),
+                        final_error=outcome.run_infos.get("error"),
+                    )
+                    trace_writer.close()
+
+                print(
+                    f"[stats] problem={problem_name}"
+                    f" solved={outcome.solved}"
+                    f" elapsed={elapsed:.2f}s"
+                    f" llm_calls={llm_calls}"
+                    f" ddar_calls={ddar_calls}"
+                    f" llm_wall={llm_wall:.2f}s"
+                    f" ddar_wall={ddar_wall:.2f}s",
+                    flush=True,
+                )
+                if "error" in outcome.run_infos:
+                    print(
+                        f"[error] problem={problem_name} reason={outcome.run_infos['error']}",
+                        flush=True,
+                    )
+                live.update(render_table(tasks, start_time))
+            live.update(render_table(tasks, start_time))
+
+        csv_path = output_dir / f"{output_stem}.csv"
+        solved_count = sum(1 for _, status, *_ in tasks if status == "Success")
+        total_time = sum(elapsed for _, _, elapsed, *_ in tasks)
+        with csv_path.open("w", newline="", encoding="utf-8") as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow([f"Dataset: {filepath.stem}, Solved: {solved_count}/{total_problems}, Total Time: {total_time:.2f}s"])
-            writer.writerow(["Problem Name", "Solved", "Time (s)"])
-            for problem_name, status, elapsed_time in all_tasks_info:
-                writer.writerow([
-                    problem_name,
-                    "√" if status == "Success" else "x",
-                    f"{elapsed_time:.2f}" if status != "Pending" else "",
-                ])
-
-        print(f"Results saved to {csv_filepath}")
-        if enable_profiling:
-            profiling_csv_filepath = csv_filepath.with_name(f"{timestamped_output_stem}_profiling.csv")
-            write_profiling_csv(
-                profiling_csv_filepath,
-                dataset_name=filepath.stem,
-                solved_count=solved_count,
-                total_problems=total_problems,
-                total_time_s=total_time,
-                rows=profiling_rows,
+            writer.writerow(
+                [f"Dataset: {filepath.stem}, Model: {served_model_name}, Checkpoint: {checkpoint_slug}, "
+                 f"Solved: {solved_count}/{len(tasks)}, Total Time: {total_time:.2f}s"]
             )
-            print(f"Profiling results saved to {profiling_csv_filepath}")
+            writer.writerow(["Problem Name", "Solved", "LM Calls", "DDAR Calls",
+                             "LM Time(s)", "DDAR Time(s)", "Total Time(s)"])
+            for name, status, elapsed, llm_calls, ddar_calls, llm_wall, ddar_wall in tasks:
+                writer.writerow([name, "√" if status == "Success" else "x",
+                                 llm_calls, ddar_calls,
+                                 f"{llm_wall:.2f}", f"{ddar_wall:.2f}", f"{elapsed:.2f}"])
+
+        print(f"Results saved to {csv_path}", flush=True)
+        print(f"[session] total_wall_time_s={time.perf_counter() - main_t0:.2f}", flush=True)
+        return {
+            "csv_path": csv_path,
+            "solved_count": solved_count,
+            "total_problems": len(tasks),
+            "total_time": total_time,
+            "served_model_name": served_model_name,
+            "model_slug": model_slug,
+            "checkpoint_slug": checkpoint_slug,
+            "trace_dir": trace_run.run_dir if trace_run is not None else None,
+        }
     finally:
         if ray.is_initialized():
             ray.shutdown()
 
 
-def main():
-    configure_logging()
-
-    parser = argparse.ArgumentParser(
-        description="Single-problem multi-GPU evaluation.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+def main() -> None:
+    logging.basicConfig(
+        level=getattr(logging, LOGLEVEL, logging.INFO),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        force=True,
     )
-    parser.add_argument(
-        "--problems_path",
-        type=str,
-        required=True,
-        help="Benchmark file to evaluate. The script reads every other line as a problem name.",
-    )
-    parser.add_argument(
-        "--model_path",
-        type=str,
-        required=True,
-        help="Local checkpoint/model directory or remote model id understood by ModelScope.",
-    )
-    parser.add_argument(
-        "--agent",
-        type=str,
-        default="lm",
-        choices=["lm", "vlm", "qwen35_text", "qwen35_vl"],
-        help="Agent backend to use for single-problem multi-GPU evaluation.",
-    )
-    parser.add_argument(
-        "--log_dir",
-        type=str,
-        default=None,
-        help="Directory for the summary CSV. Uses ./results when omitted.",
-    )
-    parser.add_argument(
-        "--render_root",
-        type=str,
-        default=None,
-        help="Optional directory for rendered visual prompts. Uses <log_dir>/_rendered when omitted.",
-    )
-    parser.add_argument(
-        "--enable_trace",
-        action=argparse.BooleanOptionalAction,
-        default=False,
-        help="Write per-problem trace JSONL files under <log_dir>/<run_id>/.",
-    )
-    parser.add_argument(
-        "--ray_address",
-        type=str,
-        default="local",
-        help="Ray address to connect to. Use 'local' to force a fresh local runtime, 'auto' to reuse any detected cluster, or an explicit address such as '127.0.0.1:6379'.",
-    )
-    parser.add_argument(
-        "--max_workers",
-        type=int,
-        default=8,
-        help="Ray CPU capacity, mainly affecting concurrent DDAR validation tasks.",
-    )
-    parser.add_argument(
-        "--decoding_size",
-        type=int,
-        default=8,
-        help="Number of model candidates generated for each beam node at one search depth.",
-    )
-    parser.add_argument(
-        "--beam_size",
-        type=int,
-        default=64,
-        help="Maximum number of candidate problems retained between search depths.",
-    )
-    parser.add_argument(
-        "--search_depth",
-        type=int,
-        default=4,
-        help="Number of iterative auxiliary-construction expansion rounds.",
-    )
-    parser.add_argument(
-        "--search_version",
-        type=str,
-        default="v1",
-        choices=["v1", "v2"],
-        help="Search/prompt variant for auxiliary construction expansion.",
-    )
-    parser.add_argument(
-        "--visual_render_mode",
-        type=str,
-        default="new",
-        choices=["new", "legacy"],
-        help="Visual prompt rendering mode. 'new' matches current data generation; 'legacy' keeps the old svg->png->invert compatibility path.",
-    )
-    parser.add_argument(
-        "--gpu_batch_size",
-        type=int,
-        default=2,
-        help="Maximum number of prepared requests grouped into one GPU generate call.",
-    )
-    parser.add_argument(
-        "--gpu_batch_timeout_ms",
-        type=int,
-        default=100,
-        help="Optional wait budget for filling a GPU batch before dispatching a tail batch.",
-    )
-    parser.add_argument(
-        "--torch_seed",
-        type=int,
-        default=123,
-        help="Torch RNG seed applied once per GPU worker process.",
-    )
-    parser.add_argument(
-        "--timeout",
-        type=int,
-        default=7200,
-        help="Per-problem timeout in seconds.",
-    )
-    parser.add_argument(
-        "--num_gpus_for_eval",
-        type=int,
-        default=0,
-        help="Number of GPU workers to start. 0 means all GPUs visible to Ray.",
-    )
-    parser.add_argument(
-        "--max_pending_ddar",
-        type=int,
-        default=None,
-        help="Upper bound on in-flight DDAR Ray tasks for the current problem. Defaults to 2 * max_workers when omitted.",
-    )
-    parser.add_argument(
-        "--prepare_request_workers",
-        type=int,
-        default=None,
-        help="Local ThreadPoolExecutor worker count for parallel request preparation. Defaults to 2 * num_gpus_for_eval.",
-    )
-    parser.add_argument(
-        "--prepare_prefetch_limit",
-        type=int,
-        default=None,
-        help="Maximum combined count of running prepare tasks and ready prepared requests. Defaults to prepare_request_workers.",
-    )
-    parser.add_argument(
-        "--enable_profiling",
-        action=argparse.BooleanOptionalAction,
-        default=False,
-        help="Write a sidecar profiling CSV with summary build/inference/DDAR timings.",
-    )
+    parser = argparse.ArgumentParser(description="vLLM-only evaluation.")
+    parser.add_argument("--agent", type=str, required=True, choices=["qwen3_text", "qwen3_vl"])
+    parser.add_argument("--problems_path", type=str, required=True)
+    parser.add_argument("--vllm_base_url", type=str, default="http://127.0.0.1:8000")
+    parser.add_argument("--decoding_size", type=int, default=8)
+    parser.add_argument("--beam_size", type=int, default=64)
+    parser.add_argument("--search_depth", type=int, default=4)
+    parser.add_argument("--search_version", type=str, default="hybrid", choices=["v1", "v2", "hybrid"])
+    parser.add_argument("--timeout", type=int, default=7200)
+    parser.add_argument("--log_dir", type=str, default=None)
+    parser.add_argument("--ray_num_cpus", type=int, default=None)
+    parser.add_argument("--using_exp", type=lambda v: v.strip().lower() not in {"false", "0", "no", "n", "off"}, default=True)
+    parser.add_argument("--enable_trace", action=argparse.BooleanOptionalAction, default=False)
     args = parser.parse_args()
 
-    solve_problems_single_problem_multi_gpu(
+    solve_problems_vllm(
         filepath=Path(args.problems_path),
-        model_path=args.model_path,
-        num_cpus=args.max_workers,
-        num_gpus_for_eval=args.num_gpus_for_eval,
+        vllm_base_url=args.vllm_base_url,
+        agent_type=args.agent,
         decoding_size=args.decoding_size,
         beam_size=args.beam_size,
         search_depth=args.search_depth,
-        gpu_batch_size=args.gpu_batch_size,
-        gpu_batch_timeout_ms=args.gpu_batch_timeout_ms,
-        torch_seed=args.torch_seed,
-        timeout=args.timeout,
-        agent_type=args.agent,
         search_version=args.search_version,
-        visual_render_mode=args.visual_render_mode,
-        max_pending_ddar=args.max_pending_ddar,
-        prepare_request_workers=args.prepare_request_workers,
-        prepare_prefetch_limit=args.prepare_prefetch_limit,
+        ray_num_cpus=args.ray_num_cpus,
+        timeout=args.timeout,
         log_dir=args.log_dir,
-        render_root=args.render_root,
-        ray_address=args.ray_address,
         enable_trace=args.enable_trace,
-        enable_profiling=args.enable_profiling,
+        using_exp=args.using_exp,
     )
 
 

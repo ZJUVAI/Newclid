@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import string
 from typing import TYPE_CHECKING, NamedTuple
 
 from newclid.formulations.clause import Clause, translate_sentence
@@ -75,12 +76,17 @@ class ProblemJGEX(NamedTuple):
         )
 
     def renamed(self) -> ProblemJGEX:
+        def next_point_name(index: int) -> str:
+            letter_part = string.ascii_lowercase[index % 26]
+            suffix = index // 26
+            return letter_part if suffix == 0 else f"{letter_part}{suffix}"
+
         mp: dict[str, str] = {}
         for construction in self.constructions:
             for point in construction.points:
                 point = point.split("@")[0]
                 if point not in mp:
-                    mp[point] = chr(ord("a") + len(mp))
+                    mp[point] = next_point_name(len(mp))
         return ProblemJGEX(
             self.name,
             tuple(construction.renamed(mp) for construction in self.constructions),
