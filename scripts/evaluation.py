@@ -25,28 +25,15 @@ for path in (str(REPO_ROOT), str(SRC_ROOT)):
 from newclid.agent.vllm import Qwen3Agent, Qwen3VLAgent, discover_served_model
 from newclid.api import GeometricSolverBuilder
 from newclid.configs import load_solver_config
-from newclid.search_trace import TraceRun, get_git_commit, timestamp_slug
+from newclid.evaluation.search_trace import TraceRun, get_git_commit, timestamp_slug
 
 
 LOGLEVEL = os.environ.get("LOGLEVEL", "WARNING").upper()
 
 
-def parse_bool_arg(value: str) -> bool:
-    normalized = value.strip().lower()
-    if normalized in {"true", "1", "yes", "y", "on"}:
-        return True
-    if normalized in {"false", "0", "no", "n", "off"}:
-        return False
-    raise argparse.ArgumentTypeError(f"Invalid boolean value: {value!r}.")
-
-
-def sanitize_problem_name(problem_name: str) -> str:
-    return re.sub(r"[^A-Za-z0-9._-]+", "_", problem_name).strip("_") or "problem"
-
-
-def slugify(value: str) -> str:
-    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", value.strip().rstrip("/"))
-    return cleaned.strip("._") or "item"
+def slugify(value: str, default: str = "item") -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", str(value).strip().rstrip("/"))
+    return cleaned.strip("._") or default
 
 
 def served_model_slugs(served_model_name: str) -> tuple[str, str]:
@@ -76,14 +63,6 @@ def build_eval_output_stem(
     )
 
 
-def configure_logging(*, force: bool = False) -> None:
-    logging.basicConfig(
-        level=getattr(logging, LOGLEVEL, logging.INFO),
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-        force=force,
-    )
-
-
 @dataclass(frozen=True)
 class EvalConfig:
     problems_path: Path
@@ -97,7 +76,7 @@ class EvalConfig:
     timeout: int
     render_root: Path
     ddar_config: dict[str, bool]
-    max_pending_ddar: int
+
 
 
 @dataclass(frozen=True)
@@ -115,7 +94,6 @@ def create_agent(config: EvalConfig, *, trace_writer=None):
         "beam_size": config.beam_size,
         "search_depth": config.search_depth,
         "search_version": config.search_version,
-        "max_pending_ddar": config.max_pending_ddar,
         "ddar_config": config.ddar_config,
         "trace_writer": trace_writer,
     }
@@ -143,10 +121,11 @@ def solve_one_problem(
     )
 
 
-def render_table(
-    tasks: list[tuple[str, str, float, int, int, float, float]],
-    start_time: float,
-) -> Table:
+# (name, status, elapsed, llm_calls, ddar_calls, llm_wall, ddar_wall)
+TaskRow = tuple[str, str, float, int, int, float, float]
+
+
+def render_table(tasks: list[TaskRow], start_time: float) -> Table:
     solved = sum(status == "Success" for _, status, *_ in tasks)
     done = sum(status != "Pending" for _, status, *_ in tasks)
     table = Table()
@@ -157,23 +136,34 @@ def render_table(
     )
     table.add_column("Status", justify="center")
     table.add_column("Calls (LM/DDAR)", justify="right")
-    table.add_column(
-        f"Time (LM/DDAR) ({time.time() - start_time:.2f}s)", justify="right"
-    )
+    table.add_column(f"Time (LM/DDAR) ({time.time() - start_time:.2f}s)", justify="right")
     priority = {"Failed": 0, "Pending": 1, "Success": 2}
     for name, status, elapsed, llm_calls, ddar_calls, llm_wall, ddar_wall in sorted(
         tasks, key=lambda item: priority.get(item[1], 99)
     ):
         if status == "Pending":
             table.add_row(name, status, "-", "-")
-            continue
-        table.add_row(
-            name,
-            status,
-            f"{llm_calls} / {ddar_calls}",
-            f"{elapsed:.2f}s ({llm_wall:.2f}/{ddar_wall:.2f})",
-        )
+        else:
+            table.add_row(
+                name,
+                status,
+                f"{llm_calls} / {ddar_calls}",
+                f"{elapsed:.2f}s ({llm_wall:.2f}/{ddar_wall:.2f})",
+            )
     return table
+
+
+def _outcome_to_row(problem_name: str, outcome: SolveOutcome) -> TaskRow:
+    info = outcome.run_infos
+    return (
+        problem_name,
+        "Success" if outcome.solved else "Failed",
+        outcome.elapsed_s,
+        int(info.get("llm_calls", 0)),
+        int(info.get("ddar_calls", 0)),
+        float(info.get("llm_real_time_s", 0.0)),
+        float(info.get("ddar_real_time_s", 0.0)),
+    )
 
 
 def solve_problems_vllm(
@@ -204,18 +194,13 @@ def solve_problems_vllm(
     ddar_config = load_solver_config(using_exp=using_exp)
 
     if not ray.is_initialized():
-        ray.init(
-            num_cpus=ray_num_cpus,
-            include_dashboard=False,
-            ignore_reinit_error=True,
-        )
-    cluster_cpus = int(ray.cluster_resources().get("CPU", 1))
-    max_pending_ddar = max(1, 2 * cluster_cpus)
+        ray.init(num_cpus=ray_num_cpus, include_dashboard=False, ignore_reinit_error=True)
 
     output_dir = Path(log_dir) if log_dir else Path("results")
     output_dir.mkdir(parents=True, exist_ok=True)
     render_root = output_dir / "_rendered"
     render_root.mkdir(parents=True, exist_ok=True)
+
     run_timestamp = timestamp_slug()
     commit_short = get_git_commit(REPO_ROOT)[:7]
     output_stem = build_eval_output_stem(
@@ -252,7 +237,6 @@ def solve_problems_vllm(
                 "search_version": search_version,
                 "using_exp": using_exp,
                 "ray_num_cpus": ray_num_cpus,
-                "max_pending_ddar": max_pending_ddar,
             },
             repo_root=REPO_ROOT,
         )
@@ -269,7 +253,6 @@ def solve_problems_vllm(
         timeout=timeout,
         render_root=render_root,
         ddar_config=ddar_config,
-        max_pending_ddar=max_pending_ddar,
     )
 
     print(
@@ -287,9 +270,7 @@ def solve_problems_vllm(
     if trace_run is not None:
         print(f"Trace run directory: {trace_run.run_dir}", flush=True)
 
-    tasks: list[tuple[str, str, float, int, int, float, float]] = [
-        (name, "Pending", 0.0, 0, 0, 0.0, 0.0) for name in problem_names
-    ]
+    tasks: list[TaskRow] = [(name, "Pending", 0.0, 0, 0, 0.0, 0.0) for name in problem_names]
     start_time = time.time()
 
     try:
@@ -297,11 +278,11 @@ def solve_problems_vllm(
             for idx, problem_name in enumerate(problem_names):
                 print(f"[start] problem={problem_name}", flush=True)
                 problem_t0 = time.time()
-                problem_render_root = render_root / sanitize_problem_name(problem_name)
+
+                problem_render_root = render_root / slugify(problem_name, "problem")
                 problem_render_root.mkdir(parents=True, exist_ok=True)
-                problem_config = EvalConfig(
-                    **{**config.__dict__, "render_root": problem_render_root}
-                )
+                problem_config = EvalConfig(**{**config.__dict__, "render_root": problem_render_root})
+
                 trace_writer = None
                 if trace_run is not None:
                     trace_writer = trace_run.create_problem_writer(
@@ -335,42 +316,31 @@ def solve_problems_vllm(
                         run_infos={"error": f"{type(exc).__name__}: {exc}"},
                     )
 
-                run_infos = outcome.run_infos
-                ddar_calls = int(run_infos.get("ddar_calls", 0))
-                ddar_wall = float(run_infos.get("ddar_real_time_s", 0.0))
-                llm_calls = int(run_infos.get("llm_calls", 0))
-                llm_wall = float(run_infos.get("llm_real_time_s", 0.0))
-                tasks[idx] = (
-                    problem_name,
-                    "Success" if outcome.solved else "Failed",
-                    outcome.elapsed_s,
-                    llm_calls,
-                    ddar_calls,
-                    llm_wall,
-                    ddar_wall,
-                )
+                tasks[idx] = _outcome_to_row(problem_name, outcome)
+                _, status, elapsed, llm_calls, ddar_calls, llm_wall, ddar_wall = tasks[idx]
+
                 if trace_writer is not None:
                     trace_writer.log(
                         "problem_end",
                         success=outcome.solved,
-                        runtime=run_infos.get("runtime"),
-                        final_error=run_infos.get("error"),
+                        runtime=outcome.run_infos.get("runtime"),
+                        final_error=outcome.run_infos.get("error"),
                     )
                     trace_writer.close()
 
                 print(
                     f"[stats] problem={problem_name}"
                     f" solved={outcome.solved}"
-                    f" elapsed={outcome.elapsed_s:.2f}s"
+                    f" elapsed={elapsed:.2f}s"
                     f" llm_calls={llm_calls}"
                     f" ddar_calls={ddar_calls}"
                     f" llm_wall={llm_wall:.2f}s"
                     f" ddar_wall={ddar_wall:.2f}s",
                     flush=True,
                 )
-                if "error" in run_infos:
+                if "error" in outcome.run_infos:
                     print(
-                        f"[error] problem={problem_name} reason={run_infos['error']}",
+                        f"[error] problem={problem_name} reason={outcome.run_infos['error']}",
                         flush=True,
                     )
                 live.update(render_table(tasks, start_time))
@@ -382,40 +352,18 @@ def solve_problems_vllm(
         with csv_path.open("w", newline="", encoding="utf-8") as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow(
-                [
-                    f"Dataset: {filepath.stem}, Model: {served_model_name}, Checkpoint: {checkpoint_slug}, "
-                    f"Solved: {solved_count}/{len(tasks)}, Total Time: {total_time:.2f}s"
-                ]
+                [f"Dataset: {filepath.stem}, Model: {served_model_name}, Checkpoint: {checkpoint_slug}, "
+                 f"Solved: {solved_count}/{len(tasks)}, Total Time: {total_time:.2f}s"]
             )
-            writer.writerow(
-                [
-                    "Problem Name",
-                    "Solved",
-                    "LM Calls",
-                    "DDAR Calls",
-                    "LM Time(s)",
-                    "DDAR Time(s)",
-                    "Total Time(s)",
-                ]
-            )
+            writer.writerow(["Problem Name", "Solved", "LM Calls", "DDAR Calls",
+                             "LM Time(s)", "DDAR Time(s)", "Total Time(s)"])
             for name, status, elapsed, llm_calls, ddar_calls, llm_wall, ddar_wall in tasks:
-                writer.writerow(
-                    [
-                        name,
-                        "√" if status == "Success" else "x",
-                        llm_calls,
-                        ddar_calls,
-                        f"{llm_wall:.2f}",
-                        f"{ddar_wall:.2f}",
-                        f"{elapsed:.2f}",
-                    ]
-                )
+                writer.writerow([name, "√" if status == "Success" else "x",
+                                 llm_calls, ddar_calls,
+                                 f"{llm_wall:.2f}", f"{ddar_wall:.2f}", f"{elapsed:.2f}"])
 
         print(f"Results saved to {csv_path}", flush=True)
-        print(
-            f"[session] total_wall_time_s={time.perf_counter() - main_t0:.2f}",
-            flush=True,
-        )
+        print(f"[session] total_wall_time_s={time.perf_counter() - main_t0:.2f}", flush=True)
         return {
             "csv_path": csv_path,
             "solved_count": solved_count,
@@ -432,29 +380,24 @@ def solve_problems_vllm(
 
 
 def main() -> None:
-    configure_logging(force=True)
-    parser = argparse.ArgumentParser(
-        description="vLLM-only evaluation.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    logging.basicConfig(
+        level=getattr(logging, LOGLEVEL, logging.INFO),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        force=True,
     )
+    parser = argparse.ArgumentParser(description="vLLM-only evaluation.")
     parser.add_argument("--agent", type=str, required=True, choices=["qwen3_text", "qwen3_vl"])
     parser.add_argument("--problems_path", type=str, required=True)
     parser.add_argument("--vllm_base_url", type=str, default="http://127.0.0.1:8000")
     parser.add_argument("--decoding_size", type=int, default=8)
     parser.add_argument("--beam_size", type=int, default=64)
     parser.add_argument("--search_depth", type=int, default=4)
-    parser.add_argument(
-        "--search_version", type=str, default="hybrid", choices=["v1", "v2", "hybrid"]
-    )
+    parser.add_argument("--search_version", type=str, default="hybrid", choices=["v1", "v2", "hybrid"])
     parser.add_argument("--timeout", type=int, default=7200)
     parser.add_argument("--log_dir", type=str, default=None)
     parser.add_argument("--ray_num_cpus", type=int, default=None)
-    parser.add_argument("--using_exp", type=parse_bool_arg, default=True)
-    parser.add_argument(
-        "--enable_trace",
-        action=argparse.BooleanOptionalAction,
-        default=False,
-    )
+    parser.add_argument("--using_exp", type=lambda v: v.strip().lower() not in {"false", "0", "no", "n", "off"}, default=True)
+    parser.add_argument("--enable_trace", action=argparse.BooleanOptionalAction, default=False)
     args = parser.parse_args()
 
     solve_problems_vllm(

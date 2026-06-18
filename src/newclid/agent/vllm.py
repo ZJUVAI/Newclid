@@ -10,11 +10,10 @@ import requests
 from transformers import AutoTokenizer
 
 from newclid.agent.base import BaseAgent, RESPONSE_PREFIX
-from newclid.agent.runtime.search_runtime import (
+from newclid.evaluation.search_runtime import (
     build_problem_proof,
     get_new_point_name,
-    problem_to_text_dsl,
-    problem_to_visual_dsl,
+    problem_to_dsl,
 )
 from newclid.formulations.problem import ProblemJGEX
 from newclid.generation.writer import save_figure_as_png
@@ -23,7 +22,6 @@ from newclid.proof import ProofState
 
 SYSTEM_PROMPT = "You are a helpful assistant."
 MAX_NEW_TOKENS = 100
-LENGTH_PENALTY = 1.0
 AUX_STOP = "</aux>"
 AUX_CANDIDATE_STOP = " ;"
 HTTP_WORKERS = 16
@@ -43,81 +41,46 @@ def discover_served_model(base_url: str) -> tuple[str, list[str | None]]:
     return str(server_models[0]), server_models
 
 
-def build_chat_messages(
-    *, query: str, response_prefix: str, new_point_name: str
-) -> list[dict[str, str]]:
-    return [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": query},
-        {
-            "role": "assistant",
-            "content": f"<think>\n\n</think>\n\n{response_prefix} {new_point_name}",
-        },
-    ]
-
-
-def build_visual_messages(
-    *,
-    image_data_url: str,
-    query: str,
-    response_prefix: str,
-    new_point_name: str,
+def _build_messages(
+    *, query: str, response_prefix: str, new_point_name: str, image_url: str | None = None
 ) -> list[dict[str, Any]]:
+    user_content: Any = query if image_url is None else [
+        {"type": "image_url", "image_url": {"url": image_url}},
+        {"type": "text", "text": query},
+    ]
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {
-            "role": "user",
-            "content": [
-                {"type": "image_url", "image_url": {"url": image_data_url}},
-                {"type": "text", "text": query},
-            ],
-        },
-        {
-            "role": "assistant",
-            "content": f"<think>\n\n</think>\n\n{response_prefix} {new_point_name}",
-        },
+        {"role": "user", "content": user_content},
+        {"role": "assistant", "content": f"<think>\n\n</think>\n\n{response_prefix} {new_point_name}"},
     ]
-
-
-def _sequence_score(token_logprobs: list[float | None]) -> float:
-    total = sum(float(lp) for lp in token_logprobs if lp is not None)
-    length = max(sum(lp is not None for lp in token_logprobs), 1)
-    return total / (length**LENGTH_PENALTY)
 
 
 def _score_chat_choices(
     *,
     choices: list[dict[str, Any]],
     request: dict[str, Any],
-    stop_token_ids: list[int],
-) -> tuple[dict[str, float], list[int]]:
+    stop_token_id: int,
+) -> dict[str, float]:
     response_prefix = str(request.get("response_prefix", RESPONSE_PREFIX))
     new_point_name = str(request["new_point_name"])
-    stop_set = {int(token_id) for token_id in stop_token_ids}
     aux_dsl_dict: dict[str, float] = {}
-    generated_token_counts: list[int] = []
     for choice in choices:
-        message = choice.get("message") or {}
-        text = str(message.get("content", "")) if isinstance(message, dict) else ""
-        idx_stop = text.find(AUX_STOP)
-        continuation = (text[:idx_stop] if idx_stop >= 0 else text).rstrip()
-        token_ids = [int(token_id) for token_id in choice.get("token_ids", [])]
-        raw_content_logprobs = (choice.get("logprobs") or {}).get("content", [])
+        text = str(choice.get("message", {}).get("content", ""))
+        continuation = text.partition(AUX_STOP)[0].rstrip()
+        token_ids = choice.get("token_ids", [])
         token_logprobs = [
-            item.get("logprob") if isinstance(item, dict) else item
-            for item in raw_content_logprobs
+            item.get("logprob") for item in choice.get("logprobs", {}).get("content", [])
         ]
-        limit = next(
-            (index for index, token_id in enumerate(token_ids) if token_id in stop_set),
+        stop_idx = next(
+            (i for i, tid in enumerate(token_ids) if tid == stop_token_id),
             min(len(token_ids), len(token_logprobs)),
         )
-        trimmed_logprobs = token_logprobs[:limit]
-        generated_token_counts.append(limit)
+        valid = [lp for lp in token_logprobs[:stop_idx] if lp is not None]
+        score = sum(valid) / max(len(valid), 1)
         aux_dsl = f"{response_prefix} {new_point_name}{continuation}"
-        score = _sequence_score(trimmed_logprobs)
         if aux_dsl not in aux_dsl_dict or score > aux_dsl_dict[aux_dsl]:
             aux_dsl_dict[aux_dsl] = score
-    return aux_dsl_dict, generated_token_counts
+    return aux_dsl_dict
 
 
 class _BaseQwen3Agent(BaseAgent):
@@ -127,24 +90,10 @@ class _BaseQwen3Agent(BaseAgent):
         self,
         *,
         base_url: str,
-        decoding_size: int,
-        beam_size: int,
-        search_depth: int,
         served_model_name: str | None = None,
-        search_version: str = "v1",
-        max_pending_ddar: int | None = None,
-        ddar_config: dict[str, bool] | None = None,
-        trace_writer=None,
+        **kwargs,
     ) -> None:
-        super().__init__(
-            decoding_size=decoding_size,
-            beam_size=beam_size,
-            search_depth=search_depth,
-            search_version=search_version,
-            max_pending_ddar=max_pending_ddar,
-            ddar_config=ddar_config,
-            trace_writer=trace_writer,
-        )
+        super().__init__(**kwargs)
         self.base_url = base_url.rstrip("/")
         self.session = requests.Session()
         adapter = requests.adapters.HTTPAdapter(
@@ -152,20 +101,18 @@ class _BaseQwen3Agent(BaseAgent):
         )
         self.session.mount("http://", adapter)
         self.session.mount("https://", adapter)
-        self.server_models: list[str | None] = []
         if served_model_name is None:
             self.served_model_name, self.server_models = discover_served_model(self.base_url)
         else:
             self.served_model_name = served_model_name
-            self.server_models = [served_model_name]
-        self.tokenizer = _load_tokenizer(self.served_model_name)
-        self.stop_token_ids = self.tokenizer.encode(
-            AUX_CANDIDATE_STOP, add_special_tokens=False
-        )
-        if len(self.stop_token_ids) != 1:
+            self.server_models: list[str | None] = [served_model_name]
+        tokenizer = _load_tokenizer(self.served_model_name)
+        stop_token_ids = tokenizer.encode(AUX_CANDIDATE_STOP, add_special_tokens=False)
+        if len(stop_token_ids) != 1:
             raise ValueError(
-                f"Expected {AUX_CANDIDATE_STOP!r} to map to one token, got {self.stop_token_ids}."
+                f"Expected {AUX_CANDIDATE_STOP!r} to map to one token, got {stop_token_ids}."
             )
+        self.stop_token_id = stop_token_ids[0]
         self._root_problem_dsl: str | None = None
 
     def server_info(self) -> dict[str, Any]:
@@ -178,7 +125,7 @@ class _BaseQwen3Agent(BaseAgent):
     def prepare_search(self, proof: ProofState) -> None:
         if self.problemJGEX is None:
             raise ValueError("Missing problemJGEX.")
-        self._root_problem_dsl = self.problem_to_dsl(self.problemJGEX, proof.defs)
+        self._root_problem_dsl = problem_to_dsl(self.problemJGEX, proof.defs)
 
     def response_prefix(self, *, mode: str, aux_prefix: str) -> str:
         if mode != "v2":
@@ -205,30 +152,56 @@ class _BaseQwen3Agent(BaseAgent):
             "stream": False,
             "include_stop_str_in_output": False,
             "stop": [AUX_CANDIDATE_STOP],
-            "stop_token_ids": self.stop_token_ids,
+            "stop_token_ids": [self.stop_token_id],
         }
         response = self.session.post(
-            f"{self.base_url}/v1/chat/completions",
-            json=payload,
-            timeout=120.0,
+            f"{self.base_url}/v1/chat/completions", json=payload, timeout=120.0
         )
         response.raise_for_status()
         choices = list(response.json().get("choices", []))
         if len(choices) != self.decoding_size:
             raise ValueError(f"Expected {self.decoding_size} choices, got {len(choices)}.")
-        aux_dsl_scores, _ = _score_chat_choices(
-            choices=choices,
-            request=request,
-            stop_token_ids=self.stop_token_ids,
-        )
         return {
             "request_id": request["request_id"],
-            "aux_dsl_scores": aux_dsl_scores,
+            "aux_dsl_scores": _score_chat_choices(
+                choices=choices, request=request, stop_token_id=self.stop_token_id
+            ),
             "completed_at_unix_s": time.time(),
         }
 
-    def problem_to_dsl(self, problem: ProblemJGEX, defs) -> str:
-        raise NotImplementedError
+    def _get_query(self, mode: str, problem: ProblemJGEX, proof: ProofState) -> str:
+        if mode == "v2":
+            if self._root_problem_dsl is None:
+                raise ValueError("Root DSL is unavailable.")
+            return self._root_problem_dsl
+        return problem_to_dsl(problem, proof.defs)
+
+    def _build_request_dict(
+        self,
+        *,
+        request_id: str,
+        query: str,
+        response_prefix: str,
+        new_point_name: str,
+        image_url: str | None = None,
+        extra: dict | None = None,
+    ) -> dict[str, Any]:
+        result = {
+            "request_id": request_id,
+            "messages": _build_messages(
+                query=query,
+                response_prefix=response_prefix,
+                new_point_name=new_point_name,
+                image_url=image_url,
+            ),
+            "query": query,
+            "new_point_name": new_point_name,
+            "response_prefix": response_prefix,
+            "decoding_size": self.decoding_size,
+        }
+        if extra:
+            result.update(extra)
+        return result
 
 
 class Qwen3Agent(_BaseQwen3Agent):
@@ -245,30 +218,13 @@ class Qwen3Agent(_BaseQwen3Agent):
         proof: ProofState,
     ) -> dict[str, Any]:
         del depth
-        if mode == "v2":
-            if self._root_problem_dsl is None:
-                raise ValueError("Root text DSL is unavailable.")
-            query = self._root_problem_dsl
-        else:
-            query = self.problem_to_dsl(problem, proof.defs)
-        new_point_name = get_new_point_name(problem)
-        response_prefix = self.response_prefix(mode=mode, aux_prefix=aux_prefix)
-        return {
-            "request_id": request_id,
-            "messages": build_chat_messages(
-                query=query,
-                response_prefix=response_prefix,
-                new_point_name=new_point_name,
-            ),
-            "query": query,
-            "new_point_name": new_point_name,
-            "response_prefix": response_prefix,
-            "decoding_size": self.decoding_size,
-        }
-
-    def problem_to_dsl(self, problem: ProblemJGEX, defs) -> str:
-        return problem_to_text_dsl(problem, defs)
-
+        query = self._get_query(mode, problem, proof)
+        return self._build_request_dict(
+            request_id=request_id,
+            query=query,
+            response_prefix=self.response_prefix(mode=mode, aux_prefix=aux_prefix),
+            new_point_name=get_new_point_name(problem),
+        )
 
 class Qwen3VLAgent(_BaseQwen3Agent):
     agent_name = "qwen3_vl"
@@ -276,28 +232,10 @@ class Qwen3VLAgent(_BaseQwen3Agent):
     def __init__(
         self,
         *,
-        base_url: str,
-        decoding_size: int,
-        beam_size: int,
-        search_depth: int,
-        served_model_name: str | None = None,
-        search_version: str = "v1",
         render_root: str | Path = "temp/eval_rendered_images",
-        max_pending_ddar: int | None = None,
-        ddar_config: dict[str, bool] | None = None,
-        trace_writer=None,
+        **kwargs,
     ) -> None:
-        super().__init__(
-            base_url=base_url,
-            decoding_size=decoding_size,
-            beam_size=beam_size,
-            search_depth=search_depth,
-            served_model_name=served_model_name,
-            search_version=search_version,
-            max_pending_ddar=max_pending_ddar,
-            ddar_config=ddar_config,
-            trace_writer=trace_writer,
-        )
+        super().__init__(**kwargs)
         self.render_root = Path(render_root)
         self.render_root.mkdir(parents=True, exist_ok=True)
 
@@ -311,48 +249,26 @@ class Qwen3VLAgent(_BaseQwen3Agent):
         aux_prefix: str,
         proof: ProofState,
     ) -> dict[str, Any]:
-        if mode == "v2":
-            if self._root_problem_dsl is None:
-                raise ValueError("Root visual DSL is unavailable.")
-            query = self._root_problem_dsl
-        else:
-            query = self.problem_to_dsl(problem, proof.defs)
-
+        query = self._get_query(mode, problem, proof)
         current_proof = build_problem_proof(problem, proof.defs)
         png_path = self.render_root / f"d{depth}_{request_id}.png"
-        fig = draw_clause_figure(
-            current_proof,
-            problem,
-            None,
-            current_proof.rng,
-            draw_annotations=True,
-            theme=None,
-        )
         save_figure_as_png(
-            fig,
+            draw_clause_figure(
+                current_proof, problem, None, current_proof.rng,
+                draw_annotations=True, theme=None,
+            ),
             png_path=str(png_path),
             img_pixels=512,
             direct_png=True,
         )
-        image_data_url = "data:image/png;base64," + base64.b64encode(
+        image_url = "data:image/png;base64," + base64.b64encode(
             png_path.read_bytes()
         ).decode("ascii")
-        new_point_name = get_new_point_name(problem)
-        response_prefix = self.response_prefix(mode=mode, aux_prefix=aux_prefix)
-        return {
-            "request_id": request_id,
-            "messages": build_visual_messages(
-                image_data_url=image_data_url,
-                query=query,
-                response_prefix=response_prefix,
-                new_point_name=new_point_name,
-            ),
-            "query": query,
-            "image_data_url": image_data_url,
-            "new_point_name": new_point_name,
-            "response_prefix": response_prefix,
-            "decoding_size": self.decoding_size,
-        }
-
-    def problem_to_dsl(self, problem: ProblemJGEX, defs) -> str:
-        return problem_to_visual_dsl(problem, defs)
+        return self._build_request_dict(
+            request_id=request_id,
+            query=query,
+            response_prefix=self.response_prefix(mode=mode, aux_prefix=aux_prefix),
+            new_point_name=get_new_point_name(problem),
+            image_url=image_url,
+            extra={"image_data_url": image_url},
+        )

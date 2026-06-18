@@ -10,8 +10,8 @@ from newclid.agent.base import BaseAgent
 from newclid.agent.vllm import (
     Qwen3Agent,
     Qwen3VLAgent,
+    _build_messages,
     _score_chat_choices,
-    build_chat_messages,
 )
 
 
@@ -33,7 +33,7 @@ def _agent_kwargs():
 
 class VLLMHelperTests(unittest.TestCase):
     def test_build_chat_messages_uses_assistant_continuation(self):
-        messages = build_chat_messages(
+        messages = _build_messages(
             query="<problem> demo </problem>",
             response_prefix="<aux> x00",
             new_point_name="a",
@@ -46,7 +46,7 @@ class VLLMHelperTests(unittest.TestCase):
         )
 
     def test_score_chat_choices_rebuilds_aux_dsl(self):
-        aux_dsl_dict, generated_token_counts = _score_chat_choices(
+        aux_dsl_dict = _score_chat_choices(
             choices=[
                 {
                     "message": {"content": " = free a</aux>"},
@@ -58,11 +58,10 @@ class VLLMHelperTests(unittest.TestCase):
                 "response_prefix": "<aux> x00",
                 "new_point_name": "a",
             },
-            stop_token_ids=[99],
+            stop_token_id=99,
         )
 
         self.assertEqual(aux_dsl_dict, {"<aux> x00 a = free a": -0.2})
-        self.assertEqual(generated_token_counts, [1])
 
 
 class Qwen3AgentTests(unittest.TestCase):
@@ -235,7 +234,7 @@ class Qwen3VLAgentTests(unittest.TestCase):
             agent.problemJGEX = object()
             rebuilt_proof = types.SimpleNamespace(defs={}, rng=object())
             problem = object()
-            with patch.object(agent, "problem_to_dsl", return_value="<problem> visual </problem>"):
+            with patch("newclid.agent.vllm.problem_to_dsl", return_value="<problem> visual </problem>"):
                 with patch("newclid.agent.vllm.get_new_point_name", return_value="c"):
                     with patch(
                         "newclid.agent.vllm.build_problem_proof",

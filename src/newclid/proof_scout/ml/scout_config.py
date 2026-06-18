@@ -17,7 +17,9 @@ BASELINE_DATA_FILE = os.path.join(SOURCE_DIR, "datasets/proof_scout/configuratio
 BASELINE_SOLVED_IDS = os.path.join(SOURCE_DIR, "datasets/proof_scout/solved_ids.txt")
 
 # ================= 求解器与存储配置 =================
-SOLVER_SCRIPT = os.path.join(SOURCE_DIR, "scripts/train_eval.sh")
+# Legacy bash evaluation entrypoints were removed. Configure this explicitly if
+# proof_scout is wired to a project-specific solver script.
+SOLVER_SCRIPT = ""
 TEMP_INPUT_FILE = os.path.join(SOURCE_DIR, "benchmarks/tmp_problems.txt")
 SOLVER_OUTPUT_JSON = os.path.join(SOURCE_DIR, "datasets/success_proofs/tmp_problems.txt.jsonl")
 
@@ -36,5 +38,4 @@ RETROSPECT_INTERVAL = 5    # 环节5: 每处理 5 个 Batch，回捞一次
 RETROSPECT_THRESHOLD = 0.5 # 环节5: 回捞时使用稍高的阈值（更严谨）
 
 DEVICE = "cuda"            # 或 "cpu"
-
 

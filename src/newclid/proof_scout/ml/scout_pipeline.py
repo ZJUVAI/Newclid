@@ -182,6 +182,11 @@ class PipelineManager:
                 f.write(f"{text}\n")
         
         # --- 步骤 2: 调用 Shell 脚本 ---
+        if not config.SOLVER_SCRIPT:
+            raise RuntimeError(
+                "No proof_scout solver script is configured. "
+                "Legacy bash evaluation scripts were removed."
+            )
         cmd = ["bash", config.SOLVER_SCRIPT]
         print(f"执行脚本: {' '.join(cmd)}")
         try:

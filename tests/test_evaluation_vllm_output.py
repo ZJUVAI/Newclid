@@ -26,7 +26,7 @@ class _FakeLive:
 
 
 class EvaluationOutputTests(unittest.TestCase):
-    def test_output_stem_contains_model_and_checkpoint_slugs(self):
+    def test_output_stem_contains_model_checkpoint_dataset_and_commit_slugs(self):
         stem = evaluation.build_eval_output_stem(
             agent_type="qwen3_text",
             search_version="hybrid",
@@ -36,10 +36,14 @@ class EvaluationOutputTests(unittest.TestCase):
             beam_size=16,
             search_depth=3,
             timestamp="20260615T000000Z",
+            commit_short="abcdef0",
         )
 
-        self.assertIn("Qwen3_checkpoint-42", stem)
-        self.assertTrue(stem.endswith("_svhybrid_d8_b16_s3_20260615T000000Z"))
+        self.assertEqual(
+            stem,
+            "eval_vllm_qwen3_text_Qwen3_checkpoint-42_demo"
+            "_svhybrid_d8_b16_s3_20260615T000000Z_abcdef0",
+        )
 
     def test_eval_csv_uses_legacy_seven_column_rows_with_model_summary(self):
         with tempfile.TemporaryDirectory() as tmpdir:
