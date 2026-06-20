@@ -1,73 +1,24 @@
 #include "ar/reduced_equation.hpp"
-#include "ar/equation.hpp"
 #include "ar/linear_system.hpp"
+#include <set>
 
 using namespace std;
 
-ReducedEquation::ReducedEquation(Equation &equation, LinearSystem *system) : _original_equation(equation),
-                                                                             _system(system),
-                                                                             _remainder(equation)
-{
-    _remainder.reduction();
-}
+class Proof;
 
-void ReducedEquation::set_index(size_t index, const LinearSystem *system)
+ReducedEquation::ReducedEquation(Equation &equation, LinearSystem *system)
+    : _original_equation(equation), _system(system), _remainder(equation)
 {
-    _remainder.set_index(index, const_cast<LinearSystem *>(system));
+    _remainder.make_monic();
 }
 
 void ReducedEquation::reduce()
 {
-    _remainder.normalize();
-    if (_remainder.empty())
+    if (_system == nullptr)
     {
         return;
     }
-
-    while (true)
-    {
-        bool changed = false;
-        for (const auto &term : _remainder.terms())
-        {
-            for (const auto &[var_arg, exp] : term.vars())
-            {
-                Term single_var(var_arg);
-                const Equation *solved_eq = _system->get_solved_variable(single_var);
-                if (solved_eq != nullptr)
-                {
-                    if (substitute_variable(single_var, *solved_eq))
-                    {
-                        changed = true;
-                        break;
-                    }
-                }
-            }
-            if (changed)
-            {
-                break;
-            }
-        }
-        if (!changed)
-        {
-            break;
-        }
-    }
-
-    while (!_remainder.empty())
-    {
-        const Term &head = *_remainder.begin();
-
-        auto it = _system->solved_terms().find(head);
-
-        if (it == _system->solved_terms().end())
-        {
-            break;
-        }
-
-        const Equation &substitute_eq = *it->second;
-        _remainder -= substitute_eq * head.coeff();
-    }
-    _remainder.reduction();
+    _remainder = _system->normal_form(_remainder);
 }
 
 bool ReducedEquation::is_solved() const
@@ -75,43 +26,20 @@ bool ReducedEquation::is_solved() const
     return _remainder.empty();
 }
 
-bool ReducedEquation::substitute_variable(Term var, const Equation &e)
-{
-    bool changed = false;
-    bool flag = true;
-    Equation new_equation = _remainder;
-    while (flag)
-    {
-        flag = false;
-        // cout << "before: " << new_equation << endl;
-        for (const auto &term : new_equation.terms())
-        {
-            if (term.contain(var))
-            {
-                new_equation -= e * (term / var);
-                changed = true;
-                flag = true;
-                break;
-                // cout << "after: " << new_equation << endl;
-            }
-        }
-        new_equation.reduction();
-        // cout << "after reduction: " << new_equation << endl;
-    }
-    _remainder = new_equation;
-    return changed;
-}
-
 vector<Proof *> ReducedEquation::statement_dependencies() const
 {
-    std::set<Proof *> res;
-    for (const auto &[t, index] : _remainder.combination())
+    set<Proof *> uniq;
+    for (size_t idx : _remainder.dependency_indices())
     {
-        if (!index.is_valid())
+        if (idx >= _system->size())
         {
             continue;
         }
-        res.insert(_system->pair_at(index.index()).second);
+        Proof *p = _system->pair_at(idx).second;
+        if (p != nullptr)
+        {
+            uniq.insert(p);
+        }
     }
-    return vector<Proof *>(res.begin(), res.end());
+    return vector<Proof *>(uniq.begin(), uniq.end());
 }

@@ -2,129 +2,44 @@
 #include "type/angle.hpp"
 #include "ar/equation.hpp"
 #include "typedef.hpp"
+#include <algorithm>
 
 using namespace std;
 
-EqAngle::EqAngle(Angle left, Angle right) : _left(left), _right(right)
+// Constructor from 4 slopes directly
+EqAngle::EqAngle(Slope s1, Slope s2, Slope s3, Slope s4)
+    : _s1(s1), _s2(s2), _s3(s3), _s4(s4)
 {
 }
 
-EqAngle::EqAngle(Point p1, Point p2, Point p3, Point p4, Point p5, Point p6, Point p7, Point p8) : _left(p1, p2, p3), _right(p5, p6, p7)
+// Constructor from two angles (for backward compatibility)
+EqAngle::EqAngle(Angle left, Angle right)
+    : _s1(left.left_side()), _s2(left.right_side()),
+      _s3(right.left_side()), _s4(right.right_side())
 {
-    bool l = false;
-    bool r = false;
-    if (p1 == p3)
-    {
-        _left = Angle(p2, p1, p4);
-        l = true;
-    }
-    else if (p1 == p4)
-    {
-        _left = Angle(p2, p1, p3);
-        l = true;
-    }
-    else if (p2 == p3)
-    {
-        _left = Angle(p1, p2, p4);
-        l = true;
-    }
-    else if (p2 == p4)
-    {
-        _left = Angle(p1, p2, p3);
-        l = true;
-    }
+}
 
-    if (p5 == p7)
-    {
-        _right = Angle(p6, p5, p8);
-        r = true;
-    }
-    else if (p5 == p8)
-    {
-        _right = Angle(p6, p5, p7);
-        r = true;
-    }
-    else if (p6 == p7)
-    {
-        _right = Angle(p5, p6, p8);
-        r = true;
-    }
-    else if (p6 == p8)
-    {
-        _right = Angle(p5, p6, p7);
-        r = true;
-    }
-
-    if (!l || !r)
-    {
-        l = r = false;
-        Point p = p3;
-        p3 = p5;
-        p5 = p;
-        p = p4;
-        p4 = p6;
-        p6 = p;
-        if (p1 == p3)
-        {
-            _left = Angle(p2, p1, p4);
-            l = true;
-        }
-        else if (p1 == p4)
-        {
-            _left = Angle(p2, p1, p3);
-            l = true;
-        }
-        else if (p2 == p3)
-        {
-            _left = Angle(p1, p2, p4);
-            l = true;
-        }
-        else if (p2 == p4)
-        {
-            _left = Angle(p1, p2, p3);
-            l = true;
-        }
-
-        if (p5 == p7)
-        {
-            _right = Angle(p6, p5, p8);
-            r = true;
-        }
-        else if (p5 == p8)
-        {
-            _right = Angle(p6, p5, p7);
-            r = true;
-        }
-        else if (p6 == p7)
-        {
-            _right = Angle(p5, p6, p8);
-            r = true;
-        }
-        else if (p6 == p8)
-        {
-            _right = Angle(p5, p6, p7);
-            r = true;
-        }
-    }
+// Constructor from 8 points - directly construct 4 slopes
+EqAngle::EqAngle(Point p1, Point p2, Point p3, Point p4, Point p5, Point p6, Point p7, Point p8)
+    : _s1(p1, p2), _s2(p3, p4), _s3(p5, p6), _s4(p7, p8)
+{
 }
 
 unique_ptr<Statement> EqAngle::replace(Point p, Point q) const
 {
-    auto left_pts = _left.points();
-    Point la = left_pts[0], lb = left_pts[1], lc = left_pts[2];
-    Point new_la = (la == p) ? q : la;
-    Point new_lb = (lb == p) ? q : lb;
-    Point new_lc = (lc == p) ? q : lc;
-    Angle new_left(new_la, new_lb, new_lc);
+    // Replace points in each slope
+    auto replace_in_slope = [p, q](const Slope& s) {
+        Point left = (s.left() == p) ? q : s.left();
+        Point right = (s.right() == p) ? q : s.right();
+        return Slope(left, right);
+    };
 
-    auto right_pts = _right.points();
-    Point ra = right_pts[0], rb = right_pts[1], rc = right_pts[2];
-    Point new_ra = (ra == p) ? q : ra;
-    Point new_rb = (rb == p) ? q : rb;
-    Point new_rc = (rc == p) ? q : rc;
-    Angle new_right(new_ra, new_rb, new_rc);
+    Slope new_s1 = replace_in_slope(_s1);
+    Slope new_s2 = replace_in_slope(_s2);
+    Slope new_s3 = replace_in_slope(_s3);
+    Slope new_s4 = replace_in_slope(_s4);
 
-    return make_unique<EqAngle>(new_left, new_right);
+    return make_unique<EqAngle>(new_s1, new_s2, new_s3, new_s4);
 }
 
 string EqAngle::name() const
@@ -134,61 +49,126 @@ string EqAngle::name() const
 
 vector<Point> EqAngle::points() const
 {
-    return {_left.left(), _left.vertex(), _left.right(), _right.left(), _right.vertex(), _right.right()};
+    return {_s1.left(), _s1.right(), _s2.left(), _s2.right(),
+            _s3.left(), _s3.right(), _s4.left(), _s4.right()};
 }
 
 unique_ptr<Statement> EqAngle::clone() const
 {
-    return make_unique<EqAngle>(*this);
+    return make_unique<EqAngle>(_s1, _s2, _s3, _s4);
 }
 
 bool EqAngle::check_nondegen() const
 {
-    return _left.check_nondegen() && _right.check_nondegen();
+    return _s1.check_nondegen() && _s2.check_nondegen() &&
+           _s3.check_nondegen() && _s4.check_nondegen();
 }
 
 bool EqAngle::check_equations() const
 {
-    return Numerical::close_enough(_left.angle(), _right.angle());
+    // For angle between two slopes, we compute the cross product and dot product
+    // angle(s1, s2) has: cos = dot(s1, s2) / (|s1||s2|), sin = cross(s1, s2) / (|s1||s2|)
+
+    // Left angle: angle between _s1 and _s2
+    double dx1 = _s1.right().x() - _s1.left().x();
+    double dy1 = _s1.right().y() - _s1.left().y();
+    double dx2 = _s2.right().x() - _s2.left().x();
+    double dy2 = _s2.right().y() - _s2.left().y();
+
+    double left_dot = dx1 * dx2 + dy1 * dy2;
+    double left_cross = dx1 * dy2 - dy1 * dx2;
+
+    // Right angle: angle between _s3 and _s4
+    double dx3 = _s3.right().x() - _s3.left().x();
+    double dy3 = _s3.right().y() - _s3.left().y();
+    double dx4 = _s4.right().x() - _s4.left().x();
+    double dy4 = _s4.right().y() - _s4.left().y();
+
+    double right_dot = dx3 * dx4 + dy3 * dy4;
+    double right_cross = dx3 * dy4 - dy3 * dx4;
+
+    // To compare angles precisely without using atan2:
+    // Two angles α and β are equal iff tan(α) = tan(β) (same sign)
+    // tan(α) = sin(α)/cos(α) = cross/dot
+    // So: cross1/dot1 = cross2/dot2  ⟺  cross1 * dot2 = cross2 * dot1
+
+    // Cross-multiply to avoid division (more precise)
+    double lhs = left_cross * right_dot;
+    double rhs = right_cross * left_dot;
+
+    return Numerical::close_enough(lhs, rhs);
 }
 
 vector<statement_arg> EqAngle::args() const
 {
-    return {_left, _right};
+    return {_s1, _s2, _s3, _s4};
 }
 
 unique_ptr<Statement> EqAngle::normalize() const
 {
-    auto all = permutations();
-    return make_unique<EqAngle>(*min_element(all.begin(), all.end()));
+    // The slope equation is s1 + s4 = s2 + s3, which shares the same
+    // symmetry group as eqratio's a*d = b*c with (a,b,c,d) = (s1,s2,s3,s4).
+    Slope a = _s1.normalize();
+    Slope b = _s2.normalize();
+    Slope c = _s3.normalize();
+    Slope d = _s4.normalize();
+
+    if (min(a, b) > min(c, d))
+    {
+        swap(a, c);
+        swap(b, d);
+    }
+
+    if (a > b)
+    {
+        swap(a, b);
+        swap(c, d);
+    }
+
+    if (a == b && c > d)
+    {
+        swap(c, d);
+    }
+
+    if (b > c)
+    {
+        swap(b, c);
+    }
+
+    return make_unique<EqAngle>(a, b, c, d);
 }
 
 ostream &EqAngle::print(ostream &os) const
 {
-    return os << _left << " = " << _right;
+    return os << _s1 << "-" << _s2 << " = " << _s3 << "-" << _s4;
 }
 
 vector<EqAngle> EqAngle::permutations() const
 {
     vector<EqAngle> res;
     res.reserve(4);
-    res.emplace_back(*this);
-    res.emplace_back(_right, _left);
-    res.emplace_back(-_left, -_right);
-    res.emplace_back(-_right, -_left);
+    res.emplace_back(_s1, _s2, _s3, _s4);           // original
+    res.emplace_back(_s3, _s4, _s1, _s2);           // swap left and right
+    res.emplace_back(_s2, _s1, _s4, _s3);           // negate both angles
+    res.emplace_back(_s4, _s3, _s2, _s1);           // swap and negate
     return res;
 }
 
-vector<unique_ptr<Equation>> EqAngle::as_equation_slope(bool exp) const
+vector<unique_ptr<Equation>> EqAngle::as_equation_slope(bool exp, bool using_ar) const
 {
+    if (!using_ar)
+    {
+        return {};
+    }
     vector<unique_ptr<Equation>> result;
-    result.push_back(make_unique<Equation>(Equation({Term(_left.left_side()), -Term(_left.right_side()), -Term(_right.left_side()), Term(_right.right_side())})));
+    result.push_back(make_unique<Equation>(Equation({Term(_s1), -Term(_s2), -Term(_s3), Term(_s4)})));
     return result;
 }
 
 bool EqAngle::operator==(const EqAngle &other) const
 {
-    return _left == other._left && _right == other._right;
+    return _s1 == other._s1 && _s2 == other._s2 &&
+           _s3 == other._s3 && _s4 == other._s4;
 }
 
 bool EqAngle::operator!=(const EqAngle &other) const
@@ -198,9 +178,19 @@ bool EqAngle::operator!=(const EqAngle &other) const
 
 bool EqAngle::operator<(const EqAngle &other) const
 {
-    if (_left == other._left)
-        return _right < other._right;
-    return _left < other._left;
+    if (_s1 == other._s1)
+    {
+        if (_s2 == other._s2)
+        {
+            if (_s3 == other._s3)
+            {
+                return _s4 < other._s4;
+            }
+            return _s3 < other._s3;
+        }
+        return _s2 < other._s2;
+    }
+    return _s1 < other._s1;
 }
 
 bool EqAngle::operator<=(const EqAngle &other) const
@@ -221,27 +211,27 @@ bool EqAngle::operator>=(const EqAngle &other) const
 string EqAngle::to_string() const
 {
     string res = name();
-    res += " " + _left.left().name();
-    res += " " + _left.vertex().name();
-    res += " " + _left.vertex().name();
-    res += " " + _left.right().name();
-    res += " " + _right.left().name();
-    res += " " + _right.vertex().name();
-    res += " " + _right.vertex().name();
-    res += " " + _right.right().name();
+    res += " " + _s1.left().name();
+    res += " " + _s1.right().name();
+    res += " " + _s2.left().name();
+    res += " " + _s2.right().name();
+    res += " " + _s3.left().name();
+    res += " " + _s3.right().name();
+    res += " " + _s4.left().name();
+    res += " " + _s4.right().name();
     return res;
 }
 
 vector<string> EqAngle::to_tokens() const
 {
     vector<string> tokens = {"eqangle"};
-    tokens.push_back(_left.left().name());
-    tokens.push_back(_left.vertex().name());
-    tokens.push_back(_left.vertex().name());
-    tokens.push_back(_left.right().name());
-    tokens.push_back(_right.left().name());
-    tokens.push_back(_right.vertex().name());
-    tokens.push_back(_right.vertex().name());
-    tokens.push_back(_right.right().name());
+    tokens.push_back(_s1.left().name());
+    tokens.push_back(_s1.right().name());
+    tokens.push_back(_s2.left().name());
+    tokens.push_back(_s2.right().name());
+    tokens.push_back(_s3.left().name());
+    tokens.push_back(_s3.right().name());
+    tokens.push_back(_s4.left().name());
+    tokens.push_back(_s4.right().name());
     return tokens;
 }

@@ -139,8 +139,12 @@ bool Coll::operator<(const Coll &other) const
     return _a < other._a;
 }
 
-vector<unique_ptr<Equation>> Coll::as_equation_slope(bool exp) const
+vector<unique_ptr<Equation>> Coll::as_equation_slope(bool exp, bool using_ar) const
 {
+    if (!using_ar)
+    {
+        return {};
+    }
     vector<unique_ptr<Equation>> result;
 
     vector<Slope> candidates = {
@@ -174,8 +178,12 @@ vector<unique_ptr<Equation>> Coll::as_equation_slope(bool exp) const
     return result;
 }
 
-vector<unique_ptr<Equation>> Coll::as_equation_dist(bool exp) const
+vector<unique_ptr<Equation>> Coll::as_equation_dist(bool exp, bool using_ar) const
 {
+    if (!using_ar)
+    {
+        return {};
+    }
     vector<unique_ptr<Equation>> result;
     vector<Term> candidates = {
         Term(Dist(_a, _b)),

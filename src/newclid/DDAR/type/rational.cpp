@@ -54,7 +54,7 @@ void Rational::normalize()
 
     if (abs(_num) == 1 && abs(_den) > 2000)
     {
-        cout << "[Rational::normalize] TRUNCATING " << _num << "/" << _den << " to 0" << endl;
+        throw std::runtime_error("Rational underflow");
         _num = 0;
         _den = 1;
         return;

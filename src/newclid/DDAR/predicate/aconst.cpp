@@ -54,8 +54,12 @@ ostream &AConst::print(std::ostream &out) const
     return out << _angle << " = " << _rhs << "π";
 }
 
-vector<unique_ptr<Equation>> AConst::as_equation_slope(bool exp) const
+vector<unique_ptr<Equation>> AConst::as_equation_slope(bool exp, bool using_ar) const
 {
+    if (!using_ar)
+    {
+        return {};
+    }
     vector<unique_ptr<Equation>> result;
     result.push_back(make_unique<Equation>(Equation({Term(_angle.right_side()), -Term(_angle.left_side())})));
     return result;

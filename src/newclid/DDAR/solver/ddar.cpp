@@ -28,12 +28,9 @@ DDARSolver::DDARSolver(Problem *problem, const std::map<std::string, bool> &conf
     {
         this->insert_statement(hyp->normalize())->prove_by_assumption();
     }
-    if (!problem->goals().empty())
+    for (const auto &goal : problem->goals())
     {
-        for (const auto &goal : problem->goals())
-        {
-            _goals.push_back(this->insert_statement(goal->normalize()));
-        }
+        _goals.push_back(this->insert_statement(goal->normalize()));
     }
     for (const auto &stmt : matcher.stmts())
     {
@@ -115,33 +112,23 @@ bool DDARSolver::run(size_t max_levels)
 {
     bool has_goal = !_problem->goals().empty();
 
-    if (!has_goal)
-    {
-        for (Point const &pt : _problem->points())
-        {
-            for (size_t i = 0; i < max_levels; ++i)
-            {
-                if (!run_level(pt))
-                {
-                    break;
-                }
-            }
-        }
-        _solved = true;
-    }
-    else
+    for (Point const &pt : _problem->points())
     {
         for (size_t i = 0; i < max_levels; ++i)
         {
-            if (!run_level(_problem->points().back()))
-            {
-                break;
-            }
-            if (_solved)
+            if (!run_level(pt))
             {
                 break;
             }
         }
+        if (_solved)
+        {
+            return _solved;
+        }
+    }
+    if (!has_goal)
+    {
+        _solved = true;
     }
     return _solved;
 }
@@ -177,20 +164,20 @@ void DDARSolver::add_custom_theorems(const vector<CustomRule> &rules)
     size_t idx = 0;
     for (const auto &thm : matcher.theorems())
     {
-        if (get_config("verbose", false))
-        {
-            cout << "[" << idx++ << "] " << thm.name() << " (" << thm.rule() << ")" << endl;
+        // if (get_config("verbose", false))
+        // {
+        //     cout << "[" << idx++ << "] " << thm.name() << " (" << thm.rule() << ")" << endl;
 
-            cout << "  Hypotheses:" << endl;
-            for (const auto &hyp : thm.hypotheses())
-                cout << "    " << hyp->to_string() << endl;
+        //     cout << "  Hypotheses:" << endl;
+        //     for (const auto &hyp : thm.hypotheses())
+        //         cout << "    " << hyp->to_string() << endl;
 
-            cout << "  Conclusions:" << endl;
-            for (const auto &con : thm.conclusions())
-                cout << "    " << con->to_string() << endl;
+        //     cout << "  Conclusions:" << endl;
+        //     for (const auto &con : thm.conclusions())
+        //         cout << "    " << con->to_string() << endl;
 
-            cout << endl;
-        }
+        //     cout << endl;
+        // }
         insert_application(thm.clone());
     }
     // cout << "Total: " << matcher.theorems().size() << " custom theorems added" << endl;
@@ -294,7 +281,7 @@ vector<ReducedEquation *> DDARSolver::insert_equation(const unique_ptr<Statement
 
     if (type == "dist")
     {
-        auto eqn_ptrs = pf->as_equation_dist(get_config("using_exp"));
+        auto eqn_ptrs = pf->as_equation_dist(get_config("using_exp"), get_config("using_ar", true));
         if (!eqn_ptrs.empty())
         {
             for (const auto &eqn_ptr : eqn_ptrs)
@@ -303,8 +290,8 @@ vector<ReducedEquation *> DDARSolver::insert_equation(const unique_ptr<Statement
                 eqns_map_type *eqns = &_equations_dist;
                 if (!eqn_ptr->empty())
                 {
-                    Rational coeff = Rational(1) / eqn_ptr->begin()->coeff();
-                    Equation eqn = *eqn_ptr * coeff;
+                    Equation eqn = *eqn_ptr;
+                    eqn.make_monic();
                     auto red_eq = ReducedEquation(eqn, sys);
                     res.push_back(&(eqns->insert({eqn, red_eq}).first->second));
                 }
@@ -314,7 +301,7 @@ vector<ReducedEquation *> DDARSolver::insert_equation(const unique_ptr<Statement
     }
     if (type == "slope")
     {
-        auto eqn_ptrs = pf->as_equation_slope(get_config("using_exp"));
+        auto eqn_ptrs = pf->as_equation_slope(get_config("using_exp"), get_config("using_ar", true));
         if (!eqn_ptrs.empty())
         {
             for (const auto &eqn_ptr : eqn_ptrs)
@@ -323,8 +310,8 @@ vector<ReducedEquation *> DDARSolver::insert_equation(const unique_ptr<Statement
                 eqns_map_type *eqns = &_equations_slope;
                 if (!eqn_ptr->empty())
                 {
-                    Rational coeff = Rational(1) / eqn_ptr->begin()->coeff();
-                    Equation eqn = *eqn_ptr * coeff;
+                    Equation eqn = *eqn_ptr;
+                    eqn.make_monic();
                     auto red_eq = ReducedEquation(eqn, sys);
                     res.push_back(&(eqns->insert({eqn, red_eq}).first->second));
                 }
@@ -334,7 +321,7 @@ vector<ReducedEquation *> DDARSolver::insert_equation(const unique_ptr<Statement
     }
     if (type == "distlog")
     {
-        auto eqn_ptrs = pf->as_equation_distlog(get_config("using_exp"));
+        auto eqn_ptrs = pf->as_equation_distlog(get_config("using_exp"), get_config("using_ar", true));
         if (!eqn_ptrs.empty())
         {
             for (const auto &eqn_ptr : eqn_ptrs)
@@ -343,8 +330,8 @@ vector<ReducedEquation *> DDARSolver::insert_equation(const unique_ptr<Statement
                 eqns_map_type *eqns = &_equations_distlog;
                 if (!eqn_ptr->empty())
                 {
-                    Rational coeff = Rational(1) / eqn_ptr->begin()->coeff();
-                    Equation eqn = *eqn_ptr * coeff;
+                    Equation eqn = *eqn_ptr;
+                    eqn.make_monic();
                     auto red_eq = ReducedEquation(eqn, sys);
                     res.push_back(&(eqns->insert({eqn, red_eq}).first->second));
                 }

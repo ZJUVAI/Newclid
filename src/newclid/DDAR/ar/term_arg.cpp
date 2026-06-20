@@ -168,5 +168,9 @@ bool TermArg::operator!=(const TermArg &other) const
 
 bool TermArg::operator<(const TermArg &other) const
 {
-    return to_string() < other.to_string();
+    if (_type != other._type)
+    {
+        return _type < other._type;
+    }
+    return _points < other._points; 
 }

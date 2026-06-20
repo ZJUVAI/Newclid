@@ -70,8 +70,12 @@ ostream &RConst::print(ostream &os) const
     return os << _left << ":" << _right << " = " << _ratio;
 }
 
-vector<unique_ptr<Equation>> RConst::as_equation_dist(bool exp) const
+vector<unique_ptr<Equation>> RConst::as_equation_dist(bool exp, bool using_ar) const
 {
+    if (!using_ar)
+    {
+        return {};
+    }
     vector<unique_ptr<Equation>> result;
     result.push_back(make_unique<Equation>(Equation({Term(_left), -Term(_right, _ratio)})));
     return result;

@@ -9,12 +9,19 @@
 class EqAngle : public Statement
 {
 private:
-    Angle _left;
-    Angle _right;
+    Slope _s1;  // First slope of left angle
+    Slope _s2;  // Second slope of left angle
+    Slope _s3;  // First slope of right angle
+    Slope _s4;  // Second slope of right angle
 
 public:
+    // Constructor from 4 slopes directly
+    EqAngle(Slope s1, Slope s2, Slope s3, Slope s4);
+
+    // Constructor from two angles (for backward compatibility)
     EqAngle(Angle left, Angle right);
 
+    // Constructor from 8 points
     EqAngle(Point p1, Point p2, Point p3, Point p4, Point p5, Point p6, Point p7, Point p8);
 
     std::string name() const override;
@@ -37,15 +44,19 @@ public:
 
     std::vector<EqAngle> permutations() const;
 
-    const Angle &left() const { return _left; }
+    // Accessors for slopes
+    const Slope &s1() const { return _s1; }
+    const Slope &s2() const { return _s2; }
+    const Slope &s3() const { return _s3; }
+    const Slope &s4() const { return _s4; }
 
-    const Angle &right() const { return _right; }
-
-    std::vector<std::unique_ptr<Equation>> as_equation_slope(bool exp) const override;
+    std::vector<std::unique_ptr<Equation>> as_equation_slope(bool exp, bool using_ar) const override;
 
     bool numerical_only() const { return false; }
 
-    bool trivial() const { return _left == _right || (_left.left_side() == _left.right_side() && _right.left_side() == _right.right_side()); }
+    bool trivial() const {
+        return (_s1 == _s3 && _s2 == _s4) || (_s1 == _s2 && _s3 == _s4);
+    }
 
     bool operator<(const EqAngle &other) const;
 

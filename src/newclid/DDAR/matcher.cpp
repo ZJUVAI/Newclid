@@ -537,41 +537,29 @@ void Matcher::match_equal_angles()
              return get<0>(a) < get<0>(b);
          });
 
-    vector<item_type> bucket;
-    bucket.push_back(angles[0]);
-    for (size_t i = 1; i < angles.size(); i++)
-    {
-        const auto &prev = bucket.back();
-        const auto &curr = angles[i];
-        if (Numerical::close_enough(get<0>(prev), get<0>(curr)))
-        {
-            bucket.push_back(curr);
-        }
-        else
-        {
-            if (bucket.size() > 1)
-            {
-                for (size_t left = 0; left < bucket.size(); left++)
+    // --- 新增：打印排序后的所有角度 ---
+    // cout << "排序后的角度: ";
+    // for (const auto& item : angles) {
+    //     cout << get<1>(item) << ": " << get<0>(item) << endl;
+    // }
+    // cout << endl;
+    // ----------------------------
+    
+    size_t hi = 0;
+    for (size_t i = 0; i < angles.size(); i++)
                 {
-                    for (size_t right = left + 1; right < bucket.size(); right++)
-                    {
-                        on_eqangle(get<1>(bucket[left]), get<1>(bucket[right]));
-                    }
-                }
-            }
-            bucket.clear();
-            bucket.push_back(curr);
-        }
-    }
-
-    if (bucket.size() > 1)
-    {
-        for (size_t left = 0; left < bucket.size(); left++)
+        if (hi < i + 1)
         {
-            for (size_t right = left + 1; right < bucket.size(); right++)
-            {
-                on_eqangle(get<1>(bucket[left]), get<1>(bucket[right]));
-            }
+            hi = i + 1;
+        }
+        while (hi < angles.size() &&
+               Numerical::close_enough(get<0>(angles[i]), get<0>(angles[hi])))
+    {
+            hi++;
+        }
+        for (size_t j = i + 1; j < hi; j++)
+        {
+            on_eqangle(get<1>(angles[i]), get<1>(angles[j]));
         }
     }
 }
