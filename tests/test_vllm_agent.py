@@ -42,14 +42,14 @@ class VLLMHelperTests(unittest.TestCase):
         self.assertEqual(messages[2]["role"], "assistant")
         self.assertEqual(
             messages[2]["content"],
-            "<think>\n\n</think>\n\n<aux> x00 a",
+            "<think>\n\n</think>\n\n<aux> x00 a :",
         )
 
     def test_score_chat_choices_rebuilds_aux_dsl(self):
         aux_dsl_dict = _score_chat_choices(
             choices=[
                 {
-                    "message": {"content": " = free a</aux>"},
+                    "message": {"content": "free a</aux>"},
                     "token_ids": [17, 99],
                     "logprobs": {"content": [{"logprob": -0.2}, {"logprob": -1.0}]},
                 }
@@ -61,7 +61,7 @@ class VLLMHelperTests(unittest.TestCase):
             stop_token_id=99,
         )
 
-        self.assertEqual(aux_dsl_dict, {"<aux> x00 a = free a": -0.2})
+        self.assertEqual(aux_dsl_dict, {"<aux> x00 a : free a": -0.2})
 
 
 class Qwen3AgentTests(unittest.TestCase):

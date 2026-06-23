@@ -51,7 +51,7 @@ def _build_messages(
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": user_content},
-        {"role": "assistant", "content": f"<think>\n\n</think>\n\n{response_prefix} {new_point_name}"},
+        {"role": "assistant", "content": f"<think>\n\n</think>\n\n{response_prefix} {new_point_name} :"},
     ]
 
 
@@ -77,7 +77,7 @@ def _score_chat_choices(
         )
         valid = [lp for lp in token_logprobs[:stop_idx] if lp is not None]
         score = sum(valid) / max(len(valid), 1)
-        aux_dsl = f"{response_prefix} {new_point_name}{continuation}"
+        aux_dsl = f"{response_prefix} {new_point_name} : {continuation.lstrip()}"
         if aux_dsl not in aux_dsl_dict or score > aux_dsl_dict[aux_dsl]:
             aux_dsl_dict[aux_dsl] = score
     return aux_dsl_dict
