@@ -106,7 +106,7 @@ python src/newclid/generation/pipeline.py \
 ### Text SFT
 
 ```bash
-bash scripts/train_eval.sh
+bash scripts/train_lm.sh
 ```
 
 ### VLM SFT
@@ -115,84 +115,46 @@ bash scripts/train_eval.sh
 bash scripts/train_vlm.sh
 ```
 
-### VLM Pretraining + Evaluation
-
-```bash
-bash scripts/train_vlm_pt.sh
-```
-
-### Qwen3.5 / Alternative VLM Pipeline
-
-```bash
-bash scripts/train_eval_vlm54.sh
-```
-
 > **Note:** Update dataset paths, checkpoint directories, output paths, and `CUDA_VISIBLE_DEVICES` in the scripts before running.
 
 ## Evaluation
 
-### Text Model
+Start a vLLM OpenAI-compatible server for the checkpoint first:
 
 ```bash
-python scripts/evaluation.py \
-  --problems_path benchmarks/imo_ag_30.txt \
-  --model_path ZJUVAI/GenesisGeo \
-  --max_workers 40 \
-  --decoding_size 32 \
-  --beam_size 512 \
-  --search_depth 4
+python scripts/launch_vllm_server.py \
+  --model_name /path/to/checkpoint \
+  --host 127.0.0.1 \
+  --port 8000 \
+  --gpu_ids 0,1,2,3
 ```
 
-### Text Ensemble
+### Qwen3 (Text)
 
 ```bash
 python scripts/evaluation.py \
-  --problems_path benchmarks/imo_ag_30.txt \
-  --model_path ZJUVAI/GenesisGeo-250915a ZJUVAI/GenesisGeo-250915b \
-  --max_workers 80 \
-  --decoding_size 32 \
-  --beam_size 512 \
-  --search_depth 4
-```
-
-### Qwen3.5 Text
-
-```bash
-python scripts/evaluation.py \
+  --agent qwen3_text \
   --problems_path benchmarks/dev_imo.txt \
-  --model_path /path/to/checkpoint \
-  --agent qwen35_text \
-  --max_workers 40 \
-  --decoding_size 32 \
-  --beam_size 512 \
-  --search_depth 4
-```
-
-### VLM
-
-```bash
-python scripts/evaluation.py \
-  --problems_path benchmarks/hageo_409.txt \
-  --model_path /path/to/checkpoint \
-  --agent vlm \
-  --max_workers 40 \
+  --vllm_base_url http://127.0.0.1:8000 \
   --decoding_size 32 \
   --beam_size 512 \
   --search_depth 4 \
+  --ray_num_cpus 40 \
   --timeout 3600
 ```
 
-### Qwen3.5 Multimodal
+### Qwen3-VL
 
 ```bash
 python scripts/evaluation.py \
-  --problems_path benchmarks/dev_imo.txt \
-  --model_path /path/to/checkpoint \
-  --agent qwen35_vl \
-  --max_workers 40 \
+  --agent qwen3_vl \
+  --problems_path benchmarks/imo_95.txt \
+  --vllm_base_url http://127.0.0.1:8000 \
   --decoding_size 32 \
   --beam_size 512 \
-  --search_depth 4
+  --search_depth 4 \
+  --ray_num_cpus 40 \
+  --timeout 3600
 ```
 
 ### Benchmarks
@@ -219,8 +181,11 @@ GenesisGeo/
 │   ├── proof.py                    # Proof state management
 │   ├── agent/                      # Reasoning agents
 │   │   ├── ddarn.py                # DDARN symbolic engine
-│   │   ├── lm.py                   # Language model agent
-│   │   └── vlm.py                  # Vision-language model agent
+│   │   ├── base.py                 # Shared neural-guided search logic
+│   │   └── vllm.py                 # vLLM text and vision-language agents
+│   ├── evaluation/                 # vLLM evaluation runtime and trace helpers
+│   │   ├── search_runtime.py       # Search DSL, DDAR tasks, beam utilities
+│   │   └── search_trace.py         # Evaluation trace recording
 │   ├── generation/                 # Data generation pipeline
 │   │   ├── pipeline.py             # ProblemPipeline orchestrator
 │   │   ├── sampler.py              # Geometry construction sampling
@@ -236,8 +201,13 @@ GenesisGeo/
 │   ├── formulations/               # Problem representations
 │   ├── numerical/                  # Numerical geometry
 │   ├── algebraic_reasoning/        # Algebraic reasoning
-│   └── predicates/                 # Geometry predicates
-├── scripts/                        # Training & evaluation scripts
+│   ├── predicates/                 # Geometry predicates
+│   └── proof_scout/                # Theorem discovery and rule reduction
+├── scripts/                        # Training, evaluation, and data utilities
+│   ├── train_lm.sh                 # Text SFT training
+│   ├── train_vlm.sh                # VLM SFT training
+│   ├── launch_vllm_server.py       # Managed vLLM gateway launcher
+│   └── evaluation.py               # vLLM evaluation CLI
 ├── tests/                          # Test suite
 ├── benchmarks/                     # Benchmark problem sets
 └── docs/                           # Documentation

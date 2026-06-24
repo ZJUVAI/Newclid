@@ -1,198 +1,237 @@
 #include "ar/linear_system.hpp"
-
-#include <vector>
-#include <set>
-#include <cassert>
-#include <iostream>
+#include "ar/reduced_equation.hpp"
+#include "numerical.hpp"
 #include "solver/proof.hpp"
-#include "ar/equation.hpp"
-#include "ar/equation_index.hpp"
+#include <iostream>
+#include <deque>
+#include <stdexcept>
+#include <cstdlib>
+#include <string>
 
 using namespace std;
 
-void LinearSystem::reduce_next(Equation &e)
+void LinearSystem::index_rule(const Monomial &head, const Equation &body)
 {
-    e.normalize();
-    while (true)
+    for (const auto &[var, exp] : head.vars())
     {
-        const auto &it_begin = e.begin();
-        const auto &it_next = next(it_begin);
-        Term head = *it_begin;
-        if (it_next == e.end())
+        _head_var_index[var].insert(head);
+    }
+    for (const auto &[mono, c] : body.body().terms())
+    {
+        for (const auto &[var, exp] : mono.vars())
         {
-            break;
-        }
-
-        const Equation *eq_var = get_solved_variable(*it_next);
-        const Equation *eq_term = get_solved_term(*it_next);
-
-        if (!eq_var && !eq_term)
-        {
-            _pivot_by_next[*it_next].insert(head);
-            break;
-        }
-        if (eq_term)
-        {
-            e -= *eq_term * it_next->coeff();
-        }
-        else if (eq_var)
-        {
-            e -= *eq_var * it_next->coeff();
+            _body_var_index[var].insert(head);
         }
     }
-    return;
 }
 
-void LinearSystem::update()
+void LinearSystem::deindex_rule(const Monomial &head, const Equation &body)
 {
-    _solved_variables.clear();
-    _solved_terms.clear();
-    _pivot_by_next.clear();
-
-    for (const auto &[original_eq, pf] : _equations)
+    for (const auto &[var, exp] : head.vars())
     {
-        Equation e = original_eq;
-        e.normalize();
-
-        if (e.empty())
+        auto it = _head_var_index.find(var);
+        if (it != _head_var_index.end())
         {
-            continue;
-        }
-
-        ReducedEquation req(e, this);
-        req.reduce();
-        e = req.remainder();
-
-        if (e.empty())
-        {
-            continue;
-        }
-
-        Term head = *e.begin();
-        bool is_linear = e.linear();
-
-        auto ptr = std::make_unique<Equation>(std::move(e));
-        bool inserted = false;
-        if (is_linear)
-        {
-            inserted = _solved_variables.emplace(head, std::move(ptr)).second;
-        }
-        else
-        {
-            inserted = _solved_terms.emplace(head, std::move(ptr)).second;
-        }
-
-        if (!inserted)
-        {
-            throw std::runtime_error("Trying to insert a duplicate solved equation during update");
-        }
-
-        auto pivot_it = _pivot_by_next.find(head);
-        if (pivot_it != _pivot_by_next.end())
-        {
-
-            for (const Term &waiting_pivot : pivot_it->second)
+            it->second.erase(head);
+            if (it->second.empty())
             {
-
-                auto var_it = _solved_variables.find(waiting_pivot);
-                if (var_it != _solved_variables.end())
+                _head_var_index.erase(it);
+            }
+        }
+    }
+    for (const auto &[mono, c] : body.body().terms())
+    {
+        for (const auto &[var, exp] : mono.vars())
+        {
+            auto it = _body_var_index.find(var);
+            if (it != _body_var_index.end())
+            {
+                it->second.erase(head);
+                if (it->second.empty())
                 {
-                    reduce_next(*var_it->second);
-                }
-
-                auto term_it = _solved_terms.find(waiting_pivot);
-                if (term_it != _solved_terms.end())
-                {
-                    reduce_next(*term_it->second);
+                    _body_var_index.erase(it);
                 }
             }
-            _pivot_by_next.erase(pivot_it);
         }
     }
 }
 
-void LinearSystem::print_equations() const
+const Equation *LinearSystem::find_divisor_rule(const Monomial &m) const
 {
-    cout << "Linear System Equations:" << endl;
-    for (const auto &[eqn, pf] : _equations)
+    if (m.is_constant())
     {
-        cout << "Equation: " << eqn << endl;
-        cout << "Proved by: " << pf->statement()->to_string() << endl;
+        return nullptr;
     }
-    cout << endl;
-    cout << "Solved Variables:" << endl;
-    for (const auto &[var, eqn] : _solved_variables)
+    // 优先精确命中(常见的线性变量代入)。
+    auto exact = _rules.find(m);
+    if (exact != _rules.end())
     {
-        cout << var << " : " << *eqn << endl;
+        return &exact->second;
     }
-    cout << endl;
-    cout << "Solved Terms:" << endl;
-    for (const auto &[term, eqn] : _solved_terms)
+    // 一般路径:在与 m 共享变量的 head 中找整除者,选最大的(优先消高次)。
+    const Equation *best = nullptr;
+    const Monomial *best_head = nullptr;
+    for (const auto &[var, exp] : m.vars())
     {
-        cout << term << " : " << *eqn << endl;
+        auto it = _head_var_index.find(var);
+        if (it == _head_var_index.end())
+        {
+            continue;
+        }
+        for (const auto &head : it->second)
+        {
+            if (head.divides(m))
+            {
+                if (best_head == nullptr || head > *best_head)
+                {
+                    best_head = &head;
+                    best = &_rules.at(head);
+                }
+            }
+        }
+    }
+    return best;
+}
+
+Equation LinearSystem::normal_form(Equation eq) const
+{
+    // 入口先做 content_reduce: a*b - a*c == 0 折叠成 b - c == 0。
+    // 接下游 fixpoint:每次代入后再 content_reduce + make_monic 重扫,
+    // 这样"代入非线性规则后冒出可代入线性变量"的场景被自然覆盖。
+    eq.content_reduce();
+    eq.make_monic();
+    bool changed = true;
+    size_t iter = 0;
+    while (changed && !eq.empty())
+    {
+        ++iter;
+        changed = false;
+        for (const auto &[mono, coeff] : eq.body().terms())
+        {
+            const Equation *rule = find_divisor_rule(mono);
+            if (rule == nullptr)
+            {
+                continue;
+            }
+            Monomial factor = mono / rule->leading_monomial();
+            // rule 已 monic;减去 coeff*factor*rule 恰好抵消 (mono, coeff) 项,
+            // 证书也通过 *= / -= 同步更新。
+            eq -= (*rule) * factor * coeff;
+            eq.content_reduce();
+            eq.make_monic();
+            changed = true;
+            break; // 项集已变,从新首项重新扫描
+        }
+    }
+    return eq;
+}
+
+void LinearSystem::install_rule(Equation eq)
+{
+    // 工作队列:重约简旧规则可能改变 head,改变后重新入队即可。
+    deque<Equation> work;
+    work.push_back(std::move(eq));
+
+    size_t rounds = 0;
+    while (!work.empty())
+    {
+        ++rounds;
+        Equation cur = std::move(work.front());
+        work.pop_front();
+
+        cur.make_monic();
+        if (cur.empty())
+        {
+            continue;
+        }
+        Monomial head = cur.leading_monomial();
+
+        if (_rules.count(head))
+        {
+            // 该 head 已存在规则:对来者再做一次约简(避免覆盖,保持规则集一致)。
+            Equation reduced = normal_form(cur);
+            if (reduced.empty())
+            {
+                continue;
+            }
+            work.push_back(std::move(reduced));
+            continue;
+        }
+
+        // 找出 body 含新 head 变量的旧规则,它们需要重约简。
+        set<Monomial> affected;
+        for (const auto &[var, exp] : head.vars())
+        {
+            auto it = _body_var_index.find(var);
+            if (it != _body_var_index.end())
+            {
+                for (const auto &h : it->second)
+                {
+                    affected.insert(h);
+                }
+            }
+        }
+
+        // 装入新规则。
+        index_rule(head, cur);
+        _rules.emplace(head, std::move(cur));
+
+        for (const auto &old_head : affected)
+        {
+            auto it = _rules.find(old_head);
+            if (it == _rules.end())
+            {
+                continue;
+            }
+            Equation old_eq = it->second;
+            deindex_rule(old_head, old_eq);
+            _rules.erase(it);
+
+            Equation new_eq = normal_form(old_eq);
+            if (new_eq.empty())
+            {
+                continue;
+            }
+            if (new_eq == old_eq)
+            {
+                index_rule(old_head, new_eq);
+                _rules.emplace(old_head, std::move(new_eq));
+                continue;
+            }
+            work.push_back(std::move(new_eq));
+        }
     }
 }
 
-void LinearSystem::add_reduced_equation(Proof *pf, string type)
+void LinearSystem::add_reduced_equation(Proof *pf, std::string type)
 {
     auto eqs = pf->reduced_equations(type);
-    for (auto &eq : eqs)
+    for (auto *eq : eqs)
     {
         eq->reduce();
         if (eq->is_solved())
         {
             continue;
         }
-
-        EquationIndex const n(_equations.size(), this);
-        _equations.emplace_back(eq->original_equation(), pf);
-
-        Equation e = eq->remainder();
-        e.set_index(n.index(), this);
-
-        Term head = *e.begin();
-        e *= Rational(1) / head.coeff();
-        reduce_next(e);
-
-        bool is_linear = e.linear();
-        head = *e.begin();
-
-        bool success = false;
-        auto ptr = std::make_unique<Equation>(std::move(e));
-
-        if (is_linear)
-        {
-            success = _solved_variables.emplace(head, std::move(ptr)).second;
-        }
-        else
-        {
-            success = _solved_terms.emplace(head, std::move(ptr)).second;
-        }
-        if (!success)
-        {
-            throw runtime_error("Trying to insert a non-reduced equation");
-        }
-
-        auto it = _pivot_by_next.find(head);
-        if (it != _pivot_by_next.end())
-        {
-            for (const auto &pivot : it->second)
-            {
-                auto it_var = _solved_variables.find(pivot);
-                if (it_var != _solved_variables.end())
-                {
-                    reduce_next(*it_var->second);
-                }
-
-                auto it_term = _solved_terms.find(pivot);
-                if (it_term != _solved_terms.end())
-                {
-                    reduce_next(*it_term->second);
-                }
-            }
-            _pivot_by_next.erase(it);
-        }
+        add_equation(eq->original_equation(), pf);
     }
+}
+
+bool LinearSystem::add_equation(const Equation &eq, Proof *proof)
+{
+    // 先约简
+    Equation remainder = normal_form(eq);
+    if (remainder.empty())
+    {
+        return false; // 已被现有规则蕴含
+    }
+    // 归档原始方程,把自指系数加到证书,装入规则集。
+    size_t idx = _equations.size();
+    _equations.emplace_back(eq, proof);
+    remainder.set_index(idx);
+    remainder.make_monic();
+    install_rule(std::move(remainder));
+    return true;
 }
 
 const Equation &LinearSystem::at(size_t index) const
@@ -200,16 +239,70 @@ const Equation &LinearSystem::at(size_t index) const
     return pair_at(index).first;
 }
 
-const std::pair<Equation, Proof *> &LinearSystem::pair_at(size_t index) const
+const pair<Equation, Proof *> &LinearSystem::pair_at(size_t index) const
 {
     if (index >= _equations.size())
     {
-        throw runtime_error("Index out of range");
+        throw runtime_error("LinearSystem::pair_at: index out of range");
     }
     return _equations[index];
 }
 
-size_t LinearSystem::size() const
+void LinearSystem::print_equations() const
 {
-    return _equations.size();
+    cout << "Linear System:" << endl;
+    cout << "  Archived equations (" << _equations.size() << "):" << endl;
+    for (size_t i = 0; i < _equations.size(); ++i)
+    {
+        cout << "    [" << i << "] " << _equations[i].first;
+        if (_equations[i].second != nullptr)
+        {
+            cout << " (proof @" << _equations[i].second << ")";
+        }
+        cout << endl;
+    }
+    cout << "  Active rules (" << _rules.size() << "):" << endl;
+    for (const auto &[head, eq] : _rules)
+    {
+        cout << "    [" << head << "] " << eq << endl;
+    }
+}
+
+void LinearSystem::verify_equations() const
+{
+    // 用当前点坐标对每条方程的 body 求值。语义是 body == 0,故应数值近零。
+    // 求值可能抛异常(如退化点导致 DistLog 取 log(0)),逐条捕获并标记为 ERROR,
+    // 避免单条求值失败掩盖其余方程的检验结果。
+    cout << "Numerical verification:" << endl;
+    cout << "  Archived equations (" << _equations.size() << "):" << endl;
+    for (size_t i = 0; i < _equations.size(); ++i)
+    {
+        const Equation &eq = _equations[i].first;
+        try
+        {
+            double val = eq.body().to_double();
+            bool ok = Numerical::nearly_zero(val);
+            cout << "    [" << i << "] " << (ok ? "OK  " : "FAIL")
+                 << " value=" << val << " | " << eq << endl;
+        }
+        catch (const exception &e)
+        {
+            cout << "    [" << i << "] ERROR (" << e.what() << ") | " << eq << endl;
+        }
+    }
+    cout << "  Active rules (" << _rules.size() << "):" << endl;
+    for (const auto &[head, eq] : _rules)
+    {
+        try
+        {
+            double val = eq.body().to_double();
+            bool ok = Numerical::nearly_zero(val);
+            cout << "    [" << head << "] " << (ok ? "OK  " : "FAIL")
+                 << " value=" << val << " | " << eq << endl;
+        }
+        catch (const exception &e)
+        {
+            cout << "    [" << head << "] ERROR (" << e.what() << ") | " << eq << endl;
+        }
+    }
 }

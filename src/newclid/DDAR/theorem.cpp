@@ -526,6 +526,22 @@ Theorem Theorem::eqpoints_of_same_ratio_on_line(const Point &p1, const Point &p2
     return theorem;
 }
 
+Theorem Theorem::cong_of_eqangle(const Point &vertex, const Point &a, const Point &b)
+{
+    Theorem theorem("equal angles imply equal opposite sides", "r110");
+    theorem.add_hypothesis(make_unique<EqAngle>(EqAngle(Angle(vertex, a, b), Angle(a, b, vertex))));
+    theorem.add_conclusion(make_unique<Cong>(Cong(Dist(vertex, a), Dist(vertex, b))));
+    return theorem;
+}
+
+Theorem Theorem::eqangle_of_cong(const Point &vertex, const Point &a, const Point &b)
+{
+    Theorem theorem("equal sides imply equal opposite angles", "r111");
+    theorem.add_hypothesis(make_unique<Cong>(Cong(Dist(vertex, a), Dist(vertex, b))));
+    theorem.add_conclusion(make_unique<EqAngle>(EqAngle(Angle(vertex, a, b), Angle(a, b, vertex))));
+    return theorem;
+}
+
 Theorem Theorem::clone() const
 {
     Theorem thm(_name, _rule);

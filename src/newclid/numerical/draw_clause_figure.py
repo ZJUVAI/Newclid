@@ -8,7 +8,12 @@ from numpy.random import Generator
 from newclid.dependencies.symbols import Point
 from newclid.formulations.clause import Clause, translate_sentence
 from newclid.formulations.definition import DefinitionJGEX
-from newclid.numerical.draw_figure import draw_point, draw_segment, draw_circle_num
+from newclid.numerical.draw_figure import (
+    apply_figure_theme,
+    draw_circle_num,
+    draw_point,
+    draw_segment,
+)
 from newclid.numerical.geometries import CircleNum
 from newclid.statement import Statement
 
@@ -26,9 +31,13 @@ def draw_clause_figure(
     draw_annotations: bool = True,
     format: Optional[str] = None,
     dpi: Optional[float] = None,
+    theme: Optional[dict[str, object]] = None,
+    save_with_legacy_style: bool = False,
 ):
     """Draw clauses figure."""
     fig = deepcopy(proof.fig)
+    if theme is not None:
+        apply_figure_theme(fig, fig.axes[0], theme)
     draw_clauses(
         fig.axes[0],
         list(problem.constructions),
@@ -48,9 +57,11 @@ def draw_clause_figure(
             savefig_kwargs["format"] = save_format
         if dpi is not None:
             savefig_kwargs["dpi"] = dpi
-        savefig_kwargs["facecolor"] = fig.get_facecolor()
-        savefig_kwargs["edgecolor"] = "none"
+        if not save_with_legacy_style:
+            savefig_kwargs["facecolor"] = fig.get_facecolor()
+            savefig_kwargs["edgecolor"] = "none"
         fig.savefig(save_to, **savefig_kwargs)
+    return fig
 
 
 def draw_clauses(

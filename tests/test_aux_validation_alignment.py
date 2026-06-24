@@ -19,6 +19,8 @@ def test_aux_only_regressions_filter_known_false_positives(seed):
         False,
         None,
         None,
+        None,
+        None,
     )
     data_list, summary = ProblemWorker._process_single_problem(args)
 

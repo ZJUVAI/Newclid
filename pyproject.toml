@@ -31,7 +31,7 @@ dependencies = [
     "markupsafe==3.0.2",
     "pyvis",
     "scipy>=1.15",
-    "adjusttext @ https://github.com/Phlya/adjustText/archive/master.zip",
+    "adjusttext @ https://gh-proxy.org/https://github.com/Phlya/adjustText/archive/master.zip",
     "pandas>=2.3",
     "pybind11",
     "httpx[socks]",

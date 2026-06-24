@@ -6,7 +6,7 @@ import numpy as np
 import logging
 
 from newclid.numerical import close_enough
-from newclid.numerical.draw_figure import PALETTE, draw_angle, draw_segment
+from newclid.numerical.draw_figure import draw_angle, draw_segment, get_figure_theme
 from newclid.predicates.predicate import Predicate
 from newclid.algebraic_reasoning.tables import Angle_Chase
 from newclid.tools import reshape
@@ -181,8 +181,9 @@ class EqAngle(Predicate):
         rng: Generator,
         draw_annotations: bool = True,
     ):
-        setattr(ax, "angle_color", (getattr(ax, "angle_color", 0) + 1) % len(PALETTE))
-        color = PALETTE[ax.angle_color]  # type: ignore
+        palette = get_figure_theme(ax)["palette"]
+        setattr(ax, "angle_color", (getattr(ax, "angle_color", 0) + 1) % len(palette))
+        color = palette[ax.angle_color]  # type: ignore
         if len(set(args[0:4])) > 3 or len(set(args[4:8])) > 3:
             ori_args = list(args)
             args = tuple(ori_args[0:2] + ori_args[4:6] + ori_args[2:4] + ori_args[6:8])

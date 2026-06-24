@@ -47,9 +47,12 @@ bool Coll::check_equations() const
     Point ref_c = _c;
 
     // 按 x 坐标排序，选择中位数点作为参考
-    if (ref_a.x() > ref_b.x()) std::swap(ref_a, ref_b);
-    if (ref_a.x() > ref_c.x()) std::swap(ref_a, ref_c);
-    if (ref_b.x() > ref_c.x()) std::swap(ref_b, ref_c);
+    if (ref_a.x() > ref_b.x())
+        std::swap(ref_a, ref_b);
+    if (ref_a.x() > ref_c.x())
+        std::swap(ref_a, ref_c);
+    if (ref_b.x() > ref_c.x())
+        std::swap(ref_b, ref_c);
     // 现在 ref_b 是 x 坐标中位数点，作为参考点
 
     // 以 ref_b 为参考点，计算叉积
@@ -88,8 +91,7 @@ vector<Coll> Coll::permutations() const
 bool Coll::is_between() const
 {
     // 判断三点是否共线
-    double cross = (_b.y() - _a.y()) * (_c.x() - _a.x()) - (_b.x() - _a.x()) * (_c.y() - _a.y());
-    if (fabs(cross) > 1e-9) // 不共线
+    if (!check_equations())
         return false;
 
     // 判断b是否在a和c之间（不包含端点）
@@ -137,43 +139,12 @@ bool Coll::operator<(const Coll &other) const
     return _a < other._a;
 }
 
-vector<unique_ptr<Equation>> Coll::as_equation_slope(bool exp) const
+vector<unique_ptr<Equation>> Coll::as_equation_dist(bool exp, bool using_ar) const
 {
-    vector<unique_ptr<Equation>> result;
-
-    vector<Slope> candidates = {
-        Slope(_a, _b),
-        Slope(_a, _c),
-        Slope(_b, _c),
-    };
-
-    vector<Slope> valid_slopes;
-    for (const auto &s : candidates)
+    if (!using_ar)
     {
-        if (s.check_numerically())
-        {
-            valid_slopes.push_back(s);
-        }
+        return {};
     }
-
-    // 3. 两两配对，生成 p - q = 0 的方程
-    for (size_t i = 0; i < valid_slopes.size(); ++i)
-    {
-        for (size_t j = i + 1; j < valid_slopes.size(); ++j)
-        {
-            vector<Term> terms = {
-                Term(valid_slopes[i]),
-                -Term(valid_slopes[j])};
-
-            result.push_back(make_unique<Equation>(Equation(std::move(terms))));
-        }
-    }
-
-    return result;
-}
-
-vector<unique_ptr<Equation>> Coll::as_equation_dist(bool exp) const
-{
     vector<unique_ptr<Equation>> result;
     vector<Term> candidates = {
         Term(Dist(_a, _b)),

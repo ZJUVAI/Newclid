@@ -154,6 +154,12 @@ public:
     // r109
     static Theorem eqpoints_of_same_ratio_on_line(const Point &p1, const Point &p2, const Point &a, const Point &c);
 
+    // r110
+    static Theorem cong_of_eqangle(const Point &vertex, const Point &a, const Point &b);
+
+    // r111
+    static Theorem eqangle_of_cong(const Point &vertex, const Point &a, const Point &b);
+
 private:
     std::string _name;
     std::string _rule;

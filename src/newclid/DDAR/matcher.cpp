@@ -537,41 +537,29 @@ void Matcher::match_equal_angles()
              return get<0>(a) < get<0>(b);
          });
 
-    vector<item_type> bucket;
-    bucket.push_back(angles[0]);
-    for (size_t i = 1; i < angles.size(); i++)
-    {
-        const auto &prev = bucket.back();
-        const auto &curr = angles[i];
-        if (Numerical::close_enough(get<0>(prev), get<0>(curr)))
-        {
-            bucket.push_back(curr);
-        }
-        else
-        {
-            if (bucket.size() > 1)
-            {
-                for (size_t left = 0; left < bucket.size(); left++)
+    // --- 新增：打印排序后的所有角度 ---
+    // cout << "排序后的角度: ";
+    // for (const auto& item : angles) {
+    //     cout << get<1>(item) << ": " << get<0>(item) << endl;
+    // }
+    // cout << endl;
+    // ----------------------------
+    
+    size_t hi = 0;
+    for (size_t i = 0; i < angles.size(); i++)
                 {
-                    for (size_t right = left + 1; right < bucket.size(); right++)
-                    {
-                        on_eqangle(get<1>(bucket[left]), get<1>(bucket[right]));
-                    }
-                }
-            }
-            bucket.clear();
-            bucket.push_back(curr);
-        }
-    }
-
-    if (bucket.size() > 1)
-    {
-        for (size_t left = 0; left < bucket.size(); left++)
+        if (hi < i + 1)
         {
-            for (size_t right = left + 1; right < bucket.size(); right++)
-            {
-                on_eqangle(get<1>(bucket[left]), get<1>(bucket[right]));
-            }
+            hi = i + 1;
+        }
+        while (hi < angles.size() &&
+               Numerical::close_enough(get<0>(angles[i]), get<0>(angles[hi])))
+    {
+            hi++;
+        }
+        for (size_t j = i + 1; j < hi; j++)
+        {
+            on_eqangle(get<1>(angles[i]), get<1>(angles[j]));
         }
     }
 }
@@ -610,6 +598,13 @@ void Matcher::on_circle(const Point &center, const vector<pair<double, Point>> &
                     }
                 }
             }
+            else if (!points[pt_a].second.is_close(points[pt_b].second))
+            {
+                // 等腰三角形底角相等
+                insert_theorem(Theorem::cong_of_eqangle(center, points[pt_a].second, points[pt_b].second));
+                insert_theorem(Theorem::eqangle_of_cong(center, points[pt_a].second, points[pt_b].second));
+            }
+
             for (size_t pt_c = pt_b + 1; pt_c < size; pt_c++)
             {
                 on_circumcenter(CircumCenter(center, Triangle(points[pt_a].second, points[pt_b].second, points[pt_c].second)));
@@ -1066,6 +1061,7 @@ void CustomTheoremMatcher::enumerate_brute_force(
     size_t stmt_idx,
     const vector<string> &new_vars,
     Mapping &current,
+    vector<bool> &used,
     vector<Mapping> &results) const
 {
     const size_t n_pts = _problem->num_points();
@@ -1080,7 +1076,7 @@ void CustomTheoremMatcher::enumerate_brute_force(
             if (verify_stmt(stmts[stmt_idx], current))
             {
                 // 当前谓词数值校验通过，进入下一条 Stmt 的匹配
-                backtrack(stmts, stmt_idx + 1, current, results);
+                backtrack(stmts, stmt_idx + 1, current, used, results);
             }
             return;
         }
@@ -1088,9 +1084,12 @@ void CustomTheoremMatcher::enumerate_brute_force(
         // 为第 v_idx 个新变量尝试绑定每一个点
         for (size_t p = 0; p < n_pts; ++p)
         {
+            if (used[p]) continue;
             current.push_back({new_vars[v_idx], (int)p});
+            used[p] = true;
             generate_combinations(v_idx + 1);
-            current.pop_back(); // 回溯：移除绑定
+            used[p] = false;
+            current.pop_back();
         }
     };
 
@@ -1098,7 +1097,8 @@ void CustomTheoremMatcher::enumerate_brute_force(
 }
 
 void CustomTheoremMatcher::backtrack(const vector<Stmt> &stmts, size_t stmt_idx,
-                                     Mapping &current, vector<Mapping> &results) const
+                                     Mapping &current, vector<bool> &used,
+                                     vector<Mapping> &results) const
 {
     if (stmt_idx == stmts.size())
     {
@@ -1114,7 +1114,7 @@ void CustomTheoremMatcher::backtrack(const vector<Stmt> &stmts, size_t stmt_idx,
     {
         if (verify_stmt(stmt, current))
         {
-            backtrack(stmts, stmt_idx + 1, current, results);
+            backtrack(stmts, stmt_idx + 1, current, used, results);
         }
         return;
     }
@@ -1140,25 +1140,32 @@ void CustomTheoremMatcher::backtrack(const vector<Stmt> &stmts, size_t stmt_idx,
                 }
                 else
                 {
+                    if (used[combo[i]])
+                    {
+                        conflict = true;
+                        break;
+                    }
                     current.push_back({stmt.second[i], combo[i]});
+                    used[combo[i]] = true;
                     added_count++;
                 }
             }
 
             if (!conflict)
-                backtrack(stmts, stmt_idx + 1, current, results);
+                backtrack(stmts, stmt_idx + 1, current, used, results);
 
             // 回溯清理
             while (added_count--)
+            {
+                used[current.back().second] = false;
                 current.pop_back();
+            }
         }
     }
     // 情况 C：暴力枚举（仅针对无索引谓词）
     else
     {
-        // 建议：此处可以将暴力枚举封装为独立的笛卡尔积迭代器
-        // 限于篇幅，保持逻辑优化：使用递归而非手动进位 goto
-        enumerate_brute_force(stmts, stmt_idx, new_vars, current, results);
+        enumerate_brute_force(stmts, stmt_idx, new_vars, current, used, results);
     }
 }
 
@@ -1177,8 +1184,9 @@ void CustomTheoremMatcher::match_rule(const CustomRule &rule)
 
     // 2. 执行匹配
     Mapping current;
+    vector<bool> used(_problem->num_points(), false);
     vector<Mapping> raw_results;
-    backtrack(sorted_stmts, 0, current, raw_results);
+    backtrack(sorted_stmts, 0, current, used, raw_results);
 
     // 3. 结果转换与去重
     std::set<map<string, int>> unique_mappings;

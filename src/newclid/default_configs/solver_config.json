@@ -1,9 +1,12 @@
 {
   "using_log": true,
   "using_exp": false,
+  "using_ar": true,
+  "allow_duplicate_points": true,
   "light": false,
   "use_predicate_cache": true,
   "verbose": false,
+  "verbose_cache_output": false,
   "r03": true,
   "r04": true,
   "r07": true,

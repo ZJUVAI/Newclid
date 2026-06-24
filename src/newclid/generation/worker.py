@@ -1134,10 +1134,25 @@ class ProblemWorker:
         essential_aux_point_names: list[str],
     ) -> dict[str, str]:
         """Create point name mapping"""
+        # 1. 合并两个列表
+        combined_points = essential_premise_point_names + essential_aux_point_names
+
+        # 2. 定义排序规则：把 "a0" 拆成 (0, 'a')，把 "a" 拆成 (-1, 'a')
+        def point_sort_key(name: str):
+            letter = name[0]        # 规则里前缀是一个字母
+            number_part = name[1:]  # 字母后面的数字部分
+            
+            # 如果没有数字，给它一个最小的权重 -1，确保排在所有带数字的字母前面
+            num = int(number_part) if number_part.isdigit() else -1
+            
+            return (num, letter)
+
+        # 3. 在构建映射前进行排序
+        sorted_points = sorted(combined_points, key=point_sort_key)
+
+        # 4. 构建映射
         mp: dict[str, str] = {}
-        for idx, p in enumerate(
-            essential_premise_point_names + essential_aux_point_names
-        ):
+        for idx, p in enumerate(sorted_points):
             assert p not in mp
             mp[p] = ProblemWorker._get_apha_geo_solver_var(idx)
         return mp

@@ -32,14 +32,12 @@ def check_too_close_numerical(
 
 
 def check_too_far_numerical(
-    newpoints: Sequence[PointNum], points: Sequence[PointNum], tol: float = 5.0
+    newpoints: Sequence[PointNum], points: Sequence[PointNum], tol: float = 6.0
 ) -> bool:
     if len(points) < 2:
         return False
-    avg = sum(points, PointNum(0.0, 0.0)) * 1.0 / len(points)
-    maxdist = max([p.distance(avg) for p in points])
     for p0 in newpoints:
         for p1 in points:
-            if p0.distance(p1) > tol * maxdist:
+            if p0.distance(p1) > tol:
                 return True
     return False

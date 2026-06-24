@@ -1,30 +1,90 @@
 #include "ar/equation.hpp"
-#include "ar/equation_index.hpp"
-#include "ar/term.hpp"
+#include "numerical.hpp"
+#include <sstream>
 
 using namespace std;
 
-Equation &Equation::operator+=(const Equation &other)
+Equation::Equation(initializer_list<Term> terms)
 {
-    _terms += other._terms;
-    for (const auto &comb : other._combination)
+    vector<pair<Monomial, Rational>> pairs;
+    pairs.reserve(terms.size());
+    for (const auto &t : terms)
     {
-        bool merged = false;
-        for (auto &my_comb : _combination)
+        pairs.emplace_back(t.monomial, t.coeff);
+    }
+    _body = Polynomial(std::move(pairs));
+}
+
+Equation::Equation(const vector<Term> &terms)
+{
+    vector<pair<Monomial, Rational>> pairs;
+    pairs.reserve(terms.size());
+    for (const auto &t : terms)
+    {
+        pairs.emplace_back(t.monomial, t.coeff);
+    }
+    _body = Polynomial(std::move(pairs));
+}
+
+void Equation::prune_zero_deps()
+{
+    for (auto it = _deps.begin(); it != _deps.end();)
+    {
+        if (it->second.empty())
         {
-            if (my_comb.second == comb.second)
-            {
-                my_comb.first += comb.first;
-                merged = true;
-                break;
-            }
+            it = _deps.erase(it);
         }
-        if (!merged)
+        else
         {
-            _combination.push_back(comb);
+            ++it;
         }
     }
-    this->normalize();
+}
+
+Equation &Equation::operator+=(const Equation &other)
+{
+    _body += other._body;
+    for (const auto &[idx, coeff] : other._deps)
+    {
+        _deps[idx] += coeff;
+    }
+    prune_zero_deps();
+    return *this;
+}
+
+Equation &Equation::operator-=(const Equation &other)
+{
+    _body -= other._body;
+    for (const auto &[idx, coeff] : other._deps)
+    {
+        _deps[idx] -= coeff;
+    }
+    prune_zero_deps();
+    return *this;
+}
+
+Equation &Equation::operator*=(const Rational &r)
+{
+    _body *= r;
+    if (r == Rational(0))
+    {
+        _deps.clear();
+        return *this;
+    }
+    for (auto &[idx, coeff] : _deps)
+    {
+        coeff *= r;
+    }
+    return *this;
+}
+
+Equation &Equation::operator*=(const Monomial &m)
+{
+    _body *= m;
+    for (auto &[idx, coeff] : _deps)
+    {
+        coeff *= m;
+    }
     return *this;
 }
 
@@ -32,174 +92,129 @@ Equation Equation::operator+(const Equation &other) const
 {
     Equation res = *this;
     res += other;
-    res.normalize();
     return res;
-}
-
-Equation &Equation::operator-=(const Equation &other)
-{
-    return *this += -other;
 }
 
 Equation Equation::operator-(const Equation &other) const
 {
     Equation res = *this;
     res -= other;
-    res.normalize();
     return res;
 }
 
-Equation &Equation::operator*=(const Rational &multiplier)
-{
-    _terms *= multiplier;
-    for (auto &comb : _combination)
-    {
-        comb.first *= multiplier;
-    }
-    return *this;
-}
-
-Equation Equation::operator*(const Rational &multiplier) const
+Equation Equation::operator*(const Rational &r) const
 {
     Equation res = *this;
-    res *= multiplier;
+    res *= r;
     return res;
 }
 
-Equation &Equation::operator*=(const Term &multiplier)
-{
-    _terms *= multiplier;
-    for (auto &comb : _combination)
-    {
-        comb.first *= multiplier;
-    }
-    return *this;
-}
-
-Equation Equation::operator*(const Term &multiplier) const
+Equation Equation::operator*(const Monomial &m) const
 {
     Equation res = *this;
-    res *= multiplier;
+    res *= m;
     return res;
 }
 
 Equation Equation::operator-() const
 {
     Equation res = *this;
-    res._terms = -_terms;
-    for (auto &comb : res._combination)
+    res *= Rational(-1);
+    return res;
+}
+
+void Equation::make_monic()
+{
+    if (_body.empty())
     {
-        comb.first = -comb.first;
+        return;
+    }
+    Rational lead = _body.leading_coeff();
+    if (lead == Rational(1))
+    {
+        return;
+    }
+    *this *= (Rational(1) / lead);
+}
+
+// content_reduce 把 body 除以其所有项的公共单项式因子 f。
+// 为保持证明不变量
+//      body == sum_j _deps[j] * Eq_j
+// 必须把右边也除以 f，即每个证明系数都乘以 f^{-1}。
+// 因为 f 是非零单项式，这不会改变任何系数是零还是非零——
+// 所以依赖*集合*不受影响——但能让 body 与证明保持一致的缩放，
+// 从而后续 +=/-= 的相消判定仍然正确。
+void Equation::content_reduce()
+{
+    if (_body.empty())
+    {
+        return;
+    }
+    auto it = _body.begin();
+    Monomial common = it->first;
+    ++it;
+    for (; it != _body.end(); ++it)
+    {
+        common = common.gcd(it->first);
+        if (common.is_constant())
+        {
+            return;
+        }
+    }
+    // 滤掉数值近零的变量（不要用数值为零的量去除）。
+    Monomial safe;
+    for (const auto &[var, exp] : common.vars())
+    {
+        if (!Numerical::close_enough(var.to_double(), 0.0))
+        {
+            safe *= Monomial(var, exp);
+        }
+    }
+    if (safe.is_constant())
+    {
+        return;
+    }
+    // 把 body 除以 `safe`，并将证明系数乘以 safe^{-1}，
+    // 以保持不变量 body == sum_j _deps[j] * Eq_j。
+    Monomial inv = safe.inverse();
+    _body *= inv;
+    for (auto &[idx, coeff] : _deps)
+    {
+        coeff *= inv;
+    }
+}
+
+void Equation::set_index(size_t archive_index)
+{
+    _deps[archive_index] += Polynomial(Rational(1));
+    prune_zero_deps();
+}
+
+vector<size_t> Equation::dependency_indices() const
+{
+    vector<size_t> res;
+    res.reserve(_deps.size());
+    for (const auto &[idx, coeff] : _deps)
+    {
+        res.push_back(idx);
     }
     return res;
 }
 
-bool Equation::empty() const
+string Equation::to_string() const
 {
-    return _terms.empty();
-}
-
-bool Equation::linear() const
-{
-    for (const auto &term : _terms)
+    ostringstream oss;
+    oss << _body.to_string() << " (deps:";
+    for (const auto &[idx, coeff] : _deps)
     {
-        if (term.degree() > 1 || term.degree() < 0)
-        {
-            return false;
-        }
+        oss << " " << idx << "*[" << coeff.to_string() << "]";
     }
-    return true;
-}
-
-bool Equation::check_numerically() const
-{
-    double res = 0.0;
-    for (const auto &term : _terms)
-    {
-        res += term.to_double();
-    }
-    return Numerical::close_enough(res, 0.0);
-}
-
-void Equation::normalize()
-{
-    _terms.normalize();
-    for (auto it = _combination.begin(); it != _combination.end();)
-    {
-        it->first.normalize();
-        if (it->first.empty())
-        {
-            it = _combination.erase(it);
-        }
-        else
-        {
-            ++it;
-        }
-    }
-
-    if (_terms.empty())
-    {
-        return;
-    }
-
-    Rational r = Rational(1) / _terms.terms().front().coeff();
-    *this *= r;
-}
-
-void Equation::set_index(int n, LinearSystem *system)
-{
-    EquationIndex index(n, system);
-    for (auto &comb : _combination)
-    {
-        if (!comb.second.is_valid())
-        {
-            comb.second = index;
-            break;
-        }
-    }
-}
-
-void Equation::reduction()
-{
-    Term common = _terms.gcd();
-    Term r = Term() / common;
-    *this *= r;
-}
-
-std::vector<Term>::const_iterator Equation::begin() const
-{
-    return _terms.begin();
-}
-
-std::vector<Term>::const_iterator Equation::end() const
-{
-    return _terms.end();
+    oss << ")";
+    return oss.str();
 }
 
 ostream &operator<<(ostream &os, const Equation &eq)
 {
-    bool first = true;
-    for (const auto &term : eq.terms())
-    {
-        if (!first)
-        {
-            os << " + ";
-        }
-        os << term;
-        first = false;
-    }
-    os << " = 0 ( ";
-    for (const auto &comb : eq.combination())
-    {
-        if (!comb.second.is_valid())
-        {
-            os << comb.first << "*Eq<*> ";
-        }
-        else
-        {
-            os << comb.first << "*Eq" << comb.second << " ";
-        }
-    }
-    os << ")";
+    os << eq.to_string();
     return os;
 }

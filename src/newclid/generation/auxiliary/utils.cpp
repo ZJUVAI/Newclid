@@ -38,28 +38,12 @@ bool is_point_too_far(const std::vector<Point>& points,
                       const std::vector<Point>& existing) {
     if (existing.size() < 2) return false;
 
-    // Calculate centroid
-    double sum_x = 0, sum_y = 0;
-    int n = (int)existing.size();
-    for (const auto& e : existing) {
-        sum_x += e[0];
-        sum_y += e[1];
-    }
-    double avg_x = sum_x / n;
-    double avg_y = sum_y / n;
-
-    // Calculate max distance from centroid
-    double maxdist = 0;
-    for (const auto& e : existing) {
-        double d = dist(e, {avg_x, avg_y});
-        if (d > maxdist) maxdist = d;
-    }
-
-    double factor = 5.0;
+    double max_dist = 6.0;
     for (const auto& p : points) {
         for (const auto& e : existing) {
             double d = dist(p, e);
-            if (d > factor * maxdist) {
+            if(d > max_dist)
+            {
                 return true;
             }
         }

@@ -1,8 +1,11 @@
 #ifndef REDUCED_EQUATION_HPP
 #define REDUCED_EQUATION_HPP
 
+#include <vector>
 #include "ar/equation.hpp"
-#include "ar/linear_system.hpp"
+
+class LinearSystem;
+class Proof;
 
 class ReducedEquation final
 {
@@ -22,11 +25,7 @@ public:
 
     bool is_solved() const;
 
-    bool substitute_variable(Term var, const Equation &e);
-
     void reduce();
-
-    void set_index(size_t index, const LinearSystem *system);
 
     std::vector<Proof *> statement_dependencies() const;
 };
