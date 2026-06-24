@@ -70,7 +70,6 @@ public:
     bool operator<(const Coll &other) const;
 
     std::vector<std::unique_ptr<Equation>> as_equation_dist(bool exp, bool using_ar) const override;
-    std::vector<std::unique_ptr<Equation>> as_equation_slope(bool exp, bool using_ar) const override;
 
     Coll reverse() const;
 };

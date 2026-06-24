@@ -598,6 +598,13 @@ void Matcher::on_circle(const Point &center, const vector<pair<double, Point>> &
                     }
                 }
             }
+            else if (!points[pt_a].second.is_close(points[pt_b].second))
+            {
+                // 等腰三角形底角相等
+                insert_theorem(Theorem::cong_of_eqangle(center, points[pt_a].second, points[pt_b].second));
+                insert_theorem(Theorem::eqangle_of_cong(center, points[pt_a].second, points[pt_b].second));
+            }
+
             for (size_t pt_c = pt_b + 1; pt_c < size; pt_c++)
             {
                 on_circumcenter(CircumCenter(center, Triangle(points[pt_a].second, points[pt_b].second, points[pt_c].second)));
