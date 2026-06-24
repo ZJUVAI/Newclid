@@ -7,6 +7,7 @@ from experiments.cot_sft_generation.geometry_text import (
     build_hidden_coordinate_guidance,
     build_multi_aux_instruction,
     build_public_problem_text,
+    extract_point_mentions,
     extract_relation_segment_tokens,
     extract_problem_goal,
     normalize_relation_surface,
@@ -47,6 +48,34 @@ class CotSftGeometryTextTest(unittest.TestCase):
             normalize_relation_surface("point g appears to be equidistant from b and e"),
             "gb equals ge",
         )
+        self.assertEqual(
+            normalize_relation_surface("segment AD equals segment AE"),
+            "ad equals ae",
+        )
+        self.assertEqual(
+            normalize_relation_surface("the angle formed by be and bf equals the angle formed by cf and bf"),
+            "angle be/bf equals angle cf/bf",
+        )
+        self.assertEqual(
+            normalize_relation_surface("the angle between ac and bh equals the angle between ch and bd"),
+            "angle ac/bh equals angle ch/bd",
+        )
+        self.assertEqual(
+            normalize_relation_surface("the angle between ac and bh must equal the angle between ch and bd"),
+            "angle ac/bh equals angle ch/bd",
+        )
+        self.assertEqual(
+            normalize_relation_surface("the angle between lines ab and ac equals the angle between lines ad and ae"),
+            "angle ab/ac equals angle ad/ae",
+        )
+        self.assertEqual(
+            normalize_relation_surface("the ratio of side bd to side be equals the ratio of side ce to side cg"),
+            "ratio bd to be equals ratio ce to cg",
+        )
+        self.assertEqual(
+            normalize_relation_surface("the ratio of the length ag to ai is equal to the ratio of the length gi to hi"),
+            "ratio ag to ai equals ratio gi to hi",
+        )
 
     def test_relations_semantically_match_accepts_surface_variants(self):
         self.assertTrue(
@@ -82,6 +111,14 @@ class CotSftGeometryTextTest(unittest.TestCase):
         self.assertEqual(
             extract_relation_segment_tokens("points b, d, and f look nearly collinear"),
             {"bd", "bf", "df"},
+        )
+        self.assertEqual(
+            extract_point_mentions("ratio ad to bc equals ratio de to ch", ["h"]),
+            {"h"},
+        )
+        self.assertEqual(
+            extract_point_mentions("triangles afg and bfh are similar", ["h"]),
+            {"h"},
         )
 
         supports = [

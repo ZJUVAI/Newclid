@@ -390,6 +390,314 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
 
         self.assertTrue(ok, msg=message)
 
+    def test_collect_backtrace_writer_issues_does_not_flag_visible_ratio_summary_as_hidden_relation(self):
+        writer_handoff = {
+            "goal_nl": "triangles acg and fag are similar",
+            "backtrace_stages": [
+                {
+                    "claim_nl": "triangles acg and fag are similar",
+                    "depth": 0,
+                    "visible_support_nl": ["angle ac/af equals angle cg/ag"],
+                    "subgoal_claims_nl": ["ratio ac to af equals ratio cg to ag"],
+                    "stops_at_aux_boundary": False,
+                },
+                {
+                    "claim_nl": "ratio ac to af equals ratio cg to ag",
+                    "depth": 1,
+                    "visible_support_nl": [
+                        "ad equals cd",
+                        "be equals dg",
+                        "ratio ab to ac equals ratio be to ag",
+                        "ratio ab to ac equals ratio cd to ce",
+                        "ratio ac to ae equals ratio cd to ce",
+                        "ratio ae to cg equals ratio de to eg",
+                    ],
+                    "subgoal_claims_nl": [],
+                    "stops_at_aux_boundary": True,
+                },
+            ],
+            "terminal_claims_nl": ["ratio ac to af equals ratio cg to ag"],
+            "aux_construction_nl": "construct point h such that a, b, e, h are concyclic and a, c, g, h are concyclic",
+        }
+        backtrace_slots = {
+            "H_relations_nl": [
+                "ratio ad to bc equals ratio de to ch",
+                "triangles afg and bfh are similar",
+            ]
+        }
+        body = (
+            "To prove that triangles acg and fag are similar, we begin by identifying the visible angular conditions. "
+            "We see that angle ac/af equals angle cg/ag, which satisfies one requirement for similarity. "
+            "The remaining subgoal is to demonstrate that the ratio ac to af equals the ratio cg to ag. "
+            "Turning to this ratio claim, we examine the available visible support regarding segment lengths and proportions. "
+            "We know that ad equals cd and be equals dg. Additionally, the ratio ab to ac equals the ratio be to ag, and the ratio ab to ac equals the ratio cd to ce. "
+            "We also have that the ratio ac to ae equals the ratio cd to ce, and the ratio ae to cg equals the ratio de to eg. "
+            "Although these relations establish connections between segments ad, cd, be, dg, ab, ac, ce, ae, de, and eg, they do not directly yield the equality between the ratio ac to af and the ratio cg to ag. "
+            "The visible route is not enough to conclude this proportionality using only the stated constraints. "
+            "Since the visible path reaches its limit, we introduce an auxiliary construction to bridge the gap. "
+            "We construct point h such that a, b, e, h are concyclic and a, c, g, h are concyclic."
+        )
+
+        issues = collect_backtrace_writer_issues(
+            body,
+            writer_handoff=writer_handoff,
+            backtrace_slots=backtrace_slots,
+            aux_part="<aux>x00 h : cyclic a b e h [010] cyclic a c g h [011] ; </aux>",
+        )
+
+        self.assertNotIn("early_hidden_relation", issues)
+
+    def test_collect_backtrace_writer_issues_allows_reused_terminal_subgoal_after_later_parent_stage(self):
+        writer_handoff = {
+            "goal_nl": "triangles agi and igh are similar",
+            "backtrace_stages": [
+                {
+                    "claim_nl": "triangles agi and igh are similar",
+                    "depth": 0,
+                    "visible_support_nl": [],
+                    "subgoal_claims_nl": [
+                        "angle ag/ai equals angle hi/gi",
+                        "ratio ag to ai equals ratio gi to hi",
+                    ],
+                    "stops_at_aux_boundary": False,
+                },
+                {
+                    "claim_nl": "angle ag/ai equals angle hi/gi",
+                    "depth": 1,
+                    "visible_support_nl": [
+                        "a, g, h are collinear",
+                        "ad equals ae",
+                    ],
+                    "subgoal_claims_nl": ["dg equals gi"],
+                    "stops_at_aux_boundary": False,
+                },
+                {
+                    "claim_nl": "dg equals gi",
+                    "depth": 2,
+                    "visible_support_nl": [],
+                    "subgoal_claims_nl": [],
+                    "stops_at_aux_boundary": True,
+                },
+                {
+                    "claim_nl": "ratio ag to ai equals ratio gi to hi",
+                    "depth": 1,
+                    "visible_support_nl": [
+                        "de equals dg",
+                        "de equals dh",
+                    ],
+                    "subgoal_claims_nl": ["dg equals gi"],
+                    "stops_at_aux_boundary": False,
+                },
+            ],
+            "terminal_claims_nl": ["dg equals gi"],
+            "aux_construction_nl": (
+                "construct point j such that line cf is perpendicular to line fj and cf equals fj. "
+                "then construct point k such that line cf is parallel to line jk and line ck is parallel to line fj"
+            ),
+        }
+        body = (
+            "We start with the goal that triangles agi and igh are similar. "
+            "At this stage, there is no immediate visible support, so we break the claim down into two subgoal claims: "
+            "first, that the angle ag/ai equals angle hi/gi, and second, that the ratio ag to ai equals ratio gi to hi. "
+            "Moving to the first subgoal, we examine the claim that angle ag/ai equals angle hi/gi. "
+            "The visible support for this includes the collinearity of points a, g, and h, and we also have ad equals ae. "
+            "Despite this support, the claim reduces to a remaining subgoal: we must show that dg equals gi. "
+            "Next, we focus on the claim that dg equals gi. "
+            "At this depth, there is no visible support available to confirm this equality directly. "
+            "We have reached the visible boundary, indicating that the current visible route is not enough to derive this result from the existing configuration. "
+            "To proceed past this limit, we introduce an auxiliary construction. "
+            "We construct point j such that line cf is perpendicular to line fj and cf equals fj. "
+            "Then we construct point k such that line cf is parallel to line jk and line ck is parallel to line fj. "
+            "Finally, we consider the second subgoal from the initial stage, that the ratio ag to ai equals ratio gi to hi. "
+            "The visible support here includes equalities like de equals dg and de equals dh. "
+            "This claim also reduces to the subgoal that dg equals gi."
+        )
+
+        issues = collect_backtrace_writer_issues(
+            body,
+            writer_handoff=writer_handoff,
+            backtrace_slots={"H_relations_nl": []},
+            aux_part="<aux>x00 j : perp c f f j [016] cong c f f j [017] ; x00 k : para c f j k [018] para c k f j [019] ; </aux>",
+        )
+
+        self.assertNotIn("narrative_order_violation", issues)
+        self.assertEqual(issues, [])
+
+    def test_collect_backtrace_writer_issues_accepts_does_not_provide_enough_boundary_phrase(self):
+        writer_handoff = {
+            "goal_nl": "triangles ach and dbh are congruent",
+            "backtrace_stages": [
+                {
+                    "claim_nl": "triangles ach and dbh are congruent",
+                    "depth": 0,
+                    "visible_support_nl": [],
+                    "subgoal_claims_nl": ["bh equals ch"],
+                    "stops_at_aux_boundary": False,
+                },
+                {
+                    "claim_nl": "bh equals ch",
+                    "depth": 1,
+                    "visible_support_nl": [],
+                    "subgoal_claims_nl": [],
+                    "stops_at_aux_boundary": True,
+                },
+            ],
+            "terminal_claims_nl": ["bh equals ch"],
+            "aux_construction_nl": "construct point i such that i is the midpoint of ac",
+        }
+        body = (
+            "The main objective is to prove that triangles ach and dbh are congruent. "
+            "To establish this congruence, we reduce the task to the subgoal that bh equals ch. "
+            "Next, we address the subgoal that bh equals ch. "
+            "The visible support involves collinearity with point h and congruences related to point g. "
+            "Despite these constraints, the visible route does not provide enough information to confirm that bh equals ch. "
+            "We must introduce an auxiliary construction to proceed. "
+            "Construct point i such that i is the midpoint of ac."
+        )
+
+        issues = collect_backtrace_writer_issues(
+            body,
+            writer_handoff=writer_handoff,
+            backtrace_slots={"H_relations_nl": []},
+            aux_part="<aux>x00 i : midp i a c [010] ; </aux>",
+        )
+
+        self.assertEqual(issues, [])
+
+    def test_collect_backtrace_writer_issues_allows_root_subgoal_list_before_sibling_expansion(self):
+        writer_handoff = {
+            "goal_nl": "triangles abe and dca are similar",
+            "backtrace_stages": [
+                {
+                    "claim_nl": "triangles abe and dca are similar",
+                    "depth": 0,
+                    "visible_support_nl": [],
+                    "subgoal_claims_nl": [
+                        "angle ab/be equals angle cd/ac",
+                        "ratio ab to be equals ratio cd to ac",
+                    ],
+                    "stops_at_aux_boundary": False,
+                },
+                {
+                    "claim_nl": "angle ab/be equals angle cd/ac",
+                    "depth": 1,
+                    "visible_support_nl": [],
+                    "subgoal_claims_nl": [],
+                    "stops_at_aux_boundary": True,
+                },
+                {
+                    "claim_nl": "ratio ab to be equals ratio cd to ac",
+                    "depth": 1,
+                    "visible_support_nl": [],
+                    "subgoal_claims_nl": [],
+                    "stops_at_aux_boundary": True,
+                },
+            ],
+            "terminal_claims_nl": [
+                "angle ab/be equals angle cd/ac",
+                "ratio ab to be equals ratio cd to ac",
+            ],
+            "aux_construction_nl": (
+                "construct point f such that bf equals cf and b, c, d, f are concyclic. "
+                "then construct point g such that c, d, g are collinear and a, f, g are collinear"
+            ),
+        }
+        body = (
+            "To prove that triangles abe and dca are similar, the main claim breaks down into two immediate subgoals. "
+            "The first subgoal is to show that the angle formed by sides ab and be equals the angle formed by sides cd and ac. "
+            "The second subgoal is to show that the ratio of the length ab to be equals the ratio of the length cd to ac. "
+            "For the first subgoal, I examine the angle condition where the angle formed by ab and be must equal the angle formed by cd and ac. "
+            "The visible route for this subgoal reaches its limit without proving the claim. "
+            "For the second subgoal, I examine the ratio condition where the ratio of ab to be must equal the ratio of cd to ac. "
+            "The visible support does not extend far enough to establish this proportionality without additional geometric connections. "
+            "Since both subgoals reach a boundary, I will construct a point f such that the length bf equals cf and the points b, c, d, f are concyclic. "
+            "Then, I will construct a point g such that points c, d, g are collinear and points a, f, g are collinear."
+        )
+
+        issues = collect_backtrace_writer_issues(
+            body,
+            writer_handoff=writer_handoff,
+            backtrace_slots={"H_relations_nl": []},
+            aux_part="<aux>x00 f : cong b f c f [010] cyclic b c d f [011] ; x00 g : coll c d g [012] coll a f g [013] ; </aux>",
+        )
+
+        self.assertEqual(issues, [])
+
+    def test_collect_backtrace_writer_issues_accepts_do_not_provide_sufficient_boundary_phrase(self):
+        writer_handoff = {
+            "goal_nl": "angle ab/ac equals angle ad/ae",
+            "backtrace_stages": [
+                {
+                    "claim_nl": "angle ab/ac equals angle ad/ae",
+                    "depth": 0,
+                    "visible_support_nl": ["ad equals ae"],
+                    "subgoal_claims_nl": [],
+                    "stops_at_aux_boundary": True,
+                }
+            ],
+            "terminal_claims_nl": ["angle ab/ac equals angle ad/ae"],
+            "aux_construction_nl": "construct point f such that a, c, d, f are concyclic and b, d, f are collinear",
+        }
+        body = (
+            "The goal is to prove that angle bac equals angle dae. "
+            "We are given that ad equals ae. "
+            "However, the direct length and angle equalities among the given points do not provide a sufficient geometric bridge to equate the two angles. "
+            "To proceed beyond this boundary, we introduce an auxiliary construction. "
+            "Construct point f such that points a, c, d, f are concyclic and points b, d, f are collinear."
+        )
+
+        issues = collect_backtrace_writer_issues(
+            body,
+            writer_handoff=writer_handoff,
+            backtrace_slots={"H_relations_nl": []},
+            aux_part="<aux>x00 f : cyclic a c d f [010] coll b d f [011] ; </aux>",
+        )
+
+        self.assertEqual(issues, [])
+
+    def test_collect_backtrace_writer_issues_does_not_treat_non_aux_constructed_point_as_aux_start(self):
+        writer_handoff = {
+            "goal_nl": "triangles ach and dbh are congruent",
+            "backtrace_stages": [
+                {
+                    "claim_nl": "triangles ach and dbh are congruent",
+                    "depth": 0,
+                    "visible_support_nl": [],
+                    "subgoal_claims_nl": ["bh equals ch"],
+                    "stops_at_aux_boundary": False,
+                },
+                {
+                    "claim_nl": "bh equals ch",
+                    "depth": 1,
+                    "visible_support_nl": [],
+                    "subgoal_claims_nl": [],
+                    "stops_at_aux_boundary": True,
+                },
+            ],
+            "terminal_claims_nl": ["bh equals ch"],
+            "aux_construction_nl": (
+                "construct point i such that i is the midpoint of ac. "
+                "then construct point j such that a, c, j are collinear and e, f, j are collinear"
+            ),
+        }
+        body = (
+            "To establish that triangles ach and dbh are congruent, we reduce the task to the subgoal that bh equals ch. "
+            "Next, we examine the claim that bh equals ch. "
+            "Point h is constructed based on points d and g, while b and c are foundational points. "
+            "Consequently, the visible route reaches its limit here, as the existing geometry does not enforce this equality without further intervention. "
+            "We construct point i such that i is the midpoint of ac. "
+            "Then we construct point j such that a, c, j are collinear and e, f, j are collinear."
+        )
+
+        issues = collect_backtrace_writer_issues(
+            body,
+            writer_handoff=writer_handoff,
+            backtrace_slots={"H_relations_nl": []},
+            aux_part="<aux>x00 i : midp i a c [010] ; x00 j : coll a c j [011] coll e f j [012] ; </aux>",
+        )
+
+        self.assertEqual(issues, [])
+
     def test_process_and_generate_sft_runs_backtrace_text_v1_without_image_inputs(self):
         record = _build_backtrace_record()
 

@@ -14,7 +14,10 @@ try:
         build_public_problem_text,
         extract_aux_new_points,
         extract_point_mentions,
+        extract_relation_segment_tokens,
+        extract_relation_signatures,
         normalize_relation_surface,
+        relation_text_keywords,
         relations_semantically_match,
     )
 except ImportError:  # pragma: no cover - script execution path
@@ -23,7 +26,10 @@ except ImportError:  # pragma: no cover - script execution path
         build_public_problem_text,
         extract_aux_new_points,
         extract_point_mentions,
+        extract_relation_segment_tokens,
+        extract_relation_signatures,
         normalize_relation_surface,
+        relation_text_keywords,
         relations_semantically_match,
     )
 
@@ -37,9 +43,9 @@ _TEXT_ONLY_BOUNDARY_RE = re.compile(
     r"(?:<coord>|\bcoordinate(?:s| table)?\b|\bimage\b|\bdiagram\b|\bfigure scan\b|\bgrid\b|\b[a-z]\w*\s*=\s*\(\s*-?\d+\s*,\s*-?\d+\s*\))",
     re.IGNORECASE,
 )
-_AUX_CONSTRUCTION_RE = re.compile(r"\bconstruct\s+point\s+([a-z]\w*)\b", re.IGNORECASE)
+_AUX_CONSTRUCTION_RE = re.compile(r"\bconstruct\s+(?:a\s+)?point\s+([a-z]\w*)\b", re.IGNORECASE)
 _INSUFFICIENCY_RE = re.compile(
-    r"\b(?:still|not enough|not yet|alone|by itself|cannot|can't|without|so we need|need a|need to|this is why)\b",
+    r"\b(?:still|not enough|not yet|alone|by itself|cannot|can't|without|insufficient|insufficiency|visible boundary|visible limit|does not provide enough|doesn't provide enough|do not provide (?:a\s+)?sufficient|does not provide (?:a\s+)?sufficient|not sufficient|so we need|need a|need to|this is why)\b",
     re.IGNORECASE,
 )
 _POINT_RE = re.compile(r"\b([a-z][a-z0-9]*)\b", re.IGNORECASE)
@@ -49,22 +55,27 @@ def _split_into_sentences(text: str) -> list[str]:
     return [part.strip() for part in re.split(r"(?<=[.!?])\s+", str(text or "").strip()) if part.strip()]
 
 
-def _extract_relation_candidates(text: str) -> list[str]:
+def _extract_relation_candidates(text: str, *, include_full_sentence: bool = True) -> list[str]:
     sentence = str(text or "").strip()
     if not sentence:
         return []
     patterns = [
-        r"(?:the\s+)?ratio(?:\s+of)?\s+(?:segment\s+)?[a-z]{2}\s+to\s+(?:segment\s+)?[a-z]{2}\s+(?:equals|is\s+equal\s+to)\s+(?:the\s+)?ratio(?:\s+of)?\s+(?:segment\s+)?[a-z]{2}\s+to\s+(?:segment\s+)?[a-z]{2}",
+        r"(?:the\s+)?ratio(?:\s+of)?\s+(?:segment\s+)?[a-z]{2}\s+to\s+(?:segment\s+)?[a-z]{2}\s+(?:equals|is\s+equal\s+to|must\s+equal)\s+(?:the\s+)?ratio(?:\s+of)?\s+(?:segment\s+)?[a-z]{2}\s+to\s+(?:segment\s+)?[a-z]{2}",
+        r"(?:the\s+)?ratio\s+of\s+(?:side|segment|length)\s+[a-z]{2}\s+to\s+(?:side|segment|length)\s+[a-z]{2}\s+(?:equals|is\s+equal\s+to|must\s+equal)\s+(?:the\s+)?ratio\s+of\s+(?:side|segment|length)\s+[a-z]{2}\s+to\s+(?:side|segment|length)\s+[a-z]{2}",
         r"(?:points?\s+)?[a-z]\w*\s*,\s*[a-z]\w*\s*,\s*(?:and\s+)?[a-z]\w*\s+(?:lie\s+on|are\s+on)\s+(?:the\s+)?same\s+line",
         r"(?:points?\s+)?[a-z]\w*\s*,\s*[a-z]\w*\s*,\s*(?:and\s+)?[a-z]\w*\s+are\s+collinear",
         r"line\s+[a-z]{2}\s+is\s+parallel\s+to\s+line\s+[a-z]{2}",
         r"line\s+[a-z]{2}\s+is\s+perpendicular\s+to\s+line\s+[a-z]{2}",
         r"angle\s+[a-z]{2}/[a-z]{2}\s+equals\s+angle\s+[a-z]{2}/[a-z]{2}",
+        r"(?:the\s+)?angle\s+[a-z]{2}/[a-z]{2}\s+(?:equals|is\s+equal\s+to|must\s+equal)\s+(?:the\s+)?angle\s+[a-z]{2}/[a-z]{2}",
+        r"(?:the\s+)?angle\s+formed\s+by\s+(?:(?:segments?|lines?)\s+)?[a-z]{2}\s+and\s+[a-z]{2}\s+(?:equals|is\s+equal\s+to|must\s+equal)\s+(?:the\s+)?angle\s+formed\s+by\s+(?:(?:segments?|lines?)\s+)?[a-z]{2}\s+and\s+[a-z]{2}",
+        r"(?:the\s+)?angle\s+between\s+(?:(?:segments?|lines?)\s+)?[a-z]{2}\s+and\s+(?:(?:segments?|lines?)\s+)?[a-z]{2}\s+(?:equals|is\s+equal\s+to|must\s+equal)\s+(?:the\s+)?angle\s+between\s+(?:(?:segments?|lines?)\s+)?[a-z]{2}\s+and\s+(?:(?:segments?|lines?)\s+)?[a-z]{2}",
         r"triangles\s+[a-z]{3}\s+and\s+[a-z]{3}\s+are\s+(?:similar|congruent)",
         r"[a-z]{2}\s+equals\s+[a-z]{2}",
+        r"(?:segment|side)\s+[a-z]{2}\s+(?:equals|is\s+equal\s+to|is\s+equal\s+in\s+length\s+to|must\s+equal)\s+(?:segment|side)\s+[a-z]{2}",
         r"equality\s+of\s+[a-z]{2}\s+and\s+[a-z]{2}",
     ]
-    candidates = [normalize_relation_surface(sentence)]
+    candidates = [normalize_relation_surface(sentence)] if include_full_sentence else []
     for pattern in patterns:
         for match in re.finditer(pattern, sentence, flags=re.IGNORECASE):
             candidates.append(normalize_relation_surface(match.group(0)))
@@ -80,6 +91,47 @@ def _extract_relation_candidates(text: str) -> list[str]:
         deduped.append(normalized_candidate)
         seen.add(normalized_candidate)
     return deduped
+
+
+def _relations_strictly_match(text_a: str, text_b: str, point_names: list[str]) -> bool:
+    normalized_a = normalize_relation_surface(text_a or "").lower()
+    normalized_b = normalize_relation_surface(text_b or "").lower()
+    if not normalized_a or not normalized_b:
+        return False
+    if normalized_a == normalized_b:
+        return True
+
+    keywords_a = relation_text_keywords(normalized_a)
+    keywords_b = relation_text_keywords(normalized_b)
+    if not keywords_a or not keywords_b or keywords_a != keywords_b:
+        return False
+
+    signatures_a = extract_relation_signatures(normalized_a)
+    signatures_b = extract_relation_signatures(normalized_b)
+    for family in ["collinear", "midpoint", "equal", "parallel", "perpendicular"]:
+        if family not in keywords_a:
+            continue
+        if signatures_a[family] or signatures_b[family]:
+            return bool(signatures_a[family] & signatures_b[family])
+
+    segments_a = extract_relation_segment_tokens(normalized_a)
+    segments_b = extract_relation_segment_tokens(normalized_b)
+    if segments_a and segments_b:
+        return segments_a == segments_b
+
+    return relations_semantically_match(text_a, text_b, point_names)
+
+
+def _relation_mentioned_in_text_strict(text: str, relation: str, point_names: list[str]) -> bool:
+    normalized_relation = normalize_relation_surface(relation or "")
+    if not normalized_relation:
+        return False
+    for sentence in _split_into_sentences(text):
+        candidates = _extract_relation_candidates(sentence, include_full_sentence=False)
+        for candidate in candidates:
+            if _relations_strictly_match(candidate, normalized_relation, point_names):
+                return True
+    return False
 
 
 def _relation_mentioned_in_text(text: str, relation: str, point_names: list[str]) -> bool:
@@ -136,23 +188,43 @@ def build_backtrace_writer_retry_feedback(message: str, writer_handoff: dict | N
     )
 
 
-def _first_sentence_idx_for_relation(sentences: list[str], relation: str, point_pool: list[str]) -> int | None:
+def _first_sentence_idx_for_relation_from(
+    sentences: list[str],
+    relation: str,
+    point_pool: list[str],
+    start_idx: int = 0,
+) -> int | None:
     if not relation:
         return None
-    for idx, sentence in enumerate(sentences):
+    for idx in range(max(start_idx, 0), len(sentences)):
+        sentence = sentences[idx]
         if _relation_mentioned_in_text(sentence, relation, point_pool):
             return idx
     return None
 
 
-def _first_sentence_idx_for_any_relation(sentences: list[str], relations: list[str], point_pool: list[str]) -> int | None:
+def _first_sentence_idx_for_relation(sentences: list[str], relation: str, point_pool: list[str]) -> int | None:
+    return _first_sentence_idx_for_relation_from(sentences, relation, point_pool, start_idx=0)
+
+
+def _first_sentence_idx_for_any_relation_from(
+    sentences: list[str],
+    relations: list[str],
+    point_pool: list[str],
+    start_idx: int = 0,
+) -> int | None:
     relation_list = [relation for relation in relations if relation]
     if not relation_list:
         return None
-    for idx, sentence in enumerate(sentences):
+    for idx in range(max(start_idx, 0), len(sentences)):
+        sentence = sentences[idx]
         if any(_relation_mentioned_in_text(sentence, relation, point_pool) for relation in relation_list):
             return idx
     return None
+
+
+def _first_sentence_idx_for_any_relation(sentences: list[str], relations: list[str], point_pool: list[str]) -> int | None:
+    return _first_sentence_idx_for_any_relation_from(sentences, relations, point_pool, start_idx=0)
 
 
 def collect_backtrace_writer_issues(
@@ -212,8 +284,9 @@ def collect_backtrace_writer_issues(
         (
             idx
             for idx, sentence in enumerate(sentences)
+            for sentence_points in [set(point.lower() for point in _POINT_RE.findall(sentence.lower()))]
             if _AUX_CONSTRUCTION_RE.search(sentence)
-            or any(point in sentence.lower() and "construct" in sentence.lower() for point in aux_points)
+            or ("construct" in sentence.lower() and any(point in sentence_points for point in aux_points))
             or (aux_construction_nl and _relation_mentioned_in_text(sentence, aux_construction_nl, point_pool))
         ),
         None,
@@ -228,10 +301,10 @@ def collect_backtrace_writer_issues(
     if aux_construction_nl and aux_idx is None:
         issues.append("missing_aux_reference")
 
-    last_stage_claim_idx = goal_idx if goal_idx is not None else -1
+    stage_cursor = (goal_idx - 1) if goal_idx is not None else -1
     first_terminal_claim_idx = None
     saw_terminal_boundary = False
-    for stage in backtrace_stages:
+    for stage_index, stage in enumerate(backtrace_stages):
         claim_nl = str(stage.get("claim_nl") or "").strip()
         visible_support_nl = [
             str(item).strip()
@@ -245,20 +318,43 @@ def collect_backtrace_writer_issues(
         ]
         is_terminal = bool(stage.get("stops_at_aux_boundary"))
 
-        claim_idx = _first_sentence_idx_for_relation(sentences, claim_nl, point_pool)
+        claim_search_start = max(stage_cursor + 1, 0)
+        if stage_index == 0 and goal_idx is not None:
+            claim_search_start = max(goal_idx, 0)
+        claim_idx = _first_sentence_idx_for_relation_from(
+            sentences,
+            claim_nl,
+            point_pool,
+            claim_search_start,
+        )
+        if claim_idx is None and stage_index > 0 and stage_cursor >= 0:
+            fallback_claim_idx = _first_sentence_idx_for_relation_from(
+                sentences,
+                claim_nl,
+                point_pool,
+                stage_cursor,
+            )
+            if fallback_claim_idx == stage_cursor:
+                claim_idx = fallback_claim_idx
         if claim_nl and claim_idx is None:
             issues.append("missing_stage_reference")
             continue
-        if claim_idx is not None and claim_idx < last_stage_claim_idx:
+        if claim_idx is not None and claim_idx < stage_cursor:
             issues.append("narrative_order_violation")
-        if claim_idx is not None:
-            last_stage_claim_idx = claim_idx
+        local_cursor = claim_idx if claim_idx is not None else stage_cursor
 
-        support_idx = _first_sentence_idx_for_any_relation(sentences, visible_support_nl, point_pool)
+        support_idx = _first_sentence_idx_for_any_relation_from(
+            sentences,
+            visible_support_nl,
+            point_pool,
+            local_cursor,
+        )
         if visible_support_nl and support_idx is None:
             issues.append("missing_stage_support_reference")
         if claim_idx is not None and support_idx is not None and support_idx < claim_idx:
             issues.append("narrative_order_violation")
+        if support_idx is not None:
+            local_cursor = max(local_cursor, support_idx)
 
         if is_terminal:
             if first_terminal_claim_idx is None:
@@ -266,21 +362,60 @@ def collect_backtrace_writer_issues(
             if claim_idx is not None and aux_idx is not None and aux_idx < claim_idx:
                 issues.append("narrative_order_violation")
             window_start = claim_idx if claim_idx is not None else 0
+            next_stage_claim_idx = None
+            if stage_index + 1 < len(backtrace_stages):
+                next_claim_nl = str(backtrace_stages[stage_index + 1].get("claim_nl") or "").strip()
+                next_stage_claim_idx = _first_sentence_idx_for_relation_from(
+                    sentences,
+                    next_claim_nl,
+                    point_pool,
+                    window_start + 1,
+                )
             window_end = aux_idx + 1 if aux_idx is not None else len(sentences)
+            if next_stage_claim_idx is not None and next_stage_claim_idx > window_start:
+                window_end = min(window_end, next_stage_claim_idx)
             insufficiency_window = " ".join(sentences[window_start:window_end])
+            stage_insufficiency_idx = next(
+                (
+                    idx
+                    for idx in range(window_start, window_end)
+                    if _INSUFFICIENCY_RE.search(sentences[idx])
+                ),
+                None,
+            )
             if not _INSUFFICIENCY_RE.search(insufficiency_window):
                 issues.append("support_insufficiency_missing")
             else:
                 saw_terminal_boundary = True
+            if stage_insufficiency_idx is not None:
+                local_cursor = max(local_cursor, stage_insufficiency_idx)
+            elif insufficiency_idx is not None and insufficiency_idx >= window_start:
+                local_cursor = max(local_cursor, insufficiency_idx)
+            stage_cursor = max(stage_cursor, local_cursor)
             continue
 
+        subgoal_match_indices: dict[str, int] = {}
+        subgoal_search_start = local_cursor
         for subgoal_nl in subgoal_claims_nl:
-            subgoal_idx = _first_sentence_idx_for_relation(sentences, subgoal_nl, point_pool)
+            subgoal_idx = _first_sentence_idx_for_relation_from(
+                sentences,
+                subgoal_nl,
+                point_pool,
+                subgoal_search_start,
+            )
             if subgoal_idx is None:
                 issues.append("missing_stage_subgoal_reference")
                 continue
             if claim_idx is not None and subgoal_idx < claim_idx:
                 issues.append("narrative_order_violation")
+            subgoal_match_indices[normalize_relation_surface(subgoal_nl)] = subgoal_idx
+        next_stage_cursor = local_cursor
+        if stage_index + 1 < len(backtrace_stages):
+            next_claim_nl = normalize_relation_surface(
+                str(backtrace_stages[stage_index + 1].get("claim_nl") or "").strip()
+            )
+            next_stage_cursor = subgoal_match_indices.get(next_claim_nl, local_cursor)
+        stage_cursor = max(stage_cursor, next_stage_cursor)
 
     if first_terminal_claim_idx is not None and aux_idx is not None and aux_idx < first_terminal_claim_idx:
         issues.append("narrative_order_violation")
@@ -303,7 +438,7 @@ def collect_backtrace_writer_issues(
             continue
         if aux_construction_nl and relations_semantically_match(relation, aux_construction_nl, point_pool):
             continue
-        if _relation_mentioned_in_text(pre_aux_text, relation, point_pool):
+        if _relation_mentioned_in_text_strict(pre_aux_text, relation, point_pool):
             issues.append("early_hidden_relation")
             break
 

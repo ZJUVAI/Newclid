@@ -88,6 +88,12 @@ def extract_point_mentions(text, visible_points):
         for token in bare_compounds:
             if all(char in single_letter_points for char in token):
                 mentioned.update(token)
+        # Recover point mentions embedded inside explicit geometry carriers such
+        # as segment tokens (`ch`) or triangle names (`bfh`).
+        for token in extract_relation_segment_tokens(text):
+            for char in token:
+                if char in single_letter_points:
+                    mentioned.add(char)
     return mentioned
 
 
@@ -189,12 +195,21 @@ def normalize_relation_surface(text):
     normalized = re.sub(r"^(?:then|thus|therefore|hence|so)\s+", "", normalized, flags=re.IGNORECASE)
     verbal_ratio_match = re.fullmatch(
         r"(?:the\s+)?ratio(?:\s+of)?\s+(?:segment\s+)?([a-z]{2})\s+to\s+(?:segment\s+)?([a-z]{2})\s+"
-        r"(?:equals|is\s+equal\s+to)\s+(?:the\s+)?ratio(?:\s+of)?\s+(?:segment\s+)?([a-z]{2})\s+to\s+(?:segment\s+)?([a-z]{2})\.?",
+        r"(?:equals|is\s+equal\s+to|must\s+equal)\s+(?:the\s+)?ratio(?:\s+of)?\s+(?:segment\s+)?([a-z]{2})\s+to\s+(?:segment\s+)?([a-z]{2})\.?",
         normalized,
         flags=re.IGNORECASE,
     )
     if verbal_ratio_match:
         left_num, left_den, right_num, right_den = [group.lower() for group in verbal_ratio_match.groups()]
+        return f"ratio {left_num} to {left_den} equals ratio {right_num} to {right_den}"
+    verbal_ratio_with_carrier_match = re.fullmatch(
+        r"(?:the\s+)?ratio\s+of\s+(?:the\s+)?(?:side|segment|length)\s+([a-z]{2})\s+to\s+(?:(?:the\s+)?(?:side|segment|length)\s+)?([a-z]{2})\s+"
+        r"(?:equals|is\s+equal\s+to|must\s+equal)\s+(?:the\s+)?ratio\s+of\s+(?:the\s+)?(?:side|segment|length)\s+([a-z]{2})\s+to\s+(?:(?:the\s+)?(?:side|segment|length)\s+)?([a-z]{2})\.?",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    if verbal_ratio_with_carrier_match:
+        left_num, left_den, right_num, right_den = [group.lower() for group in verbal_ratio_with_carrier_match.groups()]
         return f"ratio {left_num} to {left_den} equals ratio {right_num} to {right_den}"
     coincide_match = re.fullmatch(
         r"(?:point\s+)?([a-z]\w*)\s+coincides\s+with\s+(?:point\s+)?([a-z]\w*)\.?",
@@ -298,6 +313,40 @@ def normalize_relation_surface(text):
     if equality_match:
         left_seg, right_seg = [group.lower() for group in equality_match.groups()]
         return f"{left_seg} equals {right_seg}"
+    segment_equality_match = re.fullmatch(
+        r"(?:segment|side)\s+([a-z]{2})\s+(?:equals|is\s+equal\s+to|is\s+equal\s+in\s+length\s+to|must\s+equal)\s+(?:segment|side)\s+([a-z]{2})\.?",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    if segment_equality_match:
+        left_seg, right_seg = [group.lower() for group in segment_equality_match.groups()]
+        return f"{left_seg} equals {right_seg}"
+    angle_formed_match = re.fullmatch(
+        r"(?:the\s+)?angle\s+formed\s+by\s+(?:(?:segments?|lines?)\s+)?([a-z]{2})\s+and\s+([a-z]{2})\s+"
+        r"(?:equals|is\s+equal\s+to|must\s+equal)\s+(?:the\s+)?angle\s+formed\s+by\s+(?:(?:segments?|lines?)\s+)?([a-z]{2})\s+and\s+([a-z]{2})\.?",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    if angle_formed_match:
+        seg_a, seg_b, seg_c, seg_d = [group.lower() for group in angle_formed_match.groups()]
+        return f"angle {seg_a}/{seg_b} equals angle {seg_c}/{seg_d}"
+    direct_angle_match = re.fullmatch(
+        r"(?:the\s+)?angle\s+([a-z]{2})/([a-z]{2})\s+(?:equals|is\s+equal\s+to|must\s+equal)\s+(?:the\s+)?angle\s+([a-z]{2})/([a-z]{2})\.?",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    if direct_angle_match:
+        seg_a, seg_b, seg_c, seg_d = [group.lower() for group in direct_angle_match.groups()]
+        return f"angle {seg_a}/{seg_b} equals angle {seg_c}/{seg_d}"
+    angle_between_match = re.fullmatch(
+        r"(?:the\s+)?angle\s+between\s+(?:(?:segments?|lines?)\s+)?([a-z]{2})\s+and\s+(?:(?:segments?|lines?)\s+)?([a-z]{2})\s+"
+        r"(?:equals|is\s+equal\s+to|must\s+equal)\s+(?:the\s+)?angle\s+between\s+(?:(?:segments?|lines?)\s+)?([a-z]{2})\s+and\s+(?:(?:segments?|lines?)\s+)?([a-z]{2})\.?",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    if angle_between_match:
+        seg_a, seg_b, seg_c, seg_d = [group.lower() for group in angle_between_match.groups()]
+        return f"angle {seg_a}/{seg_b} equals angle {seg_c}/{seg_d}"
     triangle_binary_match = re.search(
         r"triangles?\s+([a-z]{3})\s+and\s+([a-z]{3})\s+are\s+(similar|congruent)\b",
         normalized,
