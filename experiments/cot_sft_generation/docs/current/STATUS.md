@@ -2,17 +2,17 @@
 
 ## 当前结论
 
-当前默认主线已经阶段性从 “默认要求 `aux -> full closure`” 收窄到 `insight -> aux`：
+当前默认主线已经阶段性切到 `backtrace_text_v1`：
 
-- 默认：`insight_image_v1`
+- 默认：`backtrace_text_v1`
+- image sibling：`insight_image_v1`
 - text-only sibling：`insight_text_v1`
-- text-only backtrace：`backtrace_text_v1`
 - legacy：`dossier_v1`
 - fallback compatibility：`model_evidence_legacy`
 
 切换原因很直接：
 
-1. 当前阶段性训练重点是提升 aux proposal 能力，而不是默认先优化完整证明续写。
+1. 当前阶段性训练重点是提升 staged backtrace 合同的稳定性，而不是默认先优化完整证明续写。
 2. `dossier_v1` 虽然保留了 benchmark 和 legacy 对照价值，但它天然更接近 “完整 closure 叙述”，不再适合作为当前默认主线。
 3. proof 仍然是内部监督源，但 writer 不应再看到 full hidden route。
 
@@ -22,9 +22,9 @@
 
 ### 已完成
 
-- `insight_image_v1` generation style 已落地并成为 CLI 默认值
-- `insight_text_v1` generation style 已作为 sibling mainline 落地
-- `backtrace_text_v1` generation style 已作为独立 text-only writer-only mainline 落地
+- `backtrace_text_v1` generation style 已成为 CLI 默认值并作为独立 text-only writer-only mainline 落地
+- `insight_image_v1` generation style 已作为 image sibling mainline 落地
+- `insight_text_v1` generation style 已作为 text-only sibling mainline 落地
 - proof DAG -> `InsightSlots` 的脚本抽取已落地
 - proof DAG -> `BacktraceSlots` / `WriterHandoff` 的脚本抽取已落地
 - `InsightPlan` planner / writer contract 已落地

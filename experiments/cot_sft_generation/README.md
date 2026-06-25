@@ -9,9 +9,9 @@
    - `point_coords_grid` / `grid_coord`
    - 其他源字段
 2. 最终导出的训练样本只保留学生模型在训练和评估时应当看到的输入：
+   - `backtrace_text_v1`：题目文本，writer-only backtrace 合同
    - `insight_image_v1`：图片 + 题目文本
    - `insight_text_v1`：题目文本
-   - `backtrace_text_v1`：题目文本，writer-only backtrace 合同
 
 因此，这个脚本做的是“full-information teacher -> visible-only student target”的数据蒸馏，而不是把完整证明直接暴露给训练模型。
 
@@ -20,9 +20,9 @@
 - [docs/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/README.md)：新的文档总入口，先按用途看文档，不要直接在平铺文件里找。
 - [docs/DOC_BOUNDARIES.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/DOC_BOUNDARIES.md)：先看这个，分清楚 agent 能改什么、不能改什么。
 - [docs/immutable/DATA_QUALITY_REQUIREMENTS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/immutable/DATA_QUALITY_REQUIREMENTS.md)：不可改的数据质量要求镜像。
-- [docs/current/INSIGHT_IMAGE_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/INSIGHT_IMAGE_V1_MAINLINE.md)：默认主线，先看这份。
+- [docs/current/BACKTRACE_TEXT_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/BACKTRACE_TEXT_V1_MAINLINE.md)：默认主线，先看这份。
+- [docs/current/INSIGHT_IMAGE_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/INSIGHT_IMAGE_V1_MAINLINE.md)：image sibling mainline。
 - [docs/current/INSIGHT_TEXT_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/INSIGHT_TEXT_V1_MAINLINE.md)：text-only sibling mainline。
-- [docs/current/BACKTRACE_TEXT_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/BACKTRACE_TEXT_V1_MAINLINE.md)：text-only writer-only backtrace mainline。
 - [docs/current/DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/DOSSIER_V1_MAINLINE.md)：legacy / benchmark 路线说明。
 - [benchmarks/quality_review_v1/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/quality_review_v1/README.md)：当前主线默认使用的 review-oriented benchmark。
 
@@ -250,19 +250,19 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 先区分两层文档角色：
 
 - `docs/immutable/` 代表最终质量标准，不随当前实验主线收窄而改变。
-- `docs/current/` 代表当前默认实现与阶段性策略，其中 `insight_image_v1` 是默认主线，`insight_text_v1` 是 text-only sibling mainline，`backtrace_text_v1` 是 text-only writer-only backtrace mainline，`dossier_v1` 是 legacy / benchmark 路线。
+- `docs/current/` 代表当前默认实现与阶段性策略，其中 `backtrace_text_v1` 是默认 text-only writer-only backtrace mainline，`insight_image_v1` 是 image sibling mainline，`insight_text_v1` 是 text-only sibling mainline，`dossier_v1` 是 legacy / benchmark 路线。
 
-当前默认主链已经切到 `insight_image_v1`，并新增显式 text-only 变体：
+当前默认主链已经切到 `backtrace_text_v1`，并保留显式 sibling 变体：
 
-- 默认：`--generation-style insight_image_v1`
+- 默认：`--generation-style backtrace_text_v1`
+- image sibling：`--generation-style insight_image_v1`
 - text-only sibling：`--generation-style insight_text_v1`
-- text-only backtrace：`--generation-style backtrace_text_v1`
 - legacy / benchmark：`--generation-style dossier_v1`
 - 兼容 fallback：`--generation-style model_evidence_legacy`
 
-`insight_image_v1` / `insight_text_v1` 的核心思想是：阶段性把默认主线收窄到 “观察缺口 -> 说明 helper effect -> 提出 aux”，而不是默认要求完整 closure。这里的“收窄”只针对当前主线，不重写最终质量目标；[DATA_QUALITY_REQUIREMENTS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/immutable/DATA_QUALITY_REQUIREMENTS.md) 中第 5 点仍然是长期标准。
+`backtrace_text_v1` 的核心思想是：阶段性把默认主线收窄到 staged visible backtrace，而不是默认要求完整 closure。这里的“收窄”只针对当前主线，不重写最终质量目标；[DATA_QUALITY_REQUIREMENTS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/immutable/DATA_QUALITY_REQUIREMENTS.md) 中第 5 点仍然是长期标准。
 
-`backtrace_text_v1` 则是另一条独立 text-only 路线：它不走 planner，只做 `Proof DAG -> BacktraceSlots -> WriterHandoff -> writer -> hard checks`，要求正文按 staged visible backtrace 的顺序写出：从 goal 开始，逐层说明当前 claim、已有 visible support、仍需的 visible subgoal，直到 visible route 触到 aux boundary，再引入 aux。
+`backtrace_text_v1` 不走 planner，只做 `Proof DAG -> BacktraceSlots -> WriterHandoff -> writer -> hard checks`，要求正文按 staged visible backtrace 的顺序写出：从 goal 开始，逐层说明当前 claim、已有 visible support、仍需的 visible subgoal，直到 visible route 触到 aux boundary，再引入 aux。
 
 同时要避免两个误读：
 

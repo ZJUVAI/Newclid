@@ -1,13 +1,14 @@
 # Current CoT SFT Design
 
-当前 CoT SFT 设计已经改成三轨：
+当前 CoT SFT 设计已经改成四轨：
 
-- `insight_image_v1`：默认主线
+- `backtrace_text_v1`：默认主线
+- `insight_image_v1`：image sibling mainline
 - `insight_text_v1`：text-only sibling mainline
 - `dossier_v1`：legacy / benchmark / 对照路线
 - `model_evidence_legacy`：更早的兼容回放路线
 
-如果只是继续默认主线开发，先读 [INSIGHT_IMAGE_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/INSIGHT_IMAGE_V1_MAINLINE.md)；如果明确要做 text-only 合同，再补读 [INSIGHT_TEXT_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/INSIGHT_TEXT_V1_MAINLINE.md)。
+如果只是继续默认主线开发，先读 [BACKTRACE_TEXT_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/BACKTRACE_TEXT_V1_MAINLINE.md)；如果明确要做 insight 合同，再补读 [INSIGHT_IMAGE_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/INSIGHT_IMAGE_V1_MAINLINE.md) 或 [INSIGHT_TEXT_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/INSIGHT_TEXT_V1_MAINLINE.md)。
 
 ## 总体目标
 
@@ -21,6 +22,11 @@
 
 导出给学生的数据仍只保留当前 style 允许看到的输入：
 
+- `backtrace_text_v1`
+  - `input = public problem`
+  - `thinking`
+  - `aux`
+  - `output = thinking + "\n" + aux`
 - `insight_image_v1`
   - `input = public problem`
   - `thinking`
@@ -96,7 +102,7 @@
 
 ## 当前入口状态
 
-- CLI 默认：`--generation-style insight_image_v1`
+- CLI 默认：`--generation-style backtrace_text_v1`
 - text-only sibling：`--generation-style insight_text_v1`
 - legacy 主线：`--generation-style dossier_v1`
 - 更早兼容路线：`--generation-style model_evidence_legacy`

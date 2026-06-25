@@ -9633,7 +9633,7 @@ def generate_insight_thinking(
     plan_mode=None,
     fallback_model_names=None,
     source_audit=None,
-    generation_style: str = INSIGHT_IMAGE_V1,
+    generation_style: str = BACKTRACE_TEXT_V1,
 ):
     del sanitized_rest, source_audit
     use_image_contract = generation_style == INSIGHT_IMAGE_V1
@@ -11643,9 +11643,9 @@ def parse_args():
     parser.add_argument(
         "--generation-style",
         type=str,
-        default=INSIGHT_IMAGE_V1,
+        default=BACKTRACE_TEXT_V1,
         choices=[INSIGHT_IMAGE_V1, INSIGHT_TEXT_V1, BACKTRACE_TEXT_V1, "dossier_v1", "model_evidence_legacy"],
-        help=f"Generation pipeline style. Default: {INSIGHT_IMAGE_V1}.",
+        help=f"Generation pipeline style. Default: {BACKTRACE_TEXT_V1}.",
     )
     parser.add_argument(
         "--plan-only",

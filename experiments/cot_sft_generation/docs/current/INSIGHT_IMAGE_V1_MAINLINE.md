@@ -1,6 +1,6 @@
 # Insight Image V1 Mainline
 
-`insight_image_v1` is the default CoT SFT mainline.
+`insight_image_v1` is now the image sibling CoT SFT mainline.
 
 It keeps the current insight-first target:
 
