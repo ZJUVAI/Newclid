@@ -375,7 +375,7 @@ a b c = triangle a b c; d = on_line d b c, angle_bisector d b a c; e = on_line e
 examples/complete2/unsolved/complete_006_Other_ndgTest_65.gex
 a b c = triangle a b c; e = on_line e a b; f = intersection_lp f a c e c b; d = circle d a b c; g = circle g a e f ? coll a g d
 examples/complete2/unsolved/complete_005_Other_unsolved_E051-7.gex
-a b c = triangle a b c; d = on_line d a b; e = angle_bisector e c b a, on_line e a c; f = on_pline f e a b, on_line f b c; g = angle_bisector g c b d, on_line g e f ? cong e f f g
+a b c = triangle a b c; d = on_line d a b; e = angle_bisector e c b a, on_line e a c; f = on_pline f e a b, on_line f b c; g = external_bisector g c b d, on_line g e f ? cong e f f g
 examples/complete2/unsolved/complete_005_Other_unsolved_E046-10.gex
 a b c d = isquare a b c d; e = midpoint e b a; f = on_line f a b; g = on_tline g e d e, angle_bisector g c b f ? cong d e e g
 examples/complete2/unsolved/ex-gao_ex160_103.gex
