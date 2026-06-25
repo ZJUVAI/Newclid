@@ -15,7 +15,7 @@ from experiments.cot_sft_generation.core.backtrace_pipeline import (
 )
 from experiments.cot_sft_generation.core.backtrace_schema import BACKTRACE_TEXT_V1
 from experiments.cot_sft_generation.core.proof_dag import parse_proof_dag
-from experiments.cot_sft_generation.generate_cot_sft import process_and_generate_sft
+from experiments.cot_sft_generation.generate_cot_sft import parse_args, process_and_generate_sft
 from experiments.cot_sft_generation.replay_artifact_checks import recheck_item_record
 
 
@@ -760,6 +760,12 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
         self.assertTrue(item_records[0]["thinking"].startswith("<thinking>"))
         self.assertNotIn("missing_image", item_records[0]["source_audit"]["issues"])
         self.assertNotIn("missing_point_coords", item_records[0]["source_audit"]["issues"])
+
+    def test_parse_args_defaults_generation_style_to_backtrace_text_v1(self):
+        with patch("sys.argv", ["generate_cot_sft.py"]):
+            args = parse_args()
+
+        self.assertEqual(args.generation_style, BACKTRACE_TEXT_V1)
 
     def test_collect_backtrace_writer_issues_rejects_proof_leak_wrong_order_and_aux_drift(self):
         record = _build_backtrace_record()
