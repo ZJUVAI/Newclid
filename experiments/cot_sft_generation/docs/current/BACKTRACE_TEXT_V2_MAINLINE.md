@@ -1,6 +1,6 @@
-# Backtrace Text V1 Mainline
+# Backtrace Text V2 Mainline
 
-`backtrace_text_v1` is a text-only writer-only mainline.
+`backtrace_text_v2` is the staged backtrace mainline label. In code, the current generation style id is still `backtrace_text_v1`; this doc uses the v2 label for the staged contract.
 
 Its design goal is narrower than the insight family: instead of asking for an insight-first helper pitch, it starts from the visible goal, backtraces only through the non-aux visible portion of the hidden proof DAG, organizes that route into ordered visible stages, stops when a visible stage already has direct aux-point dependencies, and then motivates the approved auxiliary construction.
 
@@ -31,7 +31,7 @@ Its design goal is narrower than the insight family: instead of asking for an in
     - 已经触到 aux 路线的阻塞 `blocking_h = deps ∩ H`
 - `U`
   - `U = V \ V_core`
-  - `backtrace_text_v1` 第一版忽略
+  - `backtrace_text_v2` 第一版忽略
 - `frontier_nodes`
   - 兼容字段
   - 在当前版本里等于 direct deps 已经触到 `H` 的 terminal `backtrace_stage`
@@ -41,7 +41,7 @@ Its design goal is narrower than the insight family: instead of asking for an in
 
 ## Flow
 
-`backtrace_text_v1` 固定走：
+`backtrace_text_v2` 固定走：
 
 `formal problem/aux/proof -> Proof DAG -> BacktraceSlots -> WriterHandoff -> writer -> hard checks -> thinking + 原始 aux`
 
@@ -129,7 +129,7 @@ writer prompt 不把这些规则塞进 handoff，而是直接写死：
 
 ## Artifacts
 
-`backtrace_text_v1` 会新增：
+`backtrace_text_v2` 会新增：
 
 - `backtrace_slots`
 - `writer_handoff`

@@ -2,9 +2,9 @@
 
 ## 当前结论
 
-当前默认主线已经阶段性切到 `backtrace_text_v1`：
+当前默认主线的文档标签已经阶段性切到 `backtrace_text_v2`：
 
-- 默认：`backtrace_text_v1`
+- 默认：`backtrace_text_v2`
 - image sibling：`insight_image_v1`
 - text-only sibling：`insight_text_v1`
 - legacy：`dossier_v1`
@@ -22,7 +22,7 @@
 
 ### 已完成
 
-- `backtrace_text_v1` generation style 已成为 CLI 默认值并作为独立 text-only writer-only mainline 落地
+- `backtrace_text_v1` generation style 已成为 CLI 默认值并作为独立 text-only writer-only mainline 落地；对应文档标签是 `backtrace_text_v2`
 - `insight_image_v1` generation style 已作为 image sibling mainline 落地
 - `insight_text_v1` generation style 已作为 text-only sibling mainline 落地
 - proof DAG -> `InsightSlots` 的脚本抽取已落地
@@ -40,7 +40,7 @@
   - `output = thinking + "\n" + aux`
 - `insight_image_v1` 最终样本保留 `image_path`
 - `insight_text_v1` 最终样本省略 `image_path`
-- `backtrace_text_v1` 最终样本同样省略 `image_path`
+- `backtrace_text_v2` 最终样本同样省略 `image_path`（运行时 style id: `backtrace_text_v1`）
 - `dossier_v1` 已明确降级为：
   - legacy
   - benchmark
@@ -88,7 +88,9 @@ proof DAG 已经是强监督源，但 `required_aux_effect`、`first_bridge_chec
 
 当前代码已经强制 multi-point aux 提供 `stage_order`，但原始 `<aux>` 记录格式本身仍有历史不一致，后续还需要继续清理。
 
-### 4. `backtrace_text_v1` 的 hard check 还在收敛期
+### 4. `backtrace_text_v2` 的 hard check 还在收敛期
+
+这里说的是这条默认主线的文档合同；对应运行时 style id 仍是 `backtrace_text_v1`。
 
 当前 deterministic run 的主要失败都集中在 `early_hidden_relation`。
 
@@ -97,7 +99,7 @@ proof DAG 已经是强监督源，但 `required_aux_effect`、`first_bridge_chec
 - 新链路已经能稳定把失败收敛到少数可读问题码
 - 但 `early_hidden_relation` 的精度还需要继续用真实 teacher 输出和人工审读去校准
 
-### 5. `backtrace_text_v1` 目前验证的是结构合同，不是最终文风质量
+### 5. `backtrace_text_v2` 目前验证的是结构合同，不是最终文风质量
 
 当前离线抽查已经确认：
 
