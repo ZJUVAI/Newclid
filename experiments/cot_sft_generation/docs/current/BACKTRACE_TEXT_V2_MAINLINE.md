@@ -1,6 +1,6 @@
 # Backtrace Text V2 Mainline
 
-`backtrace_text_v2` is the staged backtrace mainline label. In code, the current generation style id is still `backtrace_text_v1`; this doc uses the v2 label for the staged contract.
+`backtrace_text_v2` is the staged backtrace mainline and the default generation style. The older `backtrace_text_v1` style id is retained only as a legacy alias for replaying older artifacts and commands.
 
 Its design goal is narrower than the insight family: instead of asking for an insight-first helper pitch, it starts from the visible goal, backtraces only through the non-aux visible portion of the hidden proof DAG, organizes that route into ordered visible stages, stops when a visible stage already has direct aux-point dependencies, and then motivates the approved auxiliary construction.
 
@@ -147,5 +147,5 @@ writer prompt 不把这些规则塞进 handoff，而是直接写死：
 
 ```bash
 python experiments/cot_sft_generation/generate_cot_sft.py \
-  --generation-style backtrace_text_v1
+  --generation-style backtrace_text_v2
 ```

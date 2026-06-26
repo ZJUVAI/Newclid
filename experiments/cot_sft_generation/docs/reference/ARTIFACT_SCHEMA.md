@@ -21,11 +21,12 @@
 4. 当前 live generation style 名称是：
    - `insight_image_v1`
    - `insight_text_v1`
-   - `backtrace_text_v1`
+   - `backtrace_text_v2`
    - `dossier_v1`
    - `model_evidence_legacy`
-5. `insight_v1` 只应被视为历史记录名称，不应再被当作当前可选 style。
-6. 任何新增长期字段，都应先落到 `run_artifacts.py`，再同步更新本文档。
+5. `backtrace_text_v1` is a legacy alias for older backtrace artifacts and commands; new runs should use `backtrace_text_v2`.
+6. `insight_v1` 只应被视为历史记录名称，不应再被当作当前可选 style。
+7. 任何新增长期字段，都应先落到 `run_artifacts.py`，再同步更新本文档。
 
 ## 2. `run_config.json`
 
@@ -88,10 +89,10 @@ style 差异：
   - 额外包含 `image_path`
 - `insight_text_v1`
   - 不包含 `image_path`
-- `backtrace_text_v1`
+- `backtrace_text_v2`
   - 不包含 `image_path`
 - insight family 两个 variant 都不会导出 point coordinates
-- `backtrace_text_v1` 也是 text-only，不会导出 point coordinates
+- `backtrace_text_v2` 也是 text-only，不会导出 point coordinates
 
 ## 5. `item_records.jsonl`
 
@@ -116,8 +117,8 @@ style 差异：
 | `plan_parsed` | `object \| null` | 解析后的 plan |
 | `insight_slots` | `object \| null` | insight family 的 DAG 提取槽位 |
 | `insight_plan_parsed` | `object \| null` | insight family 的批准 plan |
-| `backtrace_slots` | `object \| null` | `backtrace_text_v1` 的 DAG backtrace 提取结果 |
-| `writer_handoff` | `object \| null` | writer-only handoff；当前用于 `backtrace_text_v1` |
+| `backtrace_slots` | `object \| null` | `backtrace_text_v2` 的 DAG backtrace 提取结果 |
+| `writer_handoff` | `object \| null` | writer-only handoff；当前用于 `backtrace_text_v2` |
 | `writer_validation_issues` | `list[str]` | writer hard checks 的稳定问题码列表 |
 | `write_output` | `str \| null` | writer 原始输出 |
 | `thinking` | `str \| null` | 最终 thinking |
@@ -132,13 +133,13 @@ style 差异：
 说明：
 
 - `surface_pass=true` 不等于一定导出。
-- `backtrace_text_v1` 的 artifact 可空约定是：
+- `backtrace_text_v2` 的 artifact 可空约定是：
   - `plan_prompt = null`
   - `plan_output = null`
   - `plan_parsed = null`
   - `insight_plan_parsed = null`
   - `write_prompt` / `write_output` / `thinking` 保留
-- `backtrace_text_v1` 当前 canonical 结构是 `backtrace_slots.backtrace_stages` 与 `writer_handoff.backtrace_stages`
+- `backtrace_text_v2` 当前 canonical 结构是 `backtrace_slots.backtrace_stages` 与 `writer_handoff.backtrace_stages`
 - `backtrace_chain_nl` / `frontier_nodes_nl` / `supporting_c1_facts_nl` 仍保留在 `backtrace_slots` 中，但主要作为兼容视图
 - 当前整个 insight family 都会被 generation-audit 的硬问题拦导出，硬问题范围为：
   - `no_proof_echo`

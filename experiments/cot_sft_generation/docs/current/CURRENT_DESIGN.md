@@ -2,7 +2,7 @@
 
 当前 CoT SFT 设计已经改成四轨：
 
-- `backtrace_text_v2`：默认主线文档标签；运行时 style id 仍是 `backtrace_text_v1`
+- `backtrace_text_v2`：默认主线
 - `insight_image_v1`：image sibling mainline
 - `insight_text_v1`：text-only sibling mainline
 - `dossier_v1`：legacy / benchmark / 对照路线
@@ -22,7 +22,7 @@
 
 导出给学生的数据仍只保留当前 style 允许看到的输入：
 
-- `backtrace_text_v2`（运行时 style id: `backtrace_text_v1`）
+- `backtrace_text_v2`
   - `input = public problem`
   - `thinking`
   - `aux`
@@ -102,8 +102,9 @@
 
 ## 当前入口状态
 
-- CLI 默认：`--generation-style backtrace_text_v1`（对应文档标签 `backtrace_text_v2`）
+- CLI 默认：`--generation-style backtrace_text_v2`
 - text-only sibling：`--generation-style insight_text_v1`
+- legacy backtrace alias：`--generation-style backtrace_text_v1`
 - legacy 主线：`--generation-style dossier_v1`
 - 更早兼容路线：`--generation-style model_evidence_legacy`
 
@@ -112,8 +113,9 @@
 1. 如果指定 `insight_image_v1` 或 `insight_text_v1`，先跑 insight planner / writer
 2. insight family 内部允许 planner 失败后回退到 scripted insight plan
 3. 若 writer 校验失败，则该样本直接失败，不再自动降级到 `dossier_v1`
-4. 若显式指定 `dossier_v1`，只走 legacy dossier 路线
-5. 若显式指定 `model_evidence_legacy`，走最旧的兼容链路
+4. 如果指定 `backtrace_text_v2` 或 legacy alias `backtrace_text_v1`，走 writer-only staged backtrace 路线
+5. 若显式指定 `dossier_v1`，只走 legacy dossier 路线
+6. 若显式指定 `model_evidence_legacy`，走最旧的兼容链路
 
 ## 当前合同摘要
 

@@ -9,7 +9,7 @@
    - `point_coords_grid` / `grid_coord`
    - 其他源字段
 2. 最终导出的训练样本只保留学生模型在训练和评估时应当看到的输入：
-   - `backtrace_text_v2`：题目文本，writer-only backtrace 合同；运行时 style id 仍是 `backtrace_text_v1`
+   - `backtrace_text_v2`：题目文本，writer-only backtrace 合同
    - `insight_image_v1`：图片 + 题目文本
    - `insight_text_v1`：题目文本
 
@@ -250,11 +250,11 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 先区分两层文档角色：
 
 - `docs/immutable/` 代表最终质量标准，不随当前实验主线收窄而改变。
-- `docs/current/` 代表当前默认实现与阶段性策略，其中 `backtrace_text_v2` 是默认 text-only writer-only backtrace mainline 的文档标签，运行时 style id 仍是 `backtrace_text_v1`；`insight_image_v1` 是 image sibling mainline，`insight_text_v1` 是 text-only sibling mainline，`dossier_v1` 是 legacy / benchmark 路线。
+- `docs/current/` 代表当前默认实现与阶段性策略，其中 `backtrace_text_v2` 是默认 text-only writer-only backtrace mainline；`insight_image_v1` 是 image sibling mainline，`insight_text_v1` 是 text-only sibling mainline，`dossier_v1` 是 legacy / benchmark 路线。
 
 当前默认主链的文档标签已经切到 `backtrace_text_v2`，并保留显式 sibling 变体：
 
-- 默认：`--generation-style backtrace_text_v1`
+- 默认：`--generation-style backtrace_text_v2`
 - image sibling：`--generation-style insight_image_v1`
 - text-only sibling：`--generation-style insight_text_v1`
 - legacy / benchmark：`--generation-style dossier_v1`
@@ -411,7 +411,7 @@ text-only writer-only backtrace 版本：
 python experiments/cot_sft_generation/generate_cot_sft.py \
   -n 100 \
   -w 8 \
-  --generation-style backtrace_text_v1 \
+  --generation-style backtrace_text_v2 \
   --model-name qwen/qwen3.5-plus-02-15 \
   -o experiments/cot_sft_generation/generated/run_backtrace.jsonl \
   -v
@@ -438,7 +438,7 @@ python experiments/cot_sft_generation/generate_cot_sft.py \
 | `--process-all` | 关闭 | 处理全部含 `<aux>` 的样本 |
 | `-w, --num-workers` | `4` | 并发 worker 数 |
 | `--model-name` | `qwen/qwen3.5-plus-02-15` | 教师模型 |
-| `--generation-style` | `insight_image_v1` | 当前 generation style；也可显式指定 `insight_text_v1` / `backtrace_text_v1` / `dossier_v1` / `model_evidence_legacy` |
+| `--generation-style` | `backtrace_text_v2` | 当前 generation style；也可显式指定 `insight_image_v1` / `insight_text_v1` / `backtrace_text_v1` / `dossier_v1` / `model_evidence_legacy` |
 | `-r, --max-retries` | `3` | 每个阶段的最大重试次数 |
 | `--sequential` | 关闭 | 顺序取前 N 条，而不是随机抽样 |
 | `-v, --verbose` | 关闭 | 记录样本级 prompt / plan / body / final thinking |

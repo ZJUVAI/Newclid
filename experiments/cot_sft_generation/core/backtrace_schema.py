@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Structured schemas for the backtrace_text_v1 generation style.
+Structured schemas for the backtrace_text_v2 generation style.
 """
 
 from __future__ import annotations
@@ -10,6 +10,12 @@ from typing import Any
 
 
 BACKTRACE_TEXT_V1 = "backtrace_text_v1"
+BACKTRACE_TEXT_V2 = "backtrace_text_v2"
+BACKTRACE_GENERATION_STYLES = {BACKTRACE_TEXT_V1, BACKTRACE_TEXT_V2}
+
+
+def is_backtrace_generation_style(generation_style: str | None) -> bool:
+    return generation_style in BACKTRACE_GENERATION_STYLES
 
 
 @dataclass
@@ -76,9 +82,12 @@ class WriterHandoff:
 
 
 __all__ = [
+    "BACKTRACE_GENERATION_STYLES",
     "BACKTRACE_TEXT_V1",
+    "BACKTRACE_TEXT_V2",
     "BacktraceStage",
     "BacktraceSlots",
     "WriterBacktraceStage",
     "WriterHandoff",
+    "is_backtrace_generation_style",
 ]

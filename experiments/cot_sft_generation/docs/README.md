@@ -20,7 +20,7 @@
 - [current/INSIGHT_TEXT_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/INSIGHT_TEXT_V1_MAINLINE.md)
   - text-only sibling mainline，对应 `insight_text_v1`
 - [current/BACKTRACE_TEXT_V2_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/BACKTRACE_TEXT_V2_MAINLINE.md)
-  - 默认 text-only backtrace writer-only mainline，对应 `backtrace_text_v2`；运行时 style id 仍是 `backtrace_text_v1`
+  - 默认 text-only backtrace writer-only mainline，对应 `backtrace_text_v2`
 - [current/DOSSIER_V1_MAINLINE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/DOSSIER_V1_MAINLINE.md)
   - `dossier_v1` 的 legacy / benchmark / fallback 说明
 - [current/CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/docs/current/CURRENT_DESIGN.md)

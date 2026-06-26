@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Prompt and hard-check helpers for backtrace_text_v1.
+Prompt and hard-check helpers for backtrace_text_v2.
 """
 
 from __future__ import annotations

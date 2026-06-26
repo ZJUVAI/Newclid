@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Script-side DAG extraction for the backtrace_text_v1 mainline.
+Script-side DAG extraction for the backtrace_text_v2 mainline.
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ except ImportError:  # pragma: no cover - script execution path
 _STEP_ID_RE = re.compile(r"\[\d{3}\]")
 _POINT_RE = re.compile(r"[a-z]\w*")
 
-# backtrace_text_v1 definitions. Do not change these meanings without updating
+# backtrace_text_v2 definitions. Do not change these meanings without updating
 # the mainline design docs and downstream checks together.
 #
 # C1

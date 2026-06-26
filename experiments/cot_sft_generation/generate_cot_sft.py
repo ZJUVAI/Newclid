@@ -129,7 +129,7 @@ try:
         collect_backtrace_writer_issues,
         validate_backtrace_writer_body,
     )
-    from .core.backtrace_schema import BACKTRACE_TEXT_V1
+    from .core.backtrace_schema import BACKTRACE_TEXT_V2, is_backtrace_generation_style
     from .core.insight_extractor import extract_insight_slots
     from .core.insight_pipeline import (
         build_insight_plan_prompt,
@@ -248,7 +248,7 @@ except ImportError:  # pragma: no cover - script execution path
         collect_backtrace_writer_issues,
         validate_backtrace_writer_body,
     )
-    from core.backtrace_schema import BACKTRACE_TEXT_V1  # type: ignore[no-redef]
+    from core.backtrace_schema import BACKTRACE_TEXT_V2, is_backtrace_generation_style  # type: ignore[no-redef]
     from core.insight_extractor import extract_insight_slots  # type: ignore[no-redef]
     from core.insight_pipeline import (  # type: ignore[no-redef]
         build_insight_plan_prompt,
@@ -481,7 +481,7 @@ def is_insight_generation_style(generation_style: str | None) -> bool:
 
 
 def requires_image_input(generation_style: str | None) -> bool:
-    return generation_style not in {INSIGHT_TEXT_V1, BACKTRACE_TEXT_V1}
+    return generation_style != INSIGHT_TEXT_V1 and not is_backtrace_generation_style(generation_style)
 
 
 def build_visibility_contract_message(
@@ -9633,7 +9633,7 @@ def generate_insight_thinking(
     plan_mode=None,
     fallback_model_names=None,
     source_audit=None,
-    generation_style: str = BACKTRACE_TEXT_V1,
+    generation_style: str = INSIGHT_IMAGE_V1,
 ):
     del sanitized_rest, source_audit
     use_image_contract = generation_style == INSIGHT_IMAGE_V1
@@ -9855,7 +9855,7 @@ def generate_backtrace_thinking(
     plan_mode=None,
     fallback_model_names=None,
     source_audit=None,
-    generation_style: str = BACKTRACE_TEXT_V1,
+    generation_style: str = BACKTRACE_TEXT_V2,
 ):
     del image_path, sanitized_rest, source_audit
     visible_goal = extract_problem_goal(record)
@@ -11220,7 +11220,7 @@ def process_and_generate_sft(
     process_all,
     max_retries,
     plan_mode=None,
-    generation_style=INSIGHT_IMAGE_V1,
+    generation_style=BACKTRACE_TEXT_V2,
     planner_style="default",
     run_metadata=None,
     run_dir=None,
@@ -11343,7 +11343,7 @@ def process_and_generate_sft(
                     source_audit=source_audit,
                     generation_style=generation_style,
                 )
-            elif generation_style == BACKTRACE_TEXT_V1:
+            elif is_backtrace_generation_style(generation_style):
                 generation = generate_backtrace_thinking(
                     record,
                     image_path=image_path,
@@ -11643,9 +11643,9 @@ def parse_args():
     parser.add_argument(
         "--generation-style",
         type=str,
-        default=BACKTRACE_TEXT_V1,
-        choices=[INSIGHT_IMAGE_V1, INSIGHT_TEXT_V1, BACKTRACE_TEXT_V1, "dossier_v1", "model_evidence_legacy"],
-        help=f"Generation pipeline style. Default: {BACKTRACE_TEXT_V1}.",
+        default=BACKTRACE_TEXT_V2,
+        choices=[INSIGHT_IMAGE_V1, INSIGHT_TEXT_V1, BACKTRACE_TEXT_V2, "backtrace_text_v1", "dossier_v1", "model_evidence_legacy"],
+        help=f"Generation pipeline style. Default: {BACKTRACE_TEXT_V2}.",
     )
     parser.add_argument(
         "--plan-only",

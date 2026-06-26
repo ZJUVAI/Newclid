@@ -8,15 +8,15 @@ from __future__ import annotations
 import json
 
 try:
-    from .backtrace_schema import BACKTRACE_TEXT_V1
+    from .backtrace_schema import is_backtrace_generation_style
     from .insight_schema import INSIGHT_TEXT_V1
 except ImportError:  # pragma: no cover - script execution path
-    from backtrace_schema import BACKTRACE_TEXT_V1  # type: ignore
+    from backtrace_schema import is_backtrace_generation_style  # type: ignore
     from insight_schema import INSIGHT_TEXT_V1  # type: ignore
 
 
 def build_instruction_text(generation_style: str | None = None):
-    if generation_style == BACKTRACE_TEXT_V1:
+    if is_backtrace_generation_style(generation_style):
         return (
             "Given the formal problem text, write a backtrace-style thinking trace that "
             "starts from the goal, traces the visible route backward until it gets stuck, "

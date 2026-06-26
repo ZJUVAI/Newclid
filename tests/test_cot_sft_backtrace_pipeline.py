@@ -13,7 +13,7 @@ from experiments.cot_sft_generation.core.backtrace_pipeline import (
     collect_backtrace_writer_issues,
     validate_backtrace_writer_body,
 )
-from experiments.cot_sft_generation.core.backtrace_schema import BACKTRACE_TEXT_V1
+from experiments.cot_sft_generation.core.backtrace_schema import BACKTRACE_TEXT_V1, BACKTRACE_TEXT_V2
 from experiments.cot_sft_generation.core.proof_dag import parse_proof_dag
 from experiments.cot_sft_generation.generate_cot_sft import parse_args, process_and_generate_sft
 from experiments.cot_sft_generation.replay_artifact_checks import recheck_item_record
@@ -698,7 +698,7 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
 
         self.assertEqual(issues, [])
 
-    def test_process_and_generate_sft_runs_backtrace_text_v1_without_image_inputs(self):
+    def test_process_and_generate_sft_runs_backtrace_text_v2_without_image_inputs(self):
         record = _build_backtrace_record()
 
         body = (
@@ -720,7 +720,7 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
                 side_effect=[body],
             ), patch(
                 "experiments.cot_sft_generation.generate_cot_sft._encode_image_base64",
-                side_effect=AssertionError("backtrace_text_v1 must not encode images"),
+                side_effect=AssertionError("backtrace_text_v2 must not encode images"),
             ):
                 result = process_and_generate_sft(
                     input_jsonl=str(input_path),
@@ -732,7 +732,7 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
                     random_sample=False,
                     process_all=False,
                     max_retries=1,
-                    generation_style=BACKTRACE_TEXT_V1,
+                    generation_style=BACKTRACE_TEXT_V2,
                     run_dir=run_dir,
                 )
 
@@ -747,7 +747,7 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
                 if line.strip()
             ]
 
-        self.assertEqual(result["summary"]["generation_style"], BACKTRACE_TEXT_V1)
+        self.assertEqual(result["summary"]["generation_style"], BACKTRACE_TEXT_V2)
         self.assertEqual(len(output_records), 1)
         self.assertNotIn("image_path", output_records[0])
         self.assertEqual(item_records[0]["plan_prompt"], None)
@@ -761,11 +761,11 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
         self.assertNotIn("missing_image", item_records[0]["source_audit"]["issues"])
         self.assertNotIn("missing_point_coords", item_records[0]["source_audit"]["issues"])
 
-    def test_parse_args_defaults_generation_style_to_backtrace_text_v1(self):
+    def test_parse_args_defaults_generation_style_to_backtrace_text_v2(self):
         with patch("sys.argv", ["generate_cot_sft.py"]):
             args = parse_args()
 
-        self.assertEqual(args.generation_style, BACKTRACE_TEXT_V1)
+        self.assertEqual(args.generation_style, BACKTRACE_TEXT_V2)
 
     def test_collect_backtrace_writer_issues_rejects_proof_leak_wrong_order_and_aux_drift(self):
         record = _build_backtrace_record()
@@ -843,7 +843,7 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
                     random_sample=False,
                     process_all=False,
                     max_retries=1,
-                    generation_style=BACKTRACE_TEXT_V1,
+                    generation_style=BACKTRACE_TEXT_V2,
                     run_dir=run_dir,
                 )
 

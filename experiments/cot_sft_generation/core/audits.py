@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable
 
 try:
-    from .backtrace_schema import BACKTRACE_TEXT_V1
+    from .backtrace_schema import is_backtrace_generation_style
     from .geometry_text import (
         PROBLEM_BODY_RE,
         build_aux_direct_consequences,
@@ -37,7 +37,7 @@ try:
     )
     from .insight_schema import INSIGHT_GENERATION_STYLES, INSIGHT_IMAGE_V1, INSIGHT_TEXT_V1
 except ImportError:  # pragma: no cover - script execution path
-    from backtrace_schema import BACKTRACE_TEXT_V1  # type: ignore
+    from backtrace_schema import is_backtrace_generation_style  # type: ignore
     from geometry_text import (
         PROBLEM_BODY_RE,
         build_aux_direct_consequences,
@@ -1242,7 +1242,7 @@ def audit_source_record(
     point_coords = get_point_coords(record)
     goal_spec = parse_goal_expression(visible_goal)
     goal_points = set(goal_spec["points"])
-    is_text_only_style = generation_style in {INSIGHT_TEXT_V1, BACKTRACE_TEXT_V1}
+    is_text_only_style = generation_style == INSIGHT_TEXT_V1 or is_backtrace_generation_style(generation_style)
     if is_text_only_style:
         visible_points = _derive_visible_points_from_record_text(record, visible_goal=visible_goal)
     else:
