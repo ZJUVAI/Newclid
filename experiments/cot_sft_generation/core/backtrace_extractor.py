@@ -288,13 +288,25 @@ def build_backtrace_writer_handoff(backtrace_slots: dict[str, object] | None) ->
         claim_nl = str(stage.get("claim_nl") or "")
         if is_terminal and claim_nl:
             terminal_claims_nl.append(claim_nl)
+        depth = int(stage.get("depth") or 0)
+        if is_terminal:
+            backtrace_stages.append(
+                WriterBacktraceStage(
+                    claim_nl=claim_nl,
+                    depth=depth,
+                    stage_type="aux_boundary",
+                    aux_boundary_h_nl=list(stage.get("blocking_h_nl") or []),
+                    aux_boundary_non_h_nl=list(stage.get("visible_support_nl") or []),
+                )
+            )
+            continue
         backtrace_stages.append(
             WriterBacktraceStage(
                 claim_nl=claim_nl,
-                depth=int(stage.get("depth") or 0),
+                depth=depth,
+                stage_type="visible_backtrace",
                 visible_support_nl=list(stage.get("visible_support_nl") or []),
-                subgoal_claims_nl=[] if is_terminal else list(stage.get("next_v_nl") or []),
-                stops_at_aux_boundary=is_terminal,
+                subgoal_claims_nl=list(stage.get("next_v_nl") or []),
             )
         )
     return WriterHandoff(

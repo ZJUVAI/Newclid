@@ -168,8 +168,9 @@ def build_backtrace_write_prompt(record, writer_handoff: dict[str, object]) -> s
         "[Writing Contract]\n"
         "- Output plain text only, without tags.\n"
         "- Start from the visible goal, then walk through the staged backtrace in order.\n"
-        "- For each stage, explain the current claim, which visible support already helps, and which visible subgoal(s) still remain.\n"
-        "- When a stage reaches the visible limit, explain that the current visible route is not enough before introducing the auxiliary construction.\n"
+        "- For a visible_backtrace stage, explain the current claim, which visible support already helps, and which visible subgoal(s) still remain.\n"
+        "- For an aux_boundary stage, explain the current claim and why the visible route is not enough before introducing the auxiliary construction.\n"
+        "- Right after introducing the auxiliary construction, say that the new auxiliary facts can lead to the listed aux_boundary_h_nl relations, and with the aux_boundary_non_h_nl relations this reaches the boundary claim. Do not give the full hidden derivation.\n"
         "- Stay text-only: do not mention any image, diagram, coordinates, or coordinate table.\n"
         "- Do not mention proof step ids, rule ids, hidden proofs, or internal schema names.\n"
         "- Avoid theorem-catalog or proof-style phrasing when a direct geometric description is enough.\n"
@@ -316,7 +317,18 @@ def collect_backtrace_writer_issues(
             for item in (stage.get("subgoal_claims_nl") or [])
             if isinstance(item, str) and item.strip()
         ]
-        is_terminal = bool(stage.get("stops_at_aux_boundary"))
+        aux_boundary_h_nl = [
+            str(item).strip()
+            for item in (stage.get("aux_boundary_h_nl") or [])
+            if isinstance(item, str) and item.strip()
+        ]
+        aux_boundary_non_h_nl = [
+            str(item).strip()
+            for item in (stage.get("aux_boundary_non_h_nl") or [])
+            if isinstance(item, str) and item.strip()
+        ]
+        stage_type = str(stage.get("stage_type") or "visible_backtrace").strip()
+        is_terminal = stage_type == "aux_boundary"
 
         claim_search_start = max(stage_cursor + 1, 0)
         if stage_index == 0 and goal_idx is not None:
@@ -343,18 +355,19 @@ def collect_backtrace_writer_issues(
             issues.append("narrative_order_violation")
         local_cursor = claim_idx if claim_idx is not None else stage_cursor
 
-        support_idx = _first_sentence_idx_for_any_relation_from(
-            sentences,
-            visible_support_nl,
-            point_pool,
-            local_cursor,
-        )
-        if visible_support_nl and support_idx is None:
-            issues.append("missing_stage_support_reference")
-        if claim_idx is not None and support_idx is not None and support_idx < claim_idx:
-            issues.append("narrative_order_violation")
-        if support_idx is not None:
-            local_cursor = max(local_cursor, support_idx)
+        if not is_terminal:
+            support_idx = _first_sentence_idx_for_any_relation_from(
+                sentences,
+                visible_support_nl,
+                point_pool,
+                local_cursor,
+            )
+            if visible_support_nl and support_idx is None:
+                issues.append("missing_stage_support_reference")
+            if claim_idx is not None and support_idx is not None and support_idx < claim_idx:
+                issues.append("narrative_order_violation")
+            if support_idx is not None:
+                local_cursor = max(local_cursor, support_idx)
 
         if is_terminal:
             if first_terminal_claim_idx is None:
@@ -391,6 +404,28 @@ def collect_backtrace_writer_issues(
                 local_cursor = max(local_cursor, stage_insufficiency_idx)
             elif insufficiency_idx is not None and insufficiency_idx >= window_start:
                 local_cursor = max(local_cursor, insufficiency_idx)
+            aux_h_idx = None
+            if aux_idx is not None and aux_boundary_h_nl:
+                aux_h_idx = _first_sentence_idx_for_any_relation_from(
+                    sentences,
+                    aux_boundary_h_nl,
+                    point_pool,
+                    aux_idx,
+                )
+                if aux_h_idx is None:
+                    issues.append("missing_aux_boundary_h_reference")
+                else:
+                    local_cursor = max(local_cursor, aux_h_idx)
+            non_h_idx = _first_sentence_idx_for_any_relation_from(
+                sentences,
+                aux_boundary_non_h_nl,
+                point_pool,
+                window_start,
+            )
+            if aux_boundary_non_h_nl and non_h_idx is None:
+                issues.append("missing_aux_boundary_non_h_reference")
+            if claim_idx is not None and non_h_idx is not None and non_h_idx < claim_idx:
+                issues.append("narrative_order_violation")
             stage_cursor = max(stage_cursor, local_cursor)
             continue
 

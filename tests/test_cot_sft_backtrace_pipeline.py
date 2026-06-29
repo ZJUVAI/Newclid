@@ -250,6 +250,7 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
                         "depth": 1,
                         "visible_support_nl": ["angle ab/ac equals angle bc/bd"],
                         "next_v_nl": [],
+                        "blocking_h_nl": ["bf equals cf"],
                         "is_terminal": True,
                     },
                 ],
@@ -265,16 +266,16 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
                     {
                         "claim_nl": "ratio ab to bc equals ratio be to ce",
                         "depth": 0,
+                        "stage_type": "visible_backtrace",
                         "visible_support_nl": ["ab equals ac"],
                         "subgoal_claims_nl": ["angle ab/bc equals angle be/ce"],
-                        "stops_at_aux_boundary": False,
                     },
                     {
                         "claim_nl": "angle ab/bc equals angle be/ce",
                         "depth": 1,
-                        "visible_support_nl": ["angle ab/ac equals angle bc/bd"],
-                        "subgoal_claims_nl": [],
-                        "stops_at_aux_boundary": True,
+                        "stage_type": "aux_boundary",
+                        "aux_boundary_h_nl": ["bf equals cf"],
+                        "aux_boundary_non_h_nl": ["angle ab/ac equals angle bc/bd"],
                     },
                 ],
                 "terminal_claims_nl": ["angle ab/bc equals angle be/ce"],
@@ -327,7 +328,8 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
             "The target is ratio ab to bc equals ratio be to ce. "
             "For this claim, the visible support already includes ab equals ac, but we still need angle ab/bc equals angle be/ce. "
             "For angle ab/bc equals angle be/ce, the visible support already includes angle ab/ac equals angle bc/bd, but that is still not enough by itself to finish the visible route. "
-            "So we need a new helper: construct point f such that f is the midpoint of ad."
+            "So we need a new helper: construct point f such that f is the midpoint of ad. "
+            "After introducing f, we can get bf equals cf; together with angle ab/ac equals angle bc/bd, this reaches angle ab/bc equals angle be/ce."
         )
 
         ok, message = validate_backtrace_writer_body(
@@ -353,7 +355,7 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
             "For this claim, the visible support already includes ab equals ac, but we still need angle ab/bc equals angle be/ce. "
             "For angle ab/bc equals angle be/ce, the visible support already includes angle ab/ac equals angle bc/bd, but that is still not enough by itself to finish the visible route. "
             "So we need a new helper: construct point f such that f is the midpoint of ad. "
-            "Then the midpoint theorem gives one local balance on ad that the current visible support still lacks."
+            "Then the midpoint theorem gives bf equals cf, and with angle ab/ac equals angle bc/bd this reaches angle ab/bc equals angle be/ce."
         )
 
         issues = collect_backtrace_writer_issues(
@@ -377,8 +379,9 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
         body = (
             "The goal is to prove that the ratio of segment ab to bc equals the ratio of segment be to ce. "
             "At this stage, the visible support includes the equality of ab and ac, so we reduce the task to the subgoal that angle ab/bc equals angle be/ce. "
-            "For that step, the visible support includes angle ab/ac equals angle bc/bd, but the visible route is still not enough by itself. "
-            "So we construct point f such that f is the midpoint of ad."
+            "For angle ab/bc equals angle be/ce, the visible support includes angle ab/ac equals angle bc/bd, but the visible route is still not enough by itself. "
+            "So we construct point f such that f is the midpoint of ad. "
+            "This auxiliary point can provide bf equals cf, which combines with angle ab/ac equals angle bc/bd to reach angle ab/bc equals angle be/ce."
         )
 
         ok, message = validate_backtrace_writer_body(
@@ -399,12 +402,14 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
                     "depth": 0,
                     "visible_support_nl": ["angle ac/af equals angle cg/ag"],
                     "subgoal_claims_nl": ["ratio ac to af equals ratio cg to ag"],
-                    "stops_at_aux_boundary": False,
+                    "stage_type": "visible_backtrace",
                 },
                 {
                     "claim_nl": "ratio ac to af equals ratio cg to ag",
                     "depth": 1,
-                    "visible_support_nl": [
+                    "stage_type": "aux_boundary",
+                    "aux_boundary_h_nl": [],
+                    "aux_boundary_non_h_nl": [
                         "ad equals cd",
                         "be equals dg",
                         "ratio ab to ac equals ratio be to ag",
@@ -412,8 +417,6 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
                         "ratio ac to ae equals ratio cd to ce",
                         "ratio ae to cg equals ratio de to eg",
                     ],
-                    "subgoal_claims_nl": [],
-                    "stops_at_aux_boundary": True,
                 },
             ],
             "terminal_claims_nl": ["ratio ac to af equals ratio cg to ag"],
@@ -459,7 +462,7 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
                         "angle ag/ai equals angle hi/gi",
                         "ratio ag to ai equals ratio gi to hi",
                     ],
-                    "stops_at_aux_boundary": False,
+                    "stage_type": "visible_backtrace",
                 },
                 {
                     "claim_nl": "angle ag/ai equals angle hi/gi",
@@ -469,14 +472,14 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
                         "ad equals ae",
                     ],
                     "subgoal_claims_nl": ["dg equals gi"],
-                    "stops_at_aux_boundary": False,
+                    "stage_type": "visible_backtrace",
                 },
                 {
                     "claim_nl": "dg equals gi",
                     "depth": 2,
-                    "visible_support_nl": [],
-                    "subgoal_claims_nl": [],
-                    "stops_at_aux_boundary": True,
+                    "stage_type": "aux_boundary",
+                    "aux_boundary_h_nl": [],
+                    "aux_boundary_non_h_nl": [],
                 },
                 {
                     "claim_nl": "ratio ag to ai equals ratio gi to hi",
@@ -486,7 +489,7 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
                         "de equals dh",
                     ],
                     "subgoal_claims_nl": ["dg equals gi"],
-                    "stops_at_aux_boundary": False,
+                    "stage_type": "visible_backtrace",
                 },
             ],
             "terminal_claims_nl": ["dg equals gi"],
@@ -532,14 +535,14 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
                     "depth": 0,
                     "visible_support_nl": [],
                     "subgoal_claims_nl": ["bh equals ch"],
-                    "stops_at_aux_boundary": False,
+                    "stage_type": "visible_backtrace",
                 },
                 {
                     "claim_nl": "bh equals ch",
                     "depth": 1,
-                    "visible_support_nl": [],
-                    "subgoal_claims_nl": [],
-                    "stops_at_aux_boundary": True,
+                    "stage_type": "aux_boundary",
+                    "aux_boundary_h_nl": [],
+                    "aux_boundary_non_h_nl": [],
                 },
             ],
             "terminal_claims_nl": ["bh equals ch"],
@@ -576,21 +579,21 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
                         "angle ab/be equals angle cd/ac",
                         "ratio ab to be equals ratio cd to ac",
                     ],
-                    "stops_at_aux_boundary": False,
+                    "stage_type": "visible_backtrace",
                 },
                 {
                     "claim_nl": "angle ab/be equals angle cd/ac",
                     "depth": 1,
-                    "visible_support_nl": [],
-                    "subgoal_claims_nl": [],
-                    "stops_at_aux_boundary": True,
+                    "stage_type": "aux_boundary",
+                    "aux_boundary_h_nl": [],
+                    "aux_boundary_non_h_nl": [],
                 },
                 {
                     "claim_nl": "ratio ab to be equals ratio cd to ac",
                     "depth": 1,
-                    "visible_support_nl": [],
-                    "subgoal_claims_nl": [],
-                    "stops_at_aux_boundary": True,
+                    "stage_type": "aux_boundary",
+                    "aux_boundary_h_nl": [],
+                    "aux_boundary_non_h_nl": [],
                 },
             ],
             "terminal_claims_nl": [
@@ -630,9 +633,9 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
                 {
                     "claim_nl": "angle ab/ac equals angle ad/ae",
                     "depth": 0,
-                    "visible_support_nl": ["ad equals ae"],
-                    "subgoal_claims_nl": [],
-                    "stops_at_aux_boundary": True,
+                    "stage_type": "aux_boundary",
+                    "aux_boundary_h_nl": [],
+                    "aux_boundary_non_h_nl": ["ad equals ae"],
                 }
             ],
             "terminal_claims_nl": ["angle ab/ac equals angle ad/ae"],
@@ -664,14 +667,14 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
                     "depth": 0,
                     "visible_support_nl": [],
                     "subgoal_claims_nl": ["bh equals ch"],
-                    "stops_at_aux_boundary": False,
+                    "stage_type": "visible_backtrace",
                 },
                 {
                     "claim_nl": "bh equals ch",
                     "depth": 1,
-                    "visible_support_nl": [],
-                    "subgoal_claims_nl": [],
-                    "stops_at_aux_boundary": True,
+                    "stage_type": "aux_boundary",
+                    "aux_boundary_h_nl": [],
+                    "aux_boundary_non_h_nl": [],
                 },
             ],
             "terminal_claims_nl": ["bh equals ch"],
@@ -705,7 +708,8 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
             "The target is ratio ab to bc equals ratio be to ce. "
             "For this claim, the visible support already includes ab equals ac, but we still need angle ab/bc equals angle be/ce. "
             "For angle ab/bc equals angle be/ce, the visible support already includes angle ab/ac equals angle bc/bd, but that is still not enough by itself to finish the visible route. "
-            "So we need a new helper: construct point f such that f is the midpoint of ad."
+            "So we need a new helper: construct point f such that f is the midpoint of ad. "
+            "After introducing f, we can get bf equals cf; together with angle ab/ac equals angle bc/bd, this reaches angle ab/bc equals angle be/ce."
         )
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -868,7 +872,8 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
             "The target is ratio ab to bc equals ratio be to ce. "
             "For this claim, the visible support already includes ab equals ac, but we still need angle ab/bc equals angle be/ce. "
             "For angle ab/bc equals angle be/ce, the visible support already includes angle ab/ac equals angle bc/bd, but that is still not enough by itself to finish the visible route. "
-            "So we need a new helper: construct point f such that f is the midpoint of ad."
+            "So we need a new helper: construct point f such that f is the midpoint of ad. "
+            "After introducing f, we can get bf equals cf; together with angle ab/ac equals angle bc/bd, this reaches angle ab/bc equals angle be/ce."
         )
 
         with tempfile.TemporaryDirectory() as temp_dir:

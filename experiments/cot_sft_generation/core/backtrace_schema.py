@@ -38,9 +38,25 @@ class BacktraceStage:
 class WriterBacktraceStage:
     claim_nl: str
     depth: int = 0
+    stage_type: str = "visible_backtrace"
     visible_support_nl: list[str] = field(default_factory=list)
     subgoal_claims_nl: list[str] = field(default_factory=list)
-    stops_at_aux_boundary: bool = False
+    aux_boundary_h_nl: list[str] = field(default_factory=list)
+    aux_boundary_non_h_nl: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        base: dict[str, Any] = {
+            "claim_nl": self.claim_nl,
+            "depth": self.depth,
+            "stage_type": self.stage_type,
+        }
+        if self.stage_type == "aux_boundary":
+            base["aux_boundary_h_nl"] = list(self.aux_boundary_h_nl)
+            base["aux_boundary_non_h_nl"] = list(self.aux_boundary_non_h_nl)
+            return base
+        base["visible_support_nl"] = list(self.visible_support_nl)
+        base["subgoal_claims_nl"] = list(self.subgoal_claims_nl)
+        return base
 
 
 @dataclass
@@ -78,7 +94,12 @@ class WriterHandoff:
     aux_construction_nl: str = ""
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        return {
+            "goal_nl": self.goal_nl,
+            "backtrace_stages": [stage.to_dict() for stage in self.backtrace_stages],
+            "terminal_claims_nl": list(self.terminal_claims_nl),
+            "aux_construction_nl": self.aux_construction_nl,
+        }
 
 
 __all__ = [
