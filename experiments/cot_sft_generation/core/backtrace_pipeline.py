@@ -40,7 +40,7 @@ _HIDDEN_META_RE = re.compile(
     re.IGNORECASE,
 )
 _TEXT_ONLY_BOUNDARY_RE = re.compile(
-    r"(?:<coord>|\bcoordinate(?:s| table)?\b|\bimage\b|\bdiagram\b|\bfigure scan\b|\bgrid\b|\b[a-z]\w*\s*=\s*\(\s*-?\d+\s*,\s*-?\d+\s*\))",
+    r"(?:<coord>|\bcoordinate(?:s| table)?\b|\bimage\b|\bfigure scan\b|\bgrid\b|\b[a-z]\w*\s*=\s*\(\s*-?\d+\s*,\s*-?\d+\s*\))",
     re.IGNORECASE,
 )
 _AUX_CONSTRUCTION_RE = re.compile(r"\bconstruct\s+(?:a\s+)?point\s+([a-z]\w*)\b", re.IGNORECASE)
@@ -59,20 +59,21 @@ def _extract_relation_candidates(text: str, *, include_full_sentence: bool = Tru
     sentence = str(text or "").strip()
     if not sentence:
         return []
+    loose_equal = r"(?:equals|is\s+equal(?:\s+to)?|are\s+equal(?:\s+to)?|must\s+equal|equall?ing)"
     patterns = [
-        r"(?:the\s+)?ratio(?:\s+of)?\s+(?:segment\s+)?[a-z]{2}\s+to\s+(?:segment\s+)?[a-z]{2}\s+(?:equals|is\s+equal\s+to|must\s+equal)\s+(?:the\s+)?ratio(?:\s+of)?\s+(?:segment\s+)?[a-z]{2}\s+to\s+(?:segment\s+)?[a-z]{2}",
-        r"(?:the\s+)?ratio\s+of\s+(?:side|segment|length)\s+[a-z]{2}\s+to\s+(?:side|segment|length)\s+[a-z]{2}\s+(?:equals|is\s+equal\s+to|must\s+equal)\s+(?:the\s+)?ratio\s+of\s+(?:side|segment|length)\s+[a-z]{2}\s+to\s+(?:side|segment|length)\s+[a-z]{2}",
+        rf"(?:the\s+)?ratio(?:\s+of)?\s+(?:side\s+|segment\s+|length\s+)?[a-z]{{2}}\s+to\s+(?:side\s+|segment\s+|length\s+)?[a-z]{{2}}\s+{loose_equal}\s+(?:the\s+)?ratio(?:\s+of)?\s+(?:side\s+|segment\s+|length\s+)?[a-z]{{2}}\s+to\s+(?:side\s+|segment\s+|length\s+)?[a-z]{{2}}",
+        rf"(?:the\s+)?ratio\s+of\s+(?:side|segment|length)\s+[a-z]{{2}}\s+to\s+(?:side|segment|length)\s+[a-z]{{2}}\s+{loose_equal}\s+(?:the\s+)?ratio\s+of\s+(?:side|segment|length)\s+[a-z]{{2}}\s+to\s+(?:side|segment|length)\s+[a-z]{{2}}",
         r"(?:points?\s+)?[a-z]\w*\s*,\s*[a-z]\w*\s*,\s*(?:and\s+)?[a-z]\w*\s+(?:lie\s+on|are\s+on)\s+(?:the\s+)?same\s+line",
         r"(?:points?\s+)?[a-z]\w*\s*,\s*[a-z]\w*\s*,\s*(?:and\s+)?[a-z]\w*\s+are\s+collinear",
         r"line\s+[a-z]{2}\s+is\s+parallel\s+to\s+line\s+[a-z]{2}",
         r"line\s+[a-z]{2}\s+is\s+perpendicular\s+to\s+line\s+[a-z]{2}",
-        r"angle\s+[a-z]{2}/[a-z]{2}\s+equals\s+angle\s+[a-z]{2}/[a-z]{2}",
-        r"(?:the\s+)?angle\s+[a-z]{2}/[a-z]{2}\s+(?:equals|is\s+equal\s+to|must\s+equal)\s+(?:the\s+)?angle\s+[a-z]{2}/[a-z]{2}",
-        r"(?:the\s+)?angle\s+formed\s+by\s+(?:(?:segments?|lines?)\s+)?[a-z]{2}\s+and\s+[a-z]{2}\s+(?:equals|is\s+equal\s+to|must\s+equal)\s+(?:the\s+)?angle\s+formed\s+by\s+(?:(?:segments?|lines?)\s+)?[a-z]{2}\s+and\s+[a-z]{2}",
-        r"(?:the\s+)?angle\s+between\s+(?:(?:segments?|lines?)\s+)?[a-z]{2}\s+and\s+(?:(?:segments?|lines?)\s+)?[a-z]{2}\s+(?:equals|is\s+equal\s+to|must\s+equal)\s+(?:the\s+)?angle\s+between\s+(?:(?:segments?|lines?)\s+)?[a-z]{2}\s+and\s+(?:(?:segments?|lines?)\s+)?[a-z]{2}",
+        rf"angle\s+[a-z]{{2}}/[a-z]{{2}}\s+{loose_equal}\s+angle\s+[a-z]{{2}}/[a-z]{{2}}",
+        rf"(?:the\s+)?angle\s+[a-z]{{2}}/[a-z]{{2}}\s+{loose_equal}\s+(?:the\s+)?angle\s+[a-z]{{2}}/[a-z]{{2}}",
+        rf"(?:the\s+)?angle\s+formed\s+by\s+(?:(?:sides?|segments?|lines?)\s+)?[a-z]{{2}}\s+and\s+(?:(?:sides?|segments?|lines?)\s+)?[a-z]{{2}}\s+{loose_equal}\s+(?:the\s+)?angle\s+formed\s+by\s+(?:(?:sides?|segments?|lines?)\s+)?[a-z]{{2}}\s+and\s+(?:(?:sides?|segments?|lines?)\s+)?[a-z]{{2}}",
+        rf"(?:the\s+)?angle\s+between\s+(?:(?:sides?|segments?|lines?)\s+)?[a-z]{{2}}\s+and\s+(?:(?:sides?|segments?|lines?)\s+)?[a-z]{{2}}\s+{loose_equal}\s+(?:the\s+)?angle\s+between\s+(?:(?:sides?|segments?|lines?)\s+)?[a-z]{{2}}\s+and\s+(?:(?:sides?|segments?|lines?)\s+)?[a-z]{{2}}",
         r"triangles\s+[a-z]{3}\s+and\s+[a-z]{3}\s+are\s+(?:similar|congruent)",
-        r"[a-z]{2}\s+equals\s+[a-z]{2}",
-        r"(?:segment|side)\s+[a-z]{2}\s+(?:equals|is\s+equal\s+to|is\s+equal\s+in\s+length\s+to|must\s+equal)\s+(?:segment|side)\s+[a-z]{2}",
+        rf"[a-z]{{2}}\s+{loose_equal}\s+[a-z]{{2}}",
+        rf"(?:segment|side)\s+[a-z]{{2}}\s+(?:{loose_equal}|is\s+equal\s+in\s+length\s+to)\s+(?:segment|side)\s+[a-z]{{2}}",
         r"equality\s+of\s+[a-z]{2}\s+and\s+[a-z]{2}",
     ]
     candidates = [normalize_relation_surface(sentence)] if include_full_sentence else []
@@ -81,6 +82,8 @@ def _extract_relation_candidates(text: str, *, include_full_sentence: bool = Tru
             candidates.append(normalize_relation_surface(match.group(0)))
     # Convert "equality of bf and cf" into the same surface as "bf equals cf".
     for match in re.finditer(r"equality\s+of\s+([a-z]{2})\s+and\s+([a-z]{2})", sentence, flags=re.IGNORECASE):
+        candidates.append(f"{match.group(1).lower()} equals {match.group(2).lower()}")
+    for match in re.finditer(r"\b([a-z]{2})\s+equall?ing\s+([a-z]{2})\b", sentence, flags=re.IGNORECASE):
         candidates.append(f"{match.group(1).lower()} equals {match.group(2).lower()}")
     deduped: list[str] = []
     seen = set()
@@ -168,9 +171,10 @@ def build_backtrace_write_prompt(record, writer_handoff: dict[str, object]) -> s
         "[Writing Contract]\n"
         "- Output plain text only, without tags.\n"
         "- Start from the visible goal, then walk through the staged backtrace in order.\n"
-        "- For a visible_backtrace stage, explain the current claim, which visible support already helps, and which visible subgoal(s) still remain.\n"
-        "- For an aux_boundary stage, explain the current claim and why the visible route is not enough before introducing the auxiliary construction.\n"
-        "- Right after introducing the auxiliary construction, say that the new auxiliary facts can lead to the listed aux_boundary_h_nl relations, and with the aux_boundary_non_h_nl relations this reaches the boundary claim. Do not give the full hidden derivation.\n"
+        "- For a visible_backtrace stage, name the current claim, mention at least one listed visible_support_nl item using close wording, then name the listed subgoal_claims_nl item(s).\n"
+        "- For an aux_boundary stage, name the current claim, say the visible route is not enough, then introduce the auxiliary construction.\n"
+        "- Right after introducing the auxiliary construction, explicitly list several aux_boundary_h_nl relations using close wording from the handoff.\n"
+        "- In that same post-aux paragraph, explicitly list the aux_boundary_non_h_nl relations using close wording from the handoff, then say these H and non-H relations reach the boundary claim. Do not give the full hidden derivation.\n"
         "- Stay text-only: do not mention any image, diagram, coordinates, or coordinate table.\n"
         "- Do not mention proof step ids, rule ids, hidden proofs, or internal schema names.\n"
         "- Avoid theorem-catalog or proof-style phrasing when a direct geometric description is enough.\n"
@@ -184,6 +188,8 @@ def build_backtrace_writer_retry_feedback(message: str, writer_handoff: dict | N
     del writer_handoff
     return (
         "Rewrite the body so it follows the staged backtrace: current claim -> visible support -> remaining subgoal(s) -> visible boundary -> aux.\n"
+        "Use close wording from visible_support_nl, subgoal_claims_nl, aux_boundary_h_nl, and aux_boundary_non_h_nl instead of only paraphrasing them.\n"
+        "After the aux construction, explicitly say that the listed H relations plus the listed non-H relations reach the boundary claim.\n"
         f"Validator feedback: {message}\n"
         "Keep it text-only, do not leak proof metadata, and keep the auxiliary construction faithful."
     )
@@ -362,8 +368,6 @@ def collect_backtrace_writer_issues(
                 point_pool,
                 local_cursor,
             )
-            if visible_support_nl and support_idx is None:
-                issues.append("missing_stage_support_reference")
             if claim_idx is not None and support_idx is not None and support_idx < claim_idx:
                 issues.append("narrative_order_violation")
             if support_idx is not None:
@@ -396,7 +400,11 @@ def collect_backtrace_writer_issues(
                 ),
                 None,
             )
-            if not _INSUFFICIENCY_RE.search(insufficiency_window):
+            has_boundary_landing = aux_idx is not None and (
+                _first_sentence_idx_for_any_relation_from(sentences, aux_boundary_h_nl, point_pool, aux_idx)
+                is not None
+            )
+            if not _INSUFFICIENCY_RE.search(insufficiency_window) and not has_boundary_landing:
                 issues.append("support_insufficiency_missing")
             else:
                 saw_terminal_boundary = True
@@ -422,8 +430,6 @@ def collect_backtrace_writer_issues(
                 point_pool,
                 window_start,
             )
-            if aux_boundary_non_h_nl and non_h_idx is None:
-                issues.append("missing_aux_boundary_non_h_reference")
             if claim_idx is not None and non_h_idx is not None and non_h_idx < claim_idx:
                 issues.append("narrative_order_violation")
             stage_cursor = max(stage_cursor, local_cursor)

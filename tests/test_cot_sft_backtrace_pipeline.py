@@ -310,7 +310,8 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
         prompt = build_backtrace_write_prompt(_build_backtrace_record(), handoff)
 
         self.assertIn("current claim", prompt)
-        self.assertIn("visible subgoal(s)", prompt)
+        self.assertIn("subgoal_claims_nl", prompt)
+        self.assertIn("aux_boundary_non_h_nl", prompt)
         self.assertIn("[Writer Handoff]", prompt)
         self.assertNotIn("[Visible Point Coordinates]", prompt)
         self.assertNotIn("planner", prompt.lower())
@@ -654,6 +655,50 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
             writer_handoff=writer_handoff,
             backtrace_slots={"H_relations_nl": []},
             aux_part="<aux>x00 f : cyclic a c d f [010] coll b d f [011] ; </aux>",
+        )
+
+        self.assertEqual(issues, [])
+
+    def test_collect_backtrace_writer_issues_tolerates_loose_equal_wording(self):
+        writer_handoff = {
+            "goal_nl": "triangles bde and ceg are similar",
+            "backtrace_stages": [
+                {
+                    "claim_nl": "triangles bde and ceg are similar",
+                    "depth": 0,
+                    "stage_type": "visible_backtrace",
+                    "visible_support_nl": ["angle bd/be equals angle cg/ce"],
+                    "subgoal_claims_nl": ["ratio bd to be equals ratio ce to cg"],
+                },
+                {
+                    "claim_nl": "ratio bd to be equals ratio ce to cg",
+                    "depth": 1,
+                    "stage_type": "aux_boundary",
+                    "aux_boundary_h_nl": ["ratio be to bh equals ratio ce to ch"],
+                    "aux_boundary_non_h_nl": ["af equals ef", "be equals ef", "cg equals fg"],
+                },
+            ],
+            "terminal_claims_nl": ["ratio bd to be equals ratio ce to cg"],
+            "aux_construction_nl": (
+                "construct point h such that line bd is parallel to line fh "
+                "and line bd is perpendicular to line bh"
+            ),
+        }
+        body = (
+            "The goal is to prove that triangles bde and ceg are similar. "
+            "The angle formed by sides bd and be is equal to the angle formed by sides cg and ce. "
+            "The remaining subgoal is that the ratio of side bd to side be is equal to the ratio of side ce to side cg. "
+            "For this ratio bd to be equals ratio ce to cg, the visible route is not enough. "
+            "We construct point h such that line bd is parallel to line fh and line bd is perpendicular to line bh. "
+            "This can lead to the ratio be to bh equalling the ratio ce to ch. "
+            "Combining that with af equalling ef, be equalling ef, and cg equalling fg reaches the boundary claim."
+        )
+
+        issues = collect_backtrace_writer_issues(
+            body,
+            writer_handoff=writer_handoff,
+            backtrace_slots={"H_relations_nl": []},
+            aux_part="<aux>x00 h : para b d f h [010] perp b d b h [011] ; </aux>",
         )
 
         self.assertEqual(issues, [])
