@@ -627,6 +627,70 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
 
         self.assertEqual(issues, [])
 
+    def test_collect_backtrace_writer_issues_allows_aux_after_all_sibling_boundaries(self):
+        writer_handoff = {
+            "goal_nl": "triangles abe and dca are similar",
+            "backtrace_stages": [
+                {
+                    "claim_nl": "triangles abe and dca are similar",
+                    "depth": 0,
+                    "visible_support_nl": [],
+                    "subgoal_claims_nl": [
+                        "angle ab/be equals angle cd/ac",
+                        "ratio ab to be equals ratio cd to ac",
+                    ],
+                    "stage_type": "visible_backtrace",
+                },
+                {
+                    "claim_nl": "angle ab/be equals angle cd/ac",
+                    "depth": 1,
+                    "stage_type": "aux_boundary",
+                    "aux_boundary_h_nl": [
+                        "b, e, g are collinear",
+                        "angle ab/bg equals angle cg/ac",
+                    ],
+                    "aux_boundary_non_h_nl": [],
+                },
+                {
+                    "claim_nl": "ratio ab to be equals ratio cd to ac",
+                    "depth": 1,
+                    "stage_type": "aux_boundary",
+                    "aux_boundary_h_nl": [
+                        "ratio ab to be equals ratio dg to eg",
+                        "ratio ac to cd equals ratio eg to dg",
+                    ],
+                    "aux_boundary_non_h_nl": [],
+                },
+            ],
+            "terminal_claims_nl": [
+                "angle ab/be equals angle cd/ac",
+                "ratio ab to be equals ratio cd to ac",
+            ],
+            "aux_construction_nl": (
+                "construct point f such that bf equals cf and b, c, d, f are concyclic. "
+                "then construct point g such that c, d, g are collinear and a, f, g are collinear"
+            ),
+        }
+        body = (
+            "To prove that triangles abe and dca are similar, we begin with the claim that triangles abe and dca are similar. "
+            "This requires establishing two subgoals: angle ab/be equals angle cd/ac and ratio ab to be equals ratio cd to ac. "
+            "Focusing on the claim that angle ab/be equals angle cd/ac, the visible route is not enough. "
+            "Next, for the claim that ratio ab to be equals ratio cd to ac, the visible route is also not enough. "
+            "We introduce the auxiliary construction: construct point f such that bf equals cf and b, c, d, f are concyclic. "
+            "Then construct point g such that c, d, g are collinear and a, f, g are collinear. "
+            "With this construction, b, e, g are collinear and angle ab/bg equals angle cg/ac, reaching the first boundary claim. "
+            "The relations ratio ab to be equals ratio dg to eg and ratio ac to cd equals ratio eg to dg reach the second boundary claim."
+        )
+
+        issues = collect_backtrace_writer_issues(
+            body,
+            writer_handoff=writer_handoff,
+            backtrace_slots={"H_relations_nl": []},
+            aux_part="<aux>x00 f : cong b f c f [010] cyclic b c d f [011] ; x00 g : coll c d g [012] coll a f g [013] ; </aux>",
+        )
+
+        self.assertEqual(issues, [])
+
     def test_collect_backtrace_writer_issues_accepts_do_not_provide_sufficient_boundary_phrase(self):
         writer_handoff = {
             "goal_nl": "angle ab/ac equals angle ad/ae",

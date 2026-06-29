@@ -172,9 +172,9 @@ def build_backtrace_write_prompt(record, writer_handoff: dict[str, object]) -> s
         "- Output plain text only, without tags.\n"
         "- Start from the visible goal, then walk through the staged backtrace in order.\n"
         "- For a visible_backtrace stage, name the current claim, mention at least one listed visible_support_nl item using close wording, then name the listed subgoal_claims_nl item(s).\n"
-        "- For an aux_boundary stage, name the current claim, say the visible route is not enough, then introduce the auxiliary construction.\n"
-        "- Right after introducing the auxiliary construction, explicitly list several aux_boundary_h_nl relations using close wording from the handoff.\n"
-        "- In that same post-aux paragraph, explicitly list the aux_boundary_non_h_nl relations using close wording from the handoff, then say these H and non-H relations reach the boundary claim. Do not give the full hidden derivation.\n"
+        "- For each aux_boundary stage, first name the boundary claim and say the visible route is not enough. If there are multiple aux_boundary stages, state all of these boundary claims before introducing the auxiliary construction.\n"
+        "- Introduce the auxiliary construction only after the visible route has reached all listed aux_boundary claims.\n"
+        "- After introducing the auxiliary construction, group the explanation by boundary claim: explicitly list several matching aux_boundary_h_nl relations, list the aux_boundary_non_h_nl relations when present, then say these H and non-H relations reach that boundary claim. Do not give the full hidden derivation.\n"
         "- Stay text-only: do not mention any image, diagram, coordinates, or coordinate table.\n"
         "- Do not mention proof step ids, rule ids, hidden proofs, or internal schema names.\n"
         "- Avoid theorem-catalog or proof-style phrasing when a direct geometric description is enough.\n"
@@ -187,9 +187,10 @@ def build_backtrace_write_prompt(record, writer_handoff: dict[str, object]) -> s
 def build_backtrace_writer_retry_feedback(message: str, writer_handoff: dict | None = None) -> str:
     del writer_handoff
     return (
-        "Rewrite the body so it follows the staged backtrace: current claim -> visible support -> remaining subgoal(s) -> visible boundary -> aux.\n"
+        "Rewrite the body so it follows the staged backtrace: current claim -> visible support -> remaining subgoal(s) -> all visible boundary claims -> aux.\n"
+        "State all aux_boundary claims and their visible insufficiency before introducing the auxiliary construction.\n"
         "Use close wording from visible_support_nl, subgoal_claims_nl, aux_boundary_h_nl, and aux_boundary_non_h_nl instead of only paraphrasing them.\n"
-        "After the aux construction, explicitly say that the listed H relations plus the listed non-H relations reach the boundary claim.\n"
+        "After the aux construction, explain each boundary claim with its listed H relations plus listed non-H relations.\n"
         f"Validator feedback: {message}\n"
         "Keep it text-only, do not leak proof metadata, and keep the auxiliary construction faithful."
     )
@@ -311,6 +312,7 @@ def collect_backtrace_writer_issues(
     stage_cursor = (goal_idx - 1) if goal_idx is not None else -1
     first_terminal_claim_idx = None
     saw_terminal_boundary = False
+    aux_has_been_introduced_for_terminal = False
     for stage_index, stage in enumerate(backtrace_stages):
         claim_nl = str(stage.get("claim_nl") or "").strip()
         visible_support_nl = [
@@ -376,7 +378,8 @@ def collect_backtrace_writer_issues(
         if is_terminal:
             if first_terminal_claim_idx is None:
                 first_terminal_claim_idx = claim_idx
-            if claim_idx is not None and aux_idx is not None and aux_idx < claim_idx:
+            allow_reused_aux_boundary = aux_has_been_introduced_for_terminal and aux_idx is not None
+            if claim_idx is not None and aux_idx is not None and aux_idx < claim_idx and not allow_reused_aux_boundary:
                 issues.append("narrative_order_violation")
             window_start = claim_idx if claim_idx is not None else 0
             next_stage_claim_idx = None
@@ -430,8 +433,8 @@ def collect_backtrace_writer_issues(
                 point_pool,
                 window_start,
             )
-            if claim_idx is not None and non_h_idx is not None and non_h_idx < claim_idx:
-                issues.append("narrative_order_violation")
+            if aux_idx is not None and claim_idx is not None and claim_idx <= aux_idx:
+                aux_has_been_introduced_for_terminal = True
             stage_cursor = max(stage_cursor, local_cursor)
             continue
 
@@ -462,8 +465,6 @@ def collect_backtrace_writer_issues(
         issues.append("narrative_order_violation")
     if first_terminal_claim_idx is not None and aux_idx is not None and not saw_terminal_boundary:
         issues.append("missing_terminal_boundary")
-    elif insufficiency_idx is not None and aux_idx is not None and insufficiency_idx > aux_idx:
-        issues.append("narrative_order_violation")
 
     pre_aux_text = body if aux_idx is None else " ".join(sentences[:aux_idx])
     hidden_relations = [
