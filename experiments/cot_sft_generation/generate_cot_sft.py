@@ -432,6 +432,13 @@ def write_jsonl(file_path, records):
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
+def append_jsonl(file_path, records):
+    ensure_parent_dir(file_path)
+    with open(file_path, "a", encoding="utf-8") as f:
+        for record in records:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
 def build_default_output_jsonl():
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     return SCRIPT_DIR / "generated" / timestamp / "cot_sft_dataset.jsonl"
@@ -11479,55 +11486,70 @@ def process_and_generate_sft(
                 ),
             }
 
+    ensure_parent_dir(output_jsonl)
+    Path(output_jsonl).write_text("", encoding="utf-8")
+    if verbose:
+        write_jsonl(run_dir / "item_records.jsonl", [])
+
     sft_dataset = []
     item_records = []
-    with ThreadPoolExecutor(max_workers=num_workers) as executor:
-        futures = {executor.submit(process_item, (i, rec)): i for i, rec in enumerate(selected)}
-        for future in as_completed(futures):
-            sample_order = futures[future]
-            record = selected[sample_order]
-            try:
-                result = future.result()
-            except Exception as exc:
-                image_path = None
-                if requires_image_input(generation_style):
-                    image_path = resolve_image_path(record.get("image_path", ""), input_path)
-                logger.exception(
-                    "Worker future escaped item-level failure handling: sample_order=%s input_index=%s image_path=%s generation_style=%s",
-                    sample_order,
-                    record.get("_source_index"),
-                    image_path,
-                    generation_style,
-                )
-                result = {
-                    "result_data": None,
-                    "item_record": build_generation_failure_item_record(
-                        sample_order=sample_order,
-                        input_index=record["_source_index"],
-                        image_path=str(image_path or ""),
-                        error=f"worker_future_exception: {type(exc).__name__}: {exc}",
-                        generation_style=generation_style,
-                        aux_part=record.get("_aux_part"),
-                        hidden_rest_sanitized=record.get("_sanitized_rest"),
-                        point_coords_grid=record.get("point_coords_grid", {}),
-                    ),
-                }
-            item_records.append(result["item_record"])
-            if result["result_data"] is not None:
-                sft_dataset.append(result["result_data"])
+    batch_size = max(1, num_workers)
+    for batch_start in range(0, len(selected), batch_size):
+        batch = list(enumerate(selected[batch_start:batch_start + batch_size], start=batch_start))
+        batch_sft_dataset = []
+        batch_item_records = []
+        with ThreadPoolExecutor(max_workers=num_workers) as executor:
+            futures = {executor.submit(process_item, idx_record): idx_record for idx_record in batch}
+            for future in as_completed(futures):
+                sample_order, record = futures[future]
+                try:
+                    result = future.result()
+                except Exception as exc:
+                    image_path = None
+                    if requires_image_input(generation_style):
+                        image_path = resolve_image_path(record.get("image_path", ""), input_path)
+                    logger.exception(
+                        "Worker future escaped item-level failure handling: sample_order=%s input_index=%s image_path=%s generation_style=%s",
+                        sample_order,
+                        record.get("_source_index"),
+                        image_path,
+                        generation_style,
+                    )
+                    result = {
+                        "result_data": None,
+                        "item_record": build_generation_failure_item_record(
+                            sample_order=sample_order,
+                            input_index=record["_source_index"],
+                            image_path=str(image_path or ""),
+                            error=f"worker_future_exception: {type(exc).__name__}: {exc}",
+                            generation_style=generation_style,
+                            aux_part=record.get("_aux_part"),
+                            hidden_rest_sanitized=record.get("_sanitized_rest"),
+                            point_coords_grid=record.get("point_coords_grid", {}),
+                        ),
+                    }
+                batch_item_records.append(result["item_record"])
+                if result["result_data"] is not None:
+                    batch_sft_dataset.append(result["result_data"])
 
-    sft_dataset.sort(key=lambda x: x["_order"])
-    for item in sft_dataset:
-        item.pop("_order")
-    item_records.sort(key=lambda x: x["sample_order"])
+        batch_sft_dataset.sort(key=lambda x: x["_order"])
+        for item in batch_sft_dataset:
+            item.pop("_order")
+        batch_item_records.sort(key=lambda x: x["sample_order"])
 
-    ensure_parent_dir(output_jsonl)
-    with open(output_jsonl, "w", encoding="utf-8") as f:
-        for item in sft_dataset:
-            f.write(json.dumps(item, ensure_ascii=False) + "\n")
+        append_jsonl(output_jsonl, batch_sft_dataset)
+        if verbose:
+            append_jsonl(run_dir / "item_records.jsonl", batch_item_records)
 
-    if verbose:
-        write_jsonl(run_dir / "item_records.jsonl", item_records)
+        sft_dataset.extend(batch_sft_dataset)
+        item_records.extend(batch_item_records)
+        logger.info(
+            "Completed and wrote batch %s-%s of %s selected items (%s exported records in batch).",
+            batch_start,
+            batch_start + len(batch) - 1,
+            len(selected),
+            len(batch_sft_dataset),
+        )
 
     source_audit_issue_items = sum(1 for item in item_records if item.get("source_audit", {}).get("has_issue"))
     generation_audit_issue_items = sum(1 for item in item_records if item.get("generation_audit", {}).get("has_issue"))
