@@ -691,6 +691,270 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
 
         self.assertEqual(issues, [])
 
+    def test_collect_backtrace_writer_issues_allows_visible_sibling_after_terminal_boundary(self):
+        writer_handoff = {
+            "goal_nl": "ratio af to ag equals ratio cf to eg",
+            "backtrace_stages": [
+                {
+                    "claim_nl": "ratio af to ag equals ratio cf to eg",
+                    "depth": 0,
+                    "visible_support_nl": [],
+                    "subgoal_claims_nl": [
+                        "ratio ac to ae equals ratio af to ag",
+                        "ratio ac to ae equals ratio cf to eg",
+                    ],
+                    "stage_type": "visible_backtrace",
+                },
+                {
+                    "claim_nl": "ratio ac to ae equals ratio af to ag",
+                    "depth": 1,
+                    "visible_support_nl": ["line cf is parallel to line eg"],
+                    "subgoal_claims_nl": ["a, f, g are collinear"],
+                    "stage_type": "visible_backtrace",
+                },
+                {
+                    "claim_nl": "a, f, g are collinear",
+                    "depth": 2,
+                    "stage_type": "aux_boundary",
+                    "aux_boundary_h_nl": ["a, d, h are collinear", "bh equals ch"],
+                    "aux_boundary_non_h_nl": ["b, e, g are collinear"],
+                },
+                {
+                    "claim_nl": "ratio ac to ae equals ratio cf to eg",
+                    "depth": 1,
+                    "visible_support_nl": ["line cf is parallel to line eg"],
+                    "subgoal_claims_nl": ["a, f, g are collinear"],
+                    "stage_type": "visible_backtrace",
+                },
+            ],
+            "terminal_claims_nl": ["a, f, g are collinear"],
+            "aux_construction_nl": "construct point h such that h is the midpoint of ad",
+        }
+        body = (
+            "To show that ratio af to ag equals ratio cf to eg, we first need ratio ac to ae equals ratio af to ag "
+            "and ratio ac to ae equals ratio cf to eg. "
+            "For ratio ac to ae equals ratio af to ag, line cf is parallel to line eg, reducing this to a, f, g are collinear. "
+            "The visible route is not enough for a, f, g are collinear. "
+            "For ratio ac to ae equals ratio cf to eg, line cf is parallel to line eg, and it also reduces to a, f, g are collinear. "
+            "We construct point h such that h is the midpoint of ad. "
+            "The new auxiliary relations a, d, h are collinear and bh equals ch, together with the already-visible relation b, e, g are collinear, reach a, f, g are collinear."
+        )
+
+        issues = collect_backtrace_writer_issues(
+            body,
+            writer_handoff=writer_handoff,
+            backtrace_slots={"H_relations_nl": []},
+            aux_part="<aux>x00 h : midp h a d [010] ; </aux>",
+        )
+
+        self.assertEqual(issues, [])
+
+    def test_collect_backtrace_writer_issues_allows_sibling_expansion_before_shared_boundary(self):
+        writer_handoff = {
+            "goal_nl": "triangles agi and igh are similar",
+            "backtrace_stages": [
+                {
+                    "claim_nl": "triangles agi and igh are similar",
+                    "depth": 0,
+                    "visible_support_nl": [],
+                    "subgoal_claims_nl": [
+                        "angle ag/ai equals angle hi/gi",
+                        "ratio ag to ai equals ratio gi to hi",
+                    ],
+                    "stage_type": "visible_backtrace",
+                },
+                {
+                    "claim_nl": "angle ag/ai equals angle hi/gi",
+                    "depth": 1,
+                    "visible_support_nl": ["a, g, h are collinear"],
+                    "subgoal_claims_nl": ["dg equals gi"],
+                    "stage_type": "visible_backtrace",
+                },
+                {
+                    "claim_nl": "dg equals gi",
+                    "depth": 2,
+                    "stage_type": "aux_boundary",
+                    "aux_boundary_h_nl": ["d, e, k, i are concyclic"],
+                    "aux_boundary_non_h_nl": [],
+                },
+                {
+                    "claim_nl": "ratio ag to ai equals ratio gi to hi",
+                    "depth": 1,
+                    "visible_support_nl": ["de equals dg"],
+                    "subgoal_claims_nl": ["dg equals gi"],
+                    "stage_type": "visible_backtrace",
+                },
+            ],
+            "terminal_claims_nl": ["dg equals gi"],
+            "aux_construction_nl": "construct point k such that line cf is parallel to line jk",
+        }
+        body = (
+            "To prove that triangles agi and igh are similar, we need two conditions. "
+            "First, angle ag/ai equals angle hi/gi. "
+            "Second, ratio ag to ai equals ratio gi to hi. "
+            "For the angle condition, a, g, h are collinear and the path reduces to dg equals gi. "
+            "For the ratio condition, de equals dg and this path also reduces to dg equals gi. "
+            "The claim dg equals gi is the boundary where the visible route is not enough. "
+            "Construct point k such that line cf is parallel to line jk. "
+            "The new relation d, e, k, i are concyclic reaches dg equals gi."
+        )
+
+        issues = collect_backtrace_writer_issues(
+            body,
+            writer_handoff=writer_handoff,
+            backtrace_slots={"H_relations_nl": []},
+            aux_part="<aux>x00 k : para c f j k [010] ; </aux>",
+        )
+
+        self.assertEqual(issues, [])
+
+    def test_collect_backtrace_writer_issues_prefers_pre_aux_sibling_expansion_over_summary(self):
+        writer_handoff = {
+            "goal_nl": "ratio af to ag equals ratio cf to eg",
+            "backtrace_stages": [
+                {
+                    "claim_nl": "ratio af to ag equals ratio cf to eg",
+                    "depth": 0,
+                    "visible_support_nl": [],
+                    "subgoal_claims_nl": [
+                        "ratio ac to ae equals ratio af to ag",
+                        "ratio ac to ae equals ratio cf to eg",
+                    ],
+                    "stage_type": "visible_backtrace",
+                },
+                {
+                    "claim_nl": "ratio ac to ae equals ratio af to ag",
+                    "depth": 1,
+                    "visible_support_nl": ["line cf is parallel to line eg"],
+                    "subgoal_claims_nl": ["a, f, g are collinear"],
+                    "stage_type": "visible_backtrace",
+                },
+                {
+                    "claim_nl": "a, f, g are collinear",
+                    "depth": 2,
+                    "stage_type": "aux_boundary",
+                    "aux_boundary_h_nl": ["a, d, h are collinear", "bh equals ch"],
+                    "aux_boundary_non_h_nl": [],
+                },
+                {
+                    "claim_nl": "ratio ac to ae equals ratio cf to eg",
+                    "depth": 1,
+                    "visible_support_nl": ["line cf is parallel to line eg"],
+                    "subgoal_claims_nl": ["a, f, g are collinear"],
+                    "stage_type": "visible_backtrace",
+                },
+            ],
+            "terminal_claims_nl": ["a, f, g are collinear"],
+            "aux_construction_nl": "construct point h such that h is the midpoint of ad",
+        }
+        body = (
+            "To prove ratio af to ag equals ratio cf to eg, we use two intermediate claims. "
+            "First, ratio ac to ae equals ratio af to ag. "
+            "Second, ratio ac to ae equals ratio cf to eg. "
+            "For ratio ac to ae equals ratio af to ag, line cf is parallel to line eg, provided a, f, g are collinear. "
+            "For ratio ac to ae equals ratio cf to eg, line cf is parallel to line eg, and it also reduces to a, f, g are collinear. "
+            "The boundary claim a, f, g are collinear is not visible enough. "
+            "Construct point h such that h is the midpoint of ad. "
+            "The new auxiliary relations a, d, h are collinear and bh equals ch reach a, f, g are collinear. "
+            "Thus ratio ac to ae equals ratio af to ag and ratio ac to ae equals ratio cf to eg."
+        )
+
+        issues = collect_backtrace_writer_issues(
+            body,
+            writer_handoff=writer_handoff,
+            backtrace_slots={"H_relations_nl": []},
+            aux_part="<aux>x00 h : midp h a d [010] ; </aux>",
+        )
+
+        self.assertEqual(issues, [])
+
+    def test_collect_backtrace_writer_issues_prefers_pre_aux_terminal_boundary_claim(self):
+        writer_handoff = {
+            "goal_nl": "ratio ac to ad equals ratio bc to de",
+            "backtrace_stages": [
+                {
+                    "claim_nl": "ratio ac to ad equals ratio bc to de",
+                    "depth": 0,
+                    "visible_support_nl": [],
+                    "subgoal_claims_nl": ["triangles abc and aed are similar"],
+                    "stage_type": "visible_backtrace",
+                },
+                {
+                    "claim_nl": "triangles abc and aed are similar",
+                    "depth": 1,
+                    "visible_support_nl": ["ratio ab to ac equals ratio ae to ad"],
+                    "subgoal_claims_nl": ["angle ab/ac equals angle ad/ae"],
+                    "stage_type": "visible_backtrace",
+                },
+                {
+                    "claim_nl": "angle ab/ac equals angle ad/ae",
+                    "depth": 2,
+                    "stage_type": "aux_boundary",
+                    "aux_boundary_h_nl": ["d, e, f are collinear", "bc equals cf"],
+                    "aux_boundary_non_h_nl": ["ad equals ae"],
+                },
+            ],
+            "terminal_claims_nl": ["angle ab/ac equals angle ad/ae"],
+            "aux_construction_nl": "construct point f such that a, c, d, f are concyclic",
+        }
+        body = (
+            "To show ratio ac to ad equals ratio bc to de, we aim to show that triangles abc and aed are similar. "
+            "For these triangles, ratio ab to ac equals ratio ae to ad. "
+            "This reduces to showing that angle formed by ab and ac equals angle formed by ad and ae. "
+            "However, the visible route is not enough to prove this angle equality directly. "
+            "Construct point f such that a, c, d, f are concyclic. "
+            "With this auxiliary point, d, e, f are collinear and bc equals cf. "
+            "Using the already-visible relation ad equals ae, these relations reach angle formed by ab and ac equals angle formed by ad and ae."
+        )
+
+        issues = collect_backtrace_writer_issues(
+            body,
+            writer_handoff=writer_handoff,
+            backtrace_slots={"H_relations_nl": []},
+            aux_part="<aux>x00 f : cyclic a c d f [010] ; </aux>",
+        )
+
+        self.assertEqual(issues, [])
+
+    def test_collect_backtrace_writer_issues_tolerates_angle_involving_wording(self):
+        writer_handoff = {
+            "goal_nl": "triangles abh and gde are similar",
+            "backtrace_stages": [
+                {
+                    "claim_nl": "triangles abh and gde are similar",
+                    "depth": 0,
+                    "visible_support_nl": ["angle ab/bh equals angle de/dg"],
+                    "subgoal_claims_nl": ["angle ah/bh equals angle de/eg"],
+                    "stage_type": "visible_backtrace",
+                },
+                {
+                    "claim_nl": "angle ah/bh equals angle de/eg",
+                    "depth": 1,
+                    "stage_type": "aux_boundary",
+                    "aux_boundary_h_nl": ["cf equals ci"],
+                    "aux_boundary_non_h_nl": [],
+                },
+            ],
+            "terminal_claims_nl": ["angle ah/bh equals angle de/eg"],
+            "aux_construction_nl": "construct point i such that a, c, i are collinear",
+        }
+        body = (
+            "To prove that triangles abh and gde are similar, angle ab/bh equals angle de/dg. "
+            "Thus the subgoal becomes showing that the angle involving ah and bh equals the angle involving de and eg. "
+            "The visible route is not enough. "
+            "Construct point i such that a, c, i are collinear. "
+            "The new auxiliary relation cf equals ci reaches the angle involving ah and bh equals the angle involving de and eg."
+        )
+
+        issues = collect_backtrace_writer_issues(
+            body,
+            writer_handoff=writer_handoff,
+            backtrace_slots={"H_relations_nl": []},
+            aux_part="<aux>x00 i : coll a c i [010] ; </aux>",
+        )
+
+        self.assertEqual(issues, [])
+
     def test_collect_backtrace_writer_issues_accepts_do_not_provide_sufficient_boundary_phrase(self):
         writer_handoff = {
             "goal_nl": "angle ab/ac equals angle ad/ae",
@@ -766,6 +1030,101 @@ class CotSftBacktraceExtractorTest(unittest.TestCase):
         )
 
         self.assertEqual(issues, [])
+
+    def test_collect_backtrace_writer_issues_allows_non_hidden_wording(self):
+        writer_handoff = {
+            "goal_nl": "be equals ef",
+            "backtrace_stages": [
+                {
+                    "claim_nl": "be equals ef",
+                    "depth": 0,
+                    "stage_type": "aux_boundary",
+                    "aux_boundary_h_nl": ["ae equals ag"],
+                    "aux_boundary_non_h_nl": ["b, c, e are collinear"],
+                }
+            ],
+            "terminal_claims_nl": ["be equals ef"],
+            "aux_construction_nl": (
+                "construct point g such that line be is perpendicular to line cg "
+                "and line bg is parallel to line de"
+            ),
+        }
+        body = (
+            "The goal is be equals ef, but the visible route is not enough. "
+            "We construct point g such that line be is perpendicular to line cg and line bg is parallel to line de. "
+            "The new auxiliary relation ae equals ag combines with the non-hidden relation b, c, e are collinear to reach be equals ef."
+        )
+
+        issues = collect_backtrace_writer_issues(
+            body,
+            writer_handoff=writer_handoff,
+            backtrace_slots={"H_relations_nl": []},
+            aux_part="<aux>x00 g : perp b e c g [010] para b g d e [011] ; </aux>",
+        )
+
+        self.assertEqual(issues, [])
+
+    def test_collect_backtrace_writer_issues_does_not_treat_pronoun_i_as_aux_leak(self):
+        writer_handoff = {
+            "goal_nl": "triangles ach and dbh are congruent",
+            "backtrace_stages": [
+                {
+                    "claim_nl": "triangles ach and dbh are congruent",
+                    "depth": 0,
+                    "stage_type": "aux_boundary",
+                    "aux_boundary_h_nl": ["triangles bih and cih are congruent"],
+                    "aux_boundary_non_h_nl": [],
+                }
+            ],
+            "terminal_claims_nl": ["triangles ach and dbh are congruent"],
+            "aux_construction_nl": "construct point i such that i is the midpoint of ac",
+        }
+        body = (
+            "To prove that triangles ach and dbh are congruent, I need to verify the sides. "
+            "The visible route is not enough. "
+            "I construct point i such that i is the midpoint of ac. "
+            "After the construction, triangles bih and cih are congruent, reaching the claim."
+        )
+
+        issues = collect_backtrace_writer_issues(
+            body,
+            writer_handoff=writer_handoff,
+            backtrace_slots={"H_relations_nl": ["triangles bih and cih are congruent"]},
+            aux_part="<aux>x00 i : midp i a c [010] ; </aux>",
+        )
+
+        self.assertEqual(issues, [])
+
+    def test_collect_backtrace_writer_issues_still_flags_pre_aux_h_relation(self):
+        writer_handoff = {
+            "goal_nl": "angle ab/ac equals angle bd/cd",
+            "backtrace_stages": [
+                {
+                    "claim_nl": "angle ab/ac equals angle bd/cd",
+                    "depth": 0,
+                    "stage_type": "aux_boundary",
+                    "aux_boundary_h_nl": ["a, e, d are collinear"],
+                    "aux_boundary_non_h_nl": [],
+                }
+            ],
+            "terminal_claims_nl": ["angle ab/ac equals angle bd/cd"],
+            "aux_construction_nl": "construct point e such that line ab is perpendicular to line ce",
+        }
+        body = (
+            "We aim to prove that angle ab/ac equals angle bd/cd. "
+            "The visible route is not enough, so we need a, e, d are collinear. "
+            "Construct point e such that line ab is perpendicular to line ce. "
+            "After construction, a, e, d are collinear and reaches the boundary."
+        )
+
+        issues = collect_backtrace_writer_issues(
+            body,
+            writer_handoff=writer_handoff,
+            backtrace_slots={"H_relations_nl": ["a, e, d are collinear"]},
+            aux_part="<aux>x00 e : perp a b c e [010] ; </aux>",
+        )
+
+        self.assertEqual(issues, ["early_hidden_relation"])
 
     def test_collect_backtrace_writer_issues_does_not_treat_non_aux_constructed_point_as_aux_start(self):
         writer_handoff = {
