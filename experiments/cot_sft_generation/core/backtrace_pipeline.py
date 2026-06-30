@@ -36,7 +36,7 @@ except ImportError:  # pragma: no cover - script execution path
 
 _RULE_LEAK_RE = re.compile(r"(?:\[\d{3}\]|\bAR\b|\br\d+\b|\brule\s+id\b)", re.IGNORECASE)
 _HIDDEN_META_RE = re.compile(
-    r"\b(?:hidden|supervisor|planner|writer|handoff|artifact|proof dag|step id|frontier node|v_core|c1|c2|c3)\b",
+    r"(?<!non-)\b(?:hidden|supervisor|planner|writer|handoff|artifact|proof dag|step id|frontier node|v_core|c1|c2|c3)\b",
     re.IGNORECASE,
 )
 _TEXT_ONLY_BOUNDARY_RE = re.compile(
@@ -49,6 +49,11 @@ _INSUFFICIENCY_RE = re.compile(
     re.IGNORECASE,
 )
 _POINT_RE = re.compile(r"\b([a-z][a-z0-9]*)\b", re.IGNORECASE)
+
+
+def _has_hidden_meta_language(text: str) -> bool:
+    cleaned = re.sub(r"\bhidden\s+and\s+non-hidden\b", "", str(text or ""), flags=re.IGNORECASE)
+    return bool(_HIDDEN_META_RE.search(cleaned))
 
 
 def _split_into_sentences(text: str) -> list[str]:
@@ -71,6 +76,7 @@ def _extract_relation_candidates(text: str, *, include_full_sentence: bool = Tru
         rf"(?:the\s+)?angle\s+[a-z]{{2}}/[a-z]{{2}}\s+{loose_equal}\s+(?:the\s+)?angle\s+[a-z]{{2}}/[a-z]{{2}}",
         rf"(?:the\s+)?angle\s+formed\s+by\s+(?:(?:sides?|segments?|lines?)\s+)?[a-z]{{2}}\s+and\s+(?:(?:sides?|segments?|lines?)\s+)?[a-z]{{2}}\s+{loose_equal}\s+(?:the\s+)?angle\s+formed\s+by\s+(?:(?:sides?|segments?|lines?)\s+)?[a-z]{{2}}\s+and\s+(?:(?:sides?|segments?|lines?)\s+)?[a-z]{{2}}",
         rf"(?:the\s+)?angle\s+between\s+(?:(?:sides?|segments?|lines?)\s+)?[a-z]{{2}}\s+and\s+(?:(?:sides?|segments?|lines?)\s+)?[a-z]{{2}}\s+{loose_equal}\s+(?:the\s+)?angle\s+between\s+(?:(?:sides?|segments?|lines?)\s+)?[a-z]{{2}}\s+and\s+(?:(?:sides?|segments?|lines?)\s+)?[a-z]{{2}}",
+        rf"(?:the\s+)?angle\s+involving\s+(?:(?:sides?|segments?|lines?)\s+)?[a-z]{{2}}\s+and\s+(?:(?:sides?|segments?|lines?)\s+)?[a-z]{{2}}\s+{loose_equal}\s+(?:the\s+)?angle\s+involving\s+(?:(?:sides?|segments?|lines?)\s+)?[a-z]{{2}}\s+and\s+(?:(?:sides?|segments?|lines?)\s+)?[a-z]{{2}}",
         r"triangles\s+[a-z]{3}\s+and\s+[a-z]{3}\s+are\s+(?:similar|congruent)",
         rf"[a-z]{{2}}\s+{loose_equal}\s+[a-z]{{2}}",
         rf"(?:segment|side)\s+[a-z]{{2}}\s+(?:{loose_equal}|is\s+equal\s+in\s+length\s+to)\s+(?:segment|side)\s+[a-z]{{2}}",
@@ -114,15 +120,55 @@ def _relations_strictly_match(text_a: str, text_b: str, point_names: list[str]) 
     for family in ["collinear", "midpoint", "equal", "parallel", "perpendicular"]:
         if family not in keywords_a:
             continue
+        if family == "equal" and ({"angle", "ratio"} & keywords_a):
+            continue
         if signatures_a[family] or signatures_b[family]:
             return bool(signatures_a[family] & signatures_b[family])
 
     segments_a = extract_relation_segment_tokens(normalized_a)
     segments_b = extract_relation_segment_tokens(normalized_b)
     if segments_a and segments_b:
+        if "angle" in keywords_a or "ratio" in keywords_a:
+            return segments_a == segments_b
         return segments_a == segments_b
 
     return relations_semantically_match(text_a, text_b, point_names)
+
+
+def _sentence_mentions_aux_points(sentence: str, aux_points: list[str]) -> bool:
+    lowered = str(sentence or "").lower()
+    for point in aux_points:
+        if not point:
+            continue
+        if re.search(
+            rf"\b(?:point|points|line|segment|side|angle|triangle|circle|ratio)\s+[a-z]*{re.escape(point)}[a-z]*\b",
+            lowered,
+        ):
+            return True
+        if re.search(rf"\b(?:[a-z]{re.escape(point)}|{re.escape(point)}[a-z])\b", lowered):
+            return True
+        if re.search(rf"\b{re.escape(point)}\s*,|\b,\s*{re.escape(point)}\s*,|\b,\s*{re.escape(point)}\b", lowered):
+            return True
+    return False
+
+
+def _extract_angle_segment_tokens(text: str) -> set[str]:
+    normalized = normalize_relation_surface(text or "").lower()
+    tokens: set[str] = set()
+    angle_patterns = [
+        r"angle\s+([a-z]{2})/([a-z]{2})",
+        r"angle\s+formed\s+by\s+(?:(?:sides?|segments?|lines?)\s+)?([a-z]{2})\s+and\s+"
+        r"(?:(?:sides?|segments?|lines?)\s+)?([a-z]{2})",
+        r"angle\s+between\s+(?:(?:sides?|segments?|lines?)\s+)?([a-z]{2})\s+and\s+"
+        r"(?:(?:sides?|segments?|lines?)\s+)?([a-z]{2})",
+        r"angle\s+involving\s+(?:(?:sides?|segments?|lines?)\s+)?([a-z]{2})\s+and\s+"
+        r"(?:(?:sides?|segments?|lines?)\s+)?([a-z]{2})",
+    ]
+    for pattern in angle_patterns:
+        for match in re.finditer(pattern, normalized, flags=re.IGNORECASE):
+            for token in match.groups():
+                tokens.add("".join(sorted(token.lower())))
+    return tokens
 
 
 def _relation_mentioned_in_text_strict(text: str, relation: str, point_names: list[str]) -> bool:
@@ -172,12 +218,23 @@ def build_backtrace_write_prompt(record, writer_handoff: dict[str, object]) -> s
         "- Output plain text only, without tags.\n"
         "- Start from the visible goal, then walk through the staged backtrace in order.\n"
         "- For a visible_backtrace stage, name the current claim, mention at least one listed visible_support_nl item using close wording, then name the listed subgoal_claims_nl item(s).\n"
-        "- For each aux_boundary stage, first name the boundary claim and say the visible route is not enough. If there are multiple aux_boundary stages, state all of these boundary claims before introducing the auxiliary construction.\n"
-        "- Introduce the auxiliary construction only after the visible route has reached all listed aux_boundary claims.\n"
-        "- After introducing the auxiliary construction, group the explanation by boundary claim: explicitly list several matching aux_boundary_h_nl relations, list the aux_boundary_non_h_nl relations when present, then say these H and non-H relations reach that boundary claim. Do not give the full hidden derivation.\n"
+        "- For visible_backtrace stages only, keep the chain explicit: mention the stage claim and its subgoal_claims_nl with close wording before moving to the next visible stage. Do not apply this subgoal-listing rule to aux_boundary stages.\n"
+        "- For each aux_boundary stage, before the auxiliary construction, name only the stage claim_nl and say the visible route is not enough.\n"
+        "- For aux_boundary stages, aux_boundary_h_nl items are post-construction auxiliary relations, not pre-construction subgoals. Before the construction, refer to them only generically as 'the remaining link'.\n"
+        "- Before the auxiliary construction, never list aux_boundary_h_nl relations and never mention any relation containing a newly constructed point. Do not write sentences like 'we need bf equals bg', 'boundary claim bf equals bi', or 'angle eg/ei equals angle fg/fi' before point f is constructed. Use a generic phrase such as 'the remaining link needs an auxiliary point' instead.\n"
+        "- Introduce the auxiliary construction only after the visible route has reached its listed aux_boundary stage claim(s).\n"
+        "- The auxiliary construction sentence should only restate aux_construction_nl. Do not add that it creates symmetry, congruence, cyclic structure, or a direct proof.\n"
+        "- After introducing the auxiliary construction, group the explanation only by stage claim_nl, never by an aux_boundary_h_nl item. Use this pattern: 'For [exact stage claim_nl], the auxiliary route supplies [aux_boundary_h_nl]. The already-visible relations include [aux_boundary_non_h_nl]. These listed relations reach the boundary claim [exact stage claim_nl].'\n"
+        "- After the auxiliary construction, copy at least two aux_boundary_h_nl items with close wording for each aux_boundary stage; if only one is listed, copy that one.\n"
+        "- Do not say the auxiliary construction directly establishes, directly implies, proves, or ensures any aux_boundary_h_nl relation. The construction introduces the approved point(s); the auxiliary route supplies the listed aux_boundary_h_nl relations after that construction.\n"
+        "- Never call aux_boundary_non_h_nl items auxiliary, new, constructed, or post-construction relations. Name them only as already-visible relations or visible support.\n"
+        "- Never call an aux_boundary_h_nl item a boundary claim. The boundary claim is the stage claim_nl; aux_boundary_h_nl items are supporting relations for that boundary claim.\n"
+        "- Do not invent theorem explanations such as SAS, cyclic quadrilaterals, reflection, symmetry, circle-centered arguments, or parallelograms unless that exact relation is listed in the handoff.\n"
         "- Stay text-only: do not mention any image, diagram, coordinates, or coordinate table.\n"
         "- Do not mention proof step ids, rule ids, hidden proofs, or internal schema names.\n"
+        "- Do not copy formal problem tokens such as 'cong', 'eqangle', 'cyclic', 'para', or bracketed ids into the body; use the normalized natural-language relations from the handoff.\n"
         "- Avoid theorem-catalog or proof-style phrasing when a direct geometric description is enough.\n"
+        "- For angle claims, prefer exact wording such as 'angle ab/ac equals angle de/eg' or 'angle formed by ab and ac equals angle formed by de and eg'; avoid vague 'angle involving' wording.\n"
         "- Before the auxiliary construction appears, do not reveal later hidden-route conclusions.\n"
         "- Keep the auxiliary construction geometrically faithful to the approved construction.\n"
         "- The body should show how each visible claim reduces to deeper visible subgoals until the visible route reaches its limit, and only then introduce the auxiliary construction.\n"
@@ -188,9 +245,13 @@ def build_backtrace_writer_retry_feedback(message: str, writer_handoff: dict | N
     del writer_handoff
     return (
         "Rewrite the body so it follows the staged backtrace: current claim -> visible support -> remaining subgoal(s) -> all visible boundary claims -> aux.\n"
-        "State all aux_boundary claims and their visible insufficiency before introducing the auxiliary construction.\n"
+        "Before the auxiliary construction, state only the current claim/terminal claim and visible insufficiency; do not name aux_boundary_h_nl relations yet.\n"
+        "Do not list aux_boundary_h_nl relations or relations containing newly constructed points until after the auxiliary construction appears. For example, do not write 'bf equals bg', 'bf equals bi', or 'angle eg/ei equals angle fg/fi' before constructing point f.\n"
+        "For visible_backtrace stages only, use close wording from the handoff: explicitly name the current claim and its subgoal_claims_nl items before moving to the next visible stage. Do not treat aux_boundary_h_nl items as pre-aux subgoals.\n"
         "Use close wording from visible_support_nl, subgoal_claims_nl, aux_boundary_h_nl, and aux_boundary_non_h_nl instead of only paraphrasing them.\n"
-        "After the aux construction, explain each boundary claim with its listed H relations plus listed non-H relations.\n"
+        "After the aux construction, group only by exact stage claim_nl, not by aux_boundary_h_nl items: auxiliary route supplies aux_boundary_h_nl; already-visible relations include aux_boundary_non_h_nl; these listed relations reach stage claim_nl.\n"
+        "Do not say the construction directly establishes, implies, proves, or ensures any aux_boundary_h_nl relation; say the auxiliary route supplies those relations after the construction.\n"
+        "Do not call aux_boundary_h_nl items boundary claims, and do not invent SAS/cyclic/reflection/symmetry/parallelogram derivations unless that exact relation appears in the handoff.\n"
         f"Validator feedback: {message}\n"
         "Keep it text-only, do not leak proof metadata, and keep the auxiliary construction faithful."
     )
@@ -211,8 +272,88 @@ def _first_sentence_idx_for_relation_from(
     return None
 
 
+def _first_sentence_idx_for_stage_claim_from(
+    sentences: list[str],
+    relation: str,
+    point_pool: list[str],
+    start_idx: int = 0,
+) -> int | None:
+    if not relation:
+        return None
+    normalized_relation = normalize_relation_surface(relation).lower()
+    relation_segments = extract_relation_segment_tokens(normalized_relation)
+    relation_keywords = relation_text_keywords(normalized_relation)
+    for idx in range(max(start_idx, 0), len(sentences)):
+        sentence = sentences[idx]
+        normalized_sentence = normalize_relation_surface(sentence).lower()
+        if normalized_relation and normalized_relation in normalized_sentence:
+            return idx
+        for candidate in _extract_relation_candidates(sentence):
+            normalized_candidate = normalize_relation_surface(candidate).lower()
+            if normalized_candidate == normalized_relation:
+                return idx
+            if normalized_relation in normalized_candidate or normalized_candidate in normalized_relation:
+                return idx
+            candidate_segments = extract_relation_segment_tokens(normalized_candidate)
+            candidate_keywords = relation_text_keywords(normalized_candidate)
+            if "ratio" in relation_keywords:
+                if "ratio" not in candidate_keywords:
+                    continue
+                if relation_segments and candidate_segments and relation_segments == candidate_segments:
+                    return idx
+                continue
+            if (
+                "angle" in relation_keywords
+                and "angle" in candidate_keywords
+                and _extract_angle_segment_tokens(normalized_relation)
+                and _extract_angle_segment_tokens(normalized_candidate) == _extract_angle_segment_tokens(normalized_relation)
+            ):
+                return idx
+            if _relations_strictly_match(candidate, relation, point_pool):
+                return idx
+    return None
+
+
 def _first_sentence_idx_for_relation(sentences: list[str], relation: str, point_pool: list[str]) -> int | None:
     return _first_sentence_idx_for_relation_from(sentences, relation, point_pool, start_idx=0)
+
+
+def _visible_stage_expansion_idx_before_aux(
+    sentences: list[str],
+    *,
+    claim_nl: str,
+    visible_support_nl: list[str],
+    subgoal_claims_nl: list[str],
+    point_pool: list[str],
+    aux_idx: int | None,
+) -> int | None:
+    if aux_idx is None or not claim_nl:
+        return None
+    claim_idx = _first_sentence_idx_for_stage_claim_from(sentences, claim_nl, point_pool, 0)
+    if claim_idx is None or claim_idx >= aux_idx:
+        return None
+    cursor = claim_idx
+    support_idx = _first_sentence_idx_for_any_relation_from(
+        sentences[:aux_idx],
+        visible_support_nl,
+        point_pool,
+        cursor,
+    )
+    if visible_support_nl and support_idx is None:
+        return None
+    if support_idx is not None:
+        cursor = max(cursor, support_idx)
+    for subgoal_nl in subgoal_claims_nl:
+        subgoal_idx = _first_sentence_idx_for_stage_claim_from(
+            sentences[:aux_idx],
+            subgoal_nl,
+            point_pool,
+            cursor,
+        )
+        if subgoal_idx is None:
+            return None
+        cursor = max(cursor, subgoal_idx)
+    return claim_idx
 
 
 def _first_sentence_idx_for_any_relation_from(
@@ -251,7 +392,7 @@ def collect_backtrace_writer_issues(
     issues: list[str] = []
     if _RULE_LEAK_RE.search(body):
         issues.append("proof_marker_leak")
-    if _HIDDEN_META_RE.search(body):
+    if _has_hidden_meta_language(body):
         issues.append("hidden_meta_language")
     if _TEXT_ONLY_BOUNDARY_RE.search(body):
         issues.append("text_only_boundary_violation")
@@ -341,14 +482,33 @@ def collect_backtrace_writer_issues(
         claim_search_start = max(stage_cursor + 1, 0)
         if stage_index == 0 and goal_idx is not None:
             claim_search_start = max(goal_idx, 0)
-        claim_idx = _first_sentence_idx_for_relation_from(
+        claim_matched_as_pre_boundary_sibling = False
+        previous_stage = backtrace_stages[stage_index - 1] if stage_index > 0 else None
+        previous_is_terminal = (
+            isinstance(previous_stage, dict)
+            and str(previous_stage.get("stage_type") or "visible_backtrace").strip() == "aux_boundary"
+        )
+        pre_aux_expansion_idx = None
+        if stage_index > 0 and previous_is_terminal and not is_terminal:
+            pre_aux_expansion_idx = _visible_stage_expansion_idx_before_aux(
+                sentences,
+                claim_nl=claim_nl,
+                visible_support_nl=visible_support_nl,
+                subgoal_claims_nl=subgoal_claims_nl,
+                point_pool=point_pool,
+                aux_idx=aux_idx,
+            )
+        claim_idx = _first_sentence_idx_for_stage_claim_from(
             sentences,
             claim_nl,
             point_pool,
             claim_search_start,
         )
+        if pre_aux_expansion_idx is not None:
+            claim_idx = pre_aux_expansion_idx
+            claim_matched_as_pre_boundary_sibling = True
         if claim_idx is None and stage_index > 0 and stage_cursor >= 0:
-            fallback_claim_idx = _first_sentence_idx_for_relation_from(
+            fallback_claim_idx = _first_sentence_idx_for_stage_claim_from(
                 sentences,
                 claim_nl,
                 point_pool,
@@ -356,10 +516,20 @@ def collect_backtrace_writer_issues(
             )
             if fallback_claim_idx == stage_cursor:
                 claim_idx = fallback_claim_idx
+        if claim_idx is None and stage_index > 0 and not is_terminal:
+            sibling_claim_idx = _first_sentence_idx_for_stage_claim_from(
+                sentences,
+                claim_nl,
+                point_pool,
+                0,
+            )
+            if previous_is_terminal and sibling_claim_idx is not None and aux_idx is not None and sibling_claim_idx < aux_idx:
+                claim_idx = sibling_claim_idx
+                claim_matched_as_pre_boundary_sibling = True
         if claim_nl and claim_idx is None:
             issues.append("missing_stage_reference")
             continue
-        if claim_idx is not None and claim_idx < stage_cursor:
+        if claim_idx is not None and claim_idx < stage_cursor and not claim_matched_as_pre_boundary_sibling:
             issues.append("narrative_order_violation")
         local_cursor = claim_idx if claim_idx is not None else stage_cursor
 
@@ -370,12 +540,27 @@ def collect_backtrace_writer_issues(
                 point_pool,
                 local_cursor,
             )
-            if claim_idx is not None and support_idx is not None and support_idx < claim_idx:
+            if (
+                claim_idx is not None
+                and support_idx is not None
+                and support_idx < claim_idx
+                and not claim_matched_as_pre_boundary_sibling
+            ):
                 issues.append("narrative_order_violation")
             if support_idx is not None:
                 local_cursor = max(local_cursor, support_idx)
 
         if is_terminal:
+            if aux_idx is not None and claim_idx is not None and claim_idx > aux_idx:
+                pre_aux_claim_idx = _first_sentence_idx_for_stage_claim_from(
+                    sentences[:aux_idx],
+                    claim_nl,
+                    point_pool,
+                    0,
+                )
+                if pre_aux_claim_idx is not None:
+                    claim_idx = pre_aux_claim_idx
+                    local_cursor = claim_idx
             if first_terminal_claim_idx is None:
                 first_terminal_claim_idx = claim_idx
             allow_reused_aux_boundary = aux_has_been_introduced_for_terminal and aux_idx is not None
@@ -385,7 +570,7 @@ def collect_backtrace_writer_issues(
             next_stage_claim_idx = None
             if stage_index + 1 < len(backtrace_stages):
                 next_claim_nl = str(backtrace_stages[stage_index + 1].get("claim_nl") or "").strip()
-                next_stage_claim_idx = _first_sentence_idx_for_relation_from(
+                next_stage_claim_idx = _first_sentence_idx_for_stage_claim_from(
                     sentences,
                     next_claim_nl,
                     point_pool,
@@ -425,8 +610,6 @@ def collect_backtrace_writer_issues(
                 )
                 if aux_h_idx is None:
                     issues.append("missing_aux_boundary_h_reference")
-                else:
-                    local_cursor = max(local_cursor, aux_h_idx)
             non_h_idx = _first_sentence_idx_for_any_relation_from(
                 sentences,
                 aux_boundary_non_h_nl,
@@ -441,7 +624,7 @@ def collect_backtrace_writer_issues(
         subgoal_match_indices: dict[str, int] = {}
         subgoal_search_start = local_cursor
         for subgoal_nl in subgoal_claims_nl:
-            subgoal_idx = _first_sentence_idx_for_relation_from(
+            subgoal_idx = _first_sentence_idx_for_stage_claim_from(
                 sentences,
                 subgoal_nl,
                 point_pool,
@@ -466,7 +649,6 @@ def collect_backtrace_writer_issues(
     if first_terminal_claim_idx is not None and aux_idx is not None and not saw_terminal_boundary:
         issues.append("missing_terminal_boundary")
 
-    pre_aux_text = body if aux_idx is None else " ".join(sentences[:aux_idx])
     hidden_relations = [
         str(item).strip()
         for item in (slots.get("H_relations_nl") or [])
@@ -475,13 +657,17 @@ def collect_backtrace_writer_issues(
     hidden_relations = [normalize_relation_surface(relation) for relation in hidden_relations if relation]
     for relation in hidden_relations:
         relation_aux_points = sorted(extract_point_mentions(relation, aux_points))
-        pre_aux_points = sorted(extract_point_mentions(pre_aux_text, aux_points))
-        if relation_aux_points and not set(relation_aux_points).intersection(pre_aux_points):
+        if not relation_aux_points:
             continue
         if aux_construction_nl and relations_semantically_match(relation, aux_construction_nl, point_pool):
             continue
-        if _relation_mentioned_in_text_strict(pre_aux_text, relation, point_pool):
-            issues.append("early_hidden_relation")
+        for sentence in sentences[: aux_idx or 0]:
+            if not _sentence_mentions_aux_points(sentence, relation_aux_points):
+                continue
+            if _relation_mentioned_in_text_strict(sentence, relation, point_pool):
+                issues.append("early_hidden_relation")
+                break
+        if issues and issues[-1] == "early_hidden_relation":
             break
 
     deduped_issues = []
