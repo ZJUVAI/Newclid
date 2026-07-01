@@ -31,6 +31,15 @@ from newclid.evaluation.search_trace import TraceRun, get_git_commit, timestamp_
 LOGLEVEL = os.environ.get("LOGLEVEL", "WARNING").upper()
 
 
+def parse_bool(value: str) -> bool:
+    normalized = value.strip().lower()
+    if normalized in {"true", "1", "yes", "y", "on"}:
+        return True
+    if normalized in {"false", "0", "no", "n", "off"}:
+        return False
+    raise argparse.ArgumentTypeError(f"Expected true or false, got {value!r}.")
+
+
 def slugify(value: str, default: str = "item") -> str:
     cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", str(value).strip().rstrip("/"))
     return cleaned.strip("._") or default
@@ -73,6 +82,7 @@ class EvalConfig:
     beam_size: int
     search_depth: int
     search_version: str
+    think: bool
     timeout: int
     render_root: Path
     ddar_config: dict[str, bool]
@@ -98,7 +108,7 @@ def create_agent(config: EvalConfig, *, trace_writer=None):
         "trace_writer": trace_writer,
     }
     if config.agent_type == "qwen3_text":
-        return Qwen3Agent(**common)
+        return Qwen3Agent(**common, think=config.think)
     if config.agent_type == "qwen3_vl":
         return Qwen3VLAgent(**common, render_root=config.render_root)
     raise ValueError(f"Unsupported agent type: {config.agent_type}")
@@ -175,6 +185,7 @@ def solve_problems_vllm(
     beam_size: int,
     search_depth: int,
     search_version: str,
+    think: bool,
     ray_num_cpus: int | None,
     timeout: int,
     log_dir: str | None,
@@ -235,6 +246,7 @@ def solve_problems_vllm(
                 "search_depth": search_depth,
                 "timeout": timeout,
                 "search_version": search_version,
+                "think": think,
                 "using_exp": using_exp,
                 "ray_num_cpus": ray_num_cpus,
             },
@@ -250,6 +262,7 @@ def solve_problems_vllm(
         beam_size=beam_size,
         search_depth=search_depth,
         search_version=search_version,
+        think=think,
         timeout=timeout,
         render_root=render_root,
         ddar_config=ddar_config,
@@ -263,6 +276,7 @@ def solve_problems_vllm(
         f"checkpoint_slug={checkpoint_slug}\n"
         f"vllm_base_url={vllm_base_url}\n"
         f"search_version={search_version}\n"
+        f"think={think}\n"
         f"ray_n_cpus={ray.available_resources().get('CPU')}\n"
         f"using_exp={using_exp}",
         flush=True,
@@ -393,6 +407,15 @@ def main() -> None:
     parser.add_argument("--beam_size", type=int, default=64)
     parser.add_argument("--search_depth", type=int, default=4)
     parser.add_argument("--search_version", type=str, default="hybrid", choices=["v1", "v2", "hybrid"])
+    parser.add_argument(
+        "--think",
+        type=parse_bool,
+        default=False,
+        help=(
+            "For text eval, true starts with <think> and extracts the generated <aux>; "
+            "false inserts an empty <think> block before <aux>."
+        ),
+    )
     parser.add_argument("--timeout", type=int, default=7200)
     parser.add_argument("--log_dir", type=str, default=None)
     parser.add_argument("--ray_num_cpus", type=int, default=None)
@@ -408,6 +431,7 @@ def main() -> None:
         beam_size=args.beam_size,
         search_depth=args.search_depth,
         search_version=args.search_version,
+        think=args.think,
         ray_num_cpus=args.ray_num_cpus,
         timeout=args.timeout,
         log_dir=args.log_dir,

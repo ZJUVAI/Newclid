@@ -48,19 +48,28 @@ def _build_messages(
     new_point_name: str,
     image_url: str | None = None,
     include_empty_think: bool = True,
+    assistant_prefix: str | None = None,
 ) -> list[dict[str, Any]]:
     user_content: Any = query if image_url is None else [
         {"type": "image_url", "image_url": {"url": image_url}},
         {"type": "text", "text": query},
     ]
-    assistant_prefix = f"{response_prefix} {new_point_name}"
-    if include_empty_think:
-        assistant_prefix = f"<think>\n\n</think>\n\n{assistant_prefix}"
+    if assistant_prefix is None:
+        assistant_prefix = f"{response_prefix} {new_point_name}"
+        if include_empty_think:
+            assistant_prefix = f"<think>\n\n</think>\n\n{assistant_prefix}"
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": user_content},
         {"role": "assistant", "content": assistant_prefix},
     ]
+
+
+def _extract_aux_dsl(text: str) -> str | None:
+    aux_start = text.find("<aux>")
+    if aux_start < 0:
+        return None
+    return text[aux_start:].partition(AUX_STOP)[0].rstrip()
 
 
 def _score_chat_choices(
@@ -70,11 +79,11 @@ def _score_chat_choices(
     stop_token_id: int,
 ) -> dict[str, float]:
     response_prefix = str(request.get("response_prefix", RESPONSE_PREFIX))
-    new_point_name = str(request["new_point_name"])
+    new_point_name = str(request.get("new_point_name", ""))
+    extract_aux_from_output = bool(request.get("extract_aux_from_output", False))
     aux_dsl_dict: dict[str, float] = {}
     for choice in choices:
         text = str(choice.get("message", {}).get("content", ""))
-        continuation = text.partition(AUX_STOP)[0].rstrip()
         token_ids = choice.get("token_ids", [])
         token_logprobs = [
             item.get("logprob") for item in choice.get("logprobs", {}).get("content", [])
@@ -85,7 +94,13 @@ def _score_chat_choices(
         )
         valid = [lp for lp in token_logprobs[:stop_idx] if lp is not None]
         score = sum(valid) / max(len(valid), 1)
-        aux_dsl = f"{response_prefix} {new_point_name}{continuation}"
+        if extract_aux_from_output:
+            aux_dsl = _extract_aux_dsl(text)
+            if aux_dsl is None:
+                continue
+        else:
+            continuation = text.partition(AUX_STOP)[0].rstrip()
+            aux_dsl = f"{response_prefix} {new_point_name}{continuation}"
         if aux_dsl not in aux_dsl_dict or score > aux_dsl_dict[aux_dsl]:
             aux_dsl_dict[aux_dsl] = score
     return aux_dsl_dict
@@ -142,6 +157,7 @@ class _BaseQwen3Agent(BaseAgent):
         return f"<aux>{aux_prefix}{separator} x00"
 
     def request_completions(self, request: dict[str, Any]) -> dict[str, Any]:
+        extract_aux_from_output = bool(request.get("extract_aux_from_output", False))
         payload = {
             "model": self.served_model_name,
             "messages": request["messages"],
@@ -159,9 +175,10 @@ class _BaseQwen3Agent(BaseAgent):
             "return_token_ids": True,
             "stream": False,
             "include_stop_str_in_output": False,
-            "stop": [AUX_CANDIDATE_STOP],
-            "stop_token_ids": [self.stop_token_id],
+            "stop": [AUX_STOP] if extract_aux_from_output else [AUX_CANDIDATE_STOP],
         }
+        if not extract_aux_from_output:
+            payload["stop_token_ids"] = [self.stop_token_id]
         response = self.session.post(
             f"{self.base_url}/v1/chat/completions", json=payload, timeout=120.0
         )
@@ -193,6 +210,8 @@ class _BaseQwen3Agent(BaseAgent):
         new_point_name: str,
         image_url: str | None = None,
         include_empty_think: bool = True,
+        assistant_prefix: str | None = None,
+        extract_aux_from_output: bool = False,
         extra: dict | None = None,
     ) -> dict[str, Any]:
         result = {
@@ -203,11 +222,13 @@ class _BaseQwen3Agent(BaseAgent):
                 new_point_name=new_point_name,
                 image_url=image_url,
                 include_empty_think=include_empty_think,
+                assistant_prefix=assistant_prefix,
             ),
             "query": query,
             "new_point_name": new_point_name,
             "response_prefix": response_prefix,
             "decoding_size": self.decoding_size,
+            "extract_aux_from_output": extract_aux_from_output,
         }
         if extra:
             result.update(extra)
@@ -216,6 +237,15 @@ class _BaseQwen3Agent(BaseAgent):
 
 class Qwen3Agent(_BaseQwen3Agent):
     agent_name = "qwen3_text"
+
+    def __init__(self, *, think: bool = False, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.think = think
+
+    def server_info(self) -> dict[str, Any]:
+        info = super().server_info()
+        info["think"] = self.think
+        return info
 
     def build_request(
         self,
@@ -228,12 +258,26 @@ class Qwen3Agent(_BaseQwen3Agent):
         proof: ProofState,
     ) -> dict[str, Any]:
         del depth
-        query = self._get_query(mode, problem, proof)
+        if self.think:
+            query = problem_to_dsl(problem, proof.defs)
+        else:
+            query = self._get_query(mode, problem, proof)
+        response_prefix = self.response_prefix(mode=mode, aux_prefix=aux_prefix)
+        if self.think:
+            return self._build_request_dict(
+                request_id=request_id,
+                query=query,
+                response_prefix=RESPONSE_PREFIX,
+                new_point_name="",
+                assistant_prefix="<think>",
+                extract_aux_from_output=True,
+            )
         return self._build_request_dict(
             request_id=request_id,
             query=query,
-            response_prefix=self.response_prefix(mode=mode, aux_prefix=aux_prefix),
+            response_prefix=response_prefix,
             new_point_name=get_new_point_name(problem),
+            include_empty_think=True,
         )
 
 class Qwen3VLAgent(_BaseQwen3Agent):
