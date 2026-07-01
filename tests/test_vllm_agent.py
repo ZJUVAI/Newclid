@@ -45,6 +45,17 @@ class VLLMHelperTests(unittest.TestCase):
             "<think>\n\n</think>\n\n<aux> x00 a",
         )
 
+    def test_build_chat_messages_can_skip_empty_think_prefix(self):
+        messages = _build_messages(
+            query="<problem> demo </problem>",
+            response_prefix="<aux> x00",
+            new_point_name="a",
+            include_empty_think=False,
+        )
+
+        self.assertEqual(messages[2]["role"], "assistant")
+        self.assertEqual(messages[2]["content"], "<aux> x00 a")
+
     def test_score_chat_choices_rebuilds_aux_dsl(self):
         aux_dsl_dict = _score_chat_choices(
             choices=[
@@ -258,6 +269,7 @@ class Qwen3VLAgentTests(unittest.TestCase):
 
         mock_build_proof.assert_called_once_with(problem, {})
         self.assertTrue(request["image_data_url"].startswith("data:image/png;base64,"))
+        self.assertEqual(request["messages"][2]["content"], "<aux> x00 c")
         self.assertEqual(request["messages"][1]["content"][0]["type"], "image_url")
 
 

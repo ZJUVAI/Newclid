@@ -42,16 +42,24 @@ def discover_served_model(base_url: str) -> tuple[str, list[str | None]]:
 
 
 def _build_messages(
-    *, query: str, response_prefix: str, new_point_name: str, image_url: str | None = None
+    *,
+    query: str,
+    response_prefix: str,
+    new_point_name: str,
+    image_url: str | None = None,
+    include_empty_think: bool = True,
 ) -> list[dict[str, Any]]:
     user_content: Any = query if image_url is None else [
         {"type": "image_url", "image_url": {"url": image_url}},
         {"type": "text", "text": query},
     ]
+    assistant_prefix = f"{response_prefix} {new_point_name}"
+    if include_empty_think:
+        assistant_prefix = f"<think>\n\n</think>\n\n{assistant_prefix}"
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": user_content},
-        {"role": "assistant", "content": f"<think>\n\n</think>\n\n{response_prefix} {new_point_name}"},
+        {"role": "assistant", "content": assistant_prefix},
     ]
 
 
@@ -184,6 +192,7 @@ class _BaseQwen3Agent(BaseAgent):
         response_prefix: str,
         new_point_name: str,
         image_url: str | None = None,
+        include_empty_think: bool = True,
         extra: dict | None = None,
     ) -> dict[str, Any]:
         result = {
@@ -193,6 +202,7 @@ class _BaseQwen3Agent(BaseAgent):
                 response_prefix=response_prefix,
                 new_point_name=new_point_name,
                 image_url=image_url,
+                include_empty_think=include_empty_think,
             ),
             "query": query,
             "new_point_name": new_point_name,
@@ -269,6 +279,7 @@ class Qwen3VLAgent(_BaseQwen3Agent):
             query=query,
             response_prefix=self.response_prefix(mode=mode, aux_prefix=aux_prefix),
             new_point_name=get_new_point_name(problem),
+            include_empty_think=False,
             image_url=image_url,
             extra={"image_data_url": image_url},
         )
