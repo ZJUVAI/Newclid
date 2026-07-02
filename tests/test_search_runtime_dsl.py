@@ -1,11 +1,50 @@
-from newclid.evaluation.search_runtime import problem_to_dsl
+from types import SimpleNamespace
+
+from newclid.algebraic_reasoning.algebraic_manipulator import AlgebraicManipulator
 from newclid.configs import default_defs_path
+from newclid.dependencies.dependency_graph import DependencyGraph
+from newclid.evaluation.search_runtime import problem_to_dsl
 from newclid.formulations.definition import DefinitionJGEX
 from newclid.formulations.problem import ProblemJGEX
+from newclid.generation.worker import ProblemWorker
+from newclid.statement import Statement
 
 
 def _load_defs():
     return DefinitionJGEX.to_dict(DefinitionJGEX.parse_txt_file(default_defs_path()))
+
+
+def _identity_mapping(problem: ProblemJGEX):
+    names: set[str] = set()
+    for construction in problem.constructions:
+        names.update(point.split("@")[0] for point in construction.points)
+        for sentence in construction.sentences:
+            names.update(sentence[1:])
+    for goal in problem.goals:
+        names.update(goal[1:])
+    return {name: name for name in names}
+
+
+def _generation_problem_dsl(problem: ProblemJGEX) -> str:
+    source_dep_graph = DependencyGraph(AlgebraicManipulator())
+    output_dep_graph = DependencyGraph(AlgebraicManipulator())
+    clause2basics, _ = ProblemWorker._get_all_premise(
+        list(problem.constructions),
+        SimpleNamespace(dep_graph=source_dep_graph),
+    )
+    goals = [
+        Statement.from_tokens(goal, source_dep_graph)
+        for goal in problem.goals
+    ]
+    assert all(goal is not None for goal in goals)
+    return ProblemWorker._generate_problem_predicates_section(
+        _identity_mapping(problem),
+        {},
+        clause2basics,
+        list(problem.constructions),
+        goals,
+        output_dep_graph,
+    )
 
 
 def test_problem_dsl_uses_basic_order():
@@ -31,3 +70,59 @@ def test_problem_dsl_uses_basic_order():
         "y : coll a c y [004] perp a c i y [005] ; "
         "z : coll a b z [006] perp a b i z [007] ? cong x y x y </problem>"
     )
+
+
+def test_generation_construction_round_trips_to_eval_predicates():
+    source_dep_graph = DependencyGraph(AlgebraicManipulator())
+    output_dep_graph = DependencyGraph(AlgebraicManipulator())
+    source_problem = ProblemJGEX.from_text(
+        "a = free a; b = free b; x = on_line x a b ? coll a b x"
+    )
+    clause2basics, _ = ProblemWorker._get_all_premise(
+        list(source_problem.constructions),
+        SimpleNamespace(dep_graph=source_dep_graph),
+    )
+    goals = [Statement.from_tokens(("coll", "a", "b", "x"), source_dep_graph)]
+    assert goals[0] is not None
+
+    mapping = {"a": "c", "b": "b", "x": "a"}
+    point_coords = {
+        "a": (0.0, 0.0),
+        "b": (1.0, 0.0),
+        "c": (2.0, 0.0),
+    }
+    fl_problem = ProblemWorker._generate_problem_clauses_section(
+        mapping,
+        list(source_problem.constructions),
+        goals,
+        point_coords,
+        output_dep_graph,
+    )
+    generation_dsl = ProblemWorker._generate_problem_predicates_section(
+        mapping,
+        {},
+        clause2basics,
+        list(source_problem.constructions),
+        goals,
+        output_dep_graph,
+    )
+
+    eval_dsl = problem_to_dsl(ProblemJGEX.from_text(fl_problem), _load_defs())
+
+    assert eval_dsl == generation_dsl
+
+
+def test_benchmark_problem_eval_and_generation_translation_match():
+    problem = ProblemJGEX.from_text(
+        "translated_imo_2019_p6\n"
+        "a b c = triangle a b c; "
+        "d e f i = incenter2 d e f i a b c; "
+        "r = on_tline r d e f, on_circle r i d; "
+        "p = on_line p r a, on_circle p i d; "
+        "o1 = circle o1 p c e; "
+        "o2 = circle o2 p b f; "
+        "q = on_circle q o1 p, on_circle q o2 p; "
+        "t = on_line t p q, on_line t i d ? perp a t a i"
+    )
+
+    assert _generation_problem_dsl(problem) == problem_to_dsl(problem, _load_defs())
