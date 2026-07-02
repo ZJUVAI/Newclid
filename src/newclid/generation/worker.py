@@ -805,22 +805,20 @@ class ProblemWorker:
                 premise_point_names,
                 n_premises,
                 n_proof_steps,
-            ) = (
-                ProblemWorker.llm_solution_renamed(
-                    clause2basics.copy(),
-                    clause2args.copy(),
-                    [goal_new],
-                    points,
-                    premises,
-                    numercial_checked_premises,
-                    trivial_premises,
-                    aux_points,
-                    aux,
-                    numercial_checked_aux,
-                    trivial_aux,
-                    proof_steps,
-                    name2node,
-                )
+            ) = ProblemWorker.llm_solution_renamed(
+                clause2basics.copy(),
+                clause2args.copy(),
+                [goal_new],
+                points,
+                premises,
+                numercial_checked_premises,
+                trivial_premises,
+                aux_points,
+                aux,
+                numercial_checked_aux,
+                trivial_aux,
+                proof_steps,
+                name2node,
             )
 
             if aux_only == 2 and "aux" not in llm_renamed["llm_output"]:
@@ -865,10 +863,13 @@ class ProblemWorker:
         return results
 
     @staticmethod
-    def _rediger_new_format(dep, mp, dep_idx) -> str:
+    def _rediger_new_format(dep, mp, dep_idx, dep_graph: DependencyGraph) -> str:
         """Generate proof step in new format: statement [id] rule_id [required_statement_ids]"""
         for statement in (dep.statement,) + dep.why:
-            statement_str = ProblemWorker._statement2str_with_mapping(statement, mp)
+            statement_str = Statement.from_tokens(
+                translate_sentence(mp, statement.to_str().split(" ")),
+                dep_graph,
+            ).to_str()
             if statement_str not in dep_idx:
                 dep_idx[statement_str] = f"{len(dep_idx):03d}"
 
@@ -890,11 +891,18 @@ class ProblemWorker:
             rule_id = reason if reason else "unknown"
 
         # Generate new format: statement [statement_id] rule_id [premise_ids]
-        premise_ids = " ".join(
-            f"[{dep_idx[ProblemWorker._statement2str_with_mapping(premise, mp)]}]"
-            for premise in dep.why
-        )
-        conclusion_str = ProblemWorker._statement2str_with_mapping(dep.statement, mp)
+        premise_id_items = []
+        for premise in dep.why:
+            premise_str = Statement.from_tokens(
+                translate_sentence(mp, premise.to_str().split(" ")),
+                dep_graph,
+            ).to_str()
+            premise_id_items.append(f"[{dep_idx[premise_str]}]")
+        premise_ids = " ".join(premise_id_items)
+        conclusion_str = Statement.from_tokens(
+            translate_sentence(mp, dep.statement.to_str().split(" ")),
+            dep_graph,
+        ).to_str()
         return f"{conclusion_str} [{dep_idx[conclusion_str]}] {rule_id} {premise_ids}".strip()
 
     @staticmethod
@@ -917,6 +925,7 @@ class ProblemWorker:
         try:
             # Initialize data
             dep_idx: dict[str, str] = {}
+            output_dep_graph = DependencyGraph(AlgebraicManipulator())
 
             # Get essential premises/points
             (
@@ -950,22 +959,37 @@ class ProblemWorker:
                 new_points_with_coords[mp[k]] = (name2node[k].num.x, name2node[k].num.y)
             # Generate each section
             data_problem_clauses = ProblemWorker._generate_problem_clauses_section(
-                mp, essential_premise_clauses, goals, new_points_with_coords
+                mp,
+                essential_premise_clauses,
+                goals,
+                new_points_with_coords,
+                output_dep_graph,
             )
             data_problem = ProblemWorker._generate_problem_predicates_section(
-                mp, dep_idx, expanded_clause2basics, essential_premise_clauses, goals
+                mp,
+                dep_idx,
+                expanded_clause2basics,
+                essential_premise_clauses,
+                goals,
+                output_dep_graph,
             )
             n_premises = len(dep_idx)
             data_aux = ProblemWorker._generate_aux_section(
-                mp, dep_idx, essential_aux_basics
+                mp, dep_idx, essential_aux_basics, output_dep_graph
             )
             numerical_check = ProblemWorker._generate_numerical_check_section(
-                mp, dep_idx, numercial_checked_premises, numercial_checked_aux
+                mp,
+                dep_idx,
+                numercial_checked_premises,
+                numercial_checked_aux,
+                output_dep_graph,
             )
             trivial_check = ProblemWorker._generate_trivial_section(
-                mp, dep_idx, trivial_premises, trivial_aux
+                mp, dep_idx, trivial_premises, trivial_aux, output_dep_graph
             )
-            proof = ProblemWorker._generate_proof_section(mp, dep_idx, proof_steps)
+            proof = ProblemWorker._generate_proof_section(
+                mp, dep_idx, proof_steps, output_dep_graph
+            )
 
             # Assemble result
             return (
@@ -1004,19 +1028,6 @@ class ProblemWorker:
         letter_part = string.ascii_lowercase[va_idx % 26]
         number_part = va_idx // 26
         return f"{letter_part}{number_part - 1}" if number_part else letter_part
-
-    @staticmethod
-    def _statement2str_with_mapping(statement: Statement, mp):
-        statement_args_str = statement.to_str().split(" ")[1:]
-        res = []
-        for arg, arg_str in zip(statement.args, statement_args_str):
-            if isinstance(arg, Point):
-                res.append(mp[arg_str])
-            else:  # isinstance(a, Fraction)
-                res.append(arg_str)
-        # [mp[arg.name] if isinstance(arg, Point) else str(arg) for arg in statement.args]
-        res = [statement.predicate.NAME] + res
-        return " ".join(res)
 
     @staticmethod
     def _get_all_premise(
@@ -1134,25 +1145,10 @@ class ProblemWorker:
         essential_aux_point_names: list[str],
     ) -> dict[str, str]:
         """Create point name mapping"""
-        # 1. 合并两个列表
-        combined_points = essential_premise_point_names + essential_aux_point_names
-
-        # 2. 定义排序规则：把 "a0" 拆成 (0, 'a')，把 "a" 拆成 (-1, 'a')
-        def point_sort_key(name: str):
-            letter = name[0]        # 规则里前缀是一个字母
-            number_part = name[1:]  # 字母后面的数字部分
-            
-            # 如果没有数字，给它一个最小的权重 -1，确保排在所有带数字的字母前面
-            num = int(number_part) if number_part.isdigit() else -1
-            
-            return (num, letter)
-
-        # 3. 在构建映射前进行排序
-        sorted_points = sorted(combined_points, key=point_sort_key)
-
-        # 4. 构建映射
         mp: dict[str, str] = {}
-        for idx, p in enumerate(sorted_points):
+        for idx, p in enumerate(
+            essential_premise_point_names + essential_aux_point_names
+        ):
             assert p not in mp
             mp[p] = ProblemWorker._get_apha_geo_solver_var(idx)
         return mp
@@ -1163,9 +1159,9 @@ class ProblemWorker:
         essential_premise_clauses: list[Clause],
         goals: list[Statement],
         new_points_with_coords: dict[str, tuple[float, float]],
+        dep_graph: DependencyGraph,
     ) -> str:
         """Generate problem clauses section"""
-        dep_graph = DependencyGraph(AlgebraicManipulator())
         renamed_clauses = [clause.renamed(mp) for clause in essential_premise_clauses]
         renamed_goal_strs = [
             Statement.from_tokens(
@@ -1192,10 +1188,10 @@ class ProblemWorker:
         clause2basics: dict[Clause, list],
         clauses: list[Clause],
         goals: list[Statement],
+        dep_graph: DependencyGraph,
     ):
         """Generate problem predicates section"""
         renamed_basic_strs_with_idx: list[str] = []
-        dep_graph = DependencyGraph(AlgebraicManipulator())
         for clause in clauses:
             basics = clause2basics[clause]
             for points, bs in basics:
@@ -1242,10 +1238,10 @@ class ProblemWorker:
         mp: dict[str, str],
         dep_idx: dict[str, str],
         aux_basics: list[tuple[tuple[str, ...], tuple[Statement, ...]]],
+        dep_graph: DependencyGraph,
     ):
         """Generate auxiliary information section"""
         renamed_basic_strs_with_idx: list[str] = []
-        dep_graph = DependencyGraph(AlgebraicManipulator())
         for points, bs in aux_basics:
             predicate_strs_with_idx: list[str] = []
             for b in bs:
@@ -1272,38 +1268,57 @@ class ProblemWorker:
 
     @staticmethod
     def _generate_numerical_check_section(
-        mp, dep_idx, numercial_checked_premises, numercial_checked_aux
+        mp,
+        dep_idx,
+        numercial_checked_premises,
+        numercial_checked_aux,
+        dep_graph: DependencyGraph,
     ):
         """Generate numerical check section"""
-        instance = ProblemWorker()
         numerical_check_items = []
-        # numercial_checked_premises
         for line in numercial_checked_premises:
-            statement_str = instance._statement2str_with_mapping(line.statement, mp)
+            statement_str = Statement.from_tokens(
+                translate_sentence(mp, line.statement.to_str().split(" ")),
+                dep_graph,
+            ).to_str()
             if statement_str not in dep_idx:
                 dep_idx[statement_str] = f"{len(dep_idx):03d}"
         sorted_numercial_checked_premises = sorted(
             numercial_checked_premises,
             key=lambda line: dep_idx[
-                instance._statement2str_with_mapping(line.statement, mp)
+                Statement.from_tokens(
+                    translate_sentence(mp, line.statement.to_str().split(" ")),
+                    dep_graph,
+                ).to_str()
             ],
         )
         for line in sorted_numercial_checked_premises:
-            statement_str = instance._statement2str_with_mapping(line.statement, mp)
+            statement_str = Statement.from_tokens(
+                translate_sentence(mp, line.statement.to_str().split(" ")),
+                dep_graph,
+            ).to_str()
             numerical_check_items.append(f"{statement_str} [{dep_idx[statement_str]}]")
-        # numercial_checked_premises
         for line in numercial_checked_aux:
-            statement_str = instance._statement2str_with_mapping(line.statement, mp)
+            statement_str = Statement.from_tokens(
+                translate_sentence(mp, line.statement.to_str().split(" ")),
+                dep_graph,
+            ).to_str()
             if statement_str not in dep_idx:
                 dep_idx[statement_str] = f"{len(dep_idx):03d}"
         sorted_numercial_checked_aux = sorted(
             numercial_checked_aux,
             key=lambda line: dep_idx[
-                instance._statement2str_with_mapping(line.statement, mp)
+                Statement.from_tokens(
+                    translate_sentence(mp, line.statement.to_str().split(" ")),
+                    dep_graph,
+                ).to_str()
             ],
         )
         for line in sorted_numercial_checked_aux:
-            statement_str = instance._statement2str_with_mapping(line.statement, mp)
+            statement_str = Statement.from_tokens(
+                translate_sentence(mp, line.statement.to_str().split(" ")),
+                dep_graph,
+            ).to_str()
             numerical_check_items.append(f"{statement_str} [{dep_idx[statement_str]}]")
         if len(numerical_check_items) > 0:
             numerical_check = (
@@ -1316,37 +1331,55 @@ class ProblemWorker:
         return numerical_check
 
     @staticmethod
-    def _generate_trivial_section(mp, dep_idx, trivial_premises, trivial_aux):
-        """Generate numerical check section"""
-        instance = ProblemWorker()
+    def _generate_trivial_section(
+        mp, dep_idx, trivial_premises, trivial_aux, dep_graph: DependencyGraph
+    ):
+        """Generate trivial section"""
         trivial_items = []
         # trivial_premises
         for line in trivial_premises:
-            statement_str = instance._statement2str_with_mapping(line.statement, mp)
+            statement_str = Statement.from_tokens(
+                translate_sentence(mp, line.statement.to_str().split(" ")),
+                dep_graph,
+            ).to_str()
             if statement_str not in dep_idx:
                 dep_idx[statement_str] = f"{len(dep_idx):03d}"
         sorted_trivial_premises = sorted(
             trivial_premises,
             key=lambda line: dep_idx[
-                instance._statement2str_with_mapping(line.statement, mp)
+                Statement.from_tokens(
+                    translate_sentence(mp, line.statement.to_str().split(" ")),
+                    dep_graph,
+                ).to_str()
             ],
         )
         for line in sorted_trivial_premises:
-            statement_str = instance._statement2str_with_mapping(line.statement, mp)
+            statement_str = Statement.from_tokens(
+                translate_sentence(mp, line.statement.to_str().split(" ")),
+                dep_graph,
+            ).to_str()
             trivial_items.append(f"{statement_str} [{dep_idx[statement_str]}]")
-        # trivial_premises
         for line in trivial_aux:
-            statement_str = instance._statement2str_with_mapping(line.statement, mp)
+            statement_str = Statement.from_tokens(
+                translate_sentence(mp, line.statement.to_str().split(" ")),
+                dep_graph,
+            ).to_str()
             if statement_str not in dep_idx:
                 dep_idx[statement_str] = f"{len(dep_idx):03d}"
         sorted_trivial_aux = sorted(
             trivial_aux,
             key=lambda line: dep_idx[
-                instance._statement2str_with_mapping(line.statement, mp)
+                Statement.from_tokens(
+                    translate_sentence(mp, line.statement.to_str().split(" ")),
+                    dep_graph,
+                ).to_str()
             ],
         )
         for line in sorted_trivial_aux:
-            statement_str = instance._statement2str_with_mapping(line.statement, mp)
+            statement_str = Statement.from_tokens(
+                translate_sentence(mp, line.statement.to_str().split(" ")),
+                dep_graph,
+            ).to_str()
             trivial_items.append(f"{statement_str} [{dep_idx[statement_str]}]")
         if len(trivial_items) > 0:
             trivial = "<trivial> " + " ; ".join(trivial_items) + " ; </trivial> "
@@ -1355,14 +1388,14 @@ class ProblemWorker:
         return trivial
 
     @staticmethod
-    def _generate_proof_section(mp, dep_idx, proof_steps):
+    def _generate_proof_section(mp, dep_idx, proof_steps, dep_graph: DependencyGraph):
         """Generate proof section"""
         proof = "<proof> "
         proof_steps_formatted = []
         for k, line in enumerate(proof_steps):
             if NUMERICAL_CHECK not in line.reason and IN_PREMISES not in line:
                 proof_steps_formatted.append(
-                    ProblemWorker._rediger_new_format(line, mp, dep_idx)
+                    ProblemWorker._rediger_new_format(line, mp, dep_idx, dep_graph)
                 )
         proof += " ; ".join(proof_steps_formatted) + " ; </proof>"
         return proof
