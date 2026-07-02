@@ -374,11 +374,11 @@ class ProblemWorker:
         (
             points,
             premises,
-            numercial_checked_premises,
+            numerical_checked_premises,
             trivial_premises,
             aux_points,
             aux,
-            numercial_checked_aux,
+            numerical_checked_aux,
             trivial_aux,
             proof_steps,
         ) = solver.proof.dep_graph.get_proof_steps([goal])
@@ -387,11 +387,11 @@ class ProblemWorker:
             "goal": goal,
             "points": points,
             "premises": premises,
-            "numercial_checked_premises": numercial_checked_premises,
+            "numerical_checked_premises": numerical_checked_premises,
             "trivial_premises": trivial_premises,
             "aux_points": aux_points,
             "aux": aux,
-            "numercial_checked_aux": numercial_checked_aux,
+            "numerical_checked_aux": numerical_checked_aux,
             "trivial_aux": trivial_aux,
             "proof_steps": proof_steps,
         }
@@ -789,11 +789,11 @@ class ProblemWorker:
             goal_new = res["goal"]
             points = res["points"]
             premises = res["premises"]
-            numercial_checked_premises = res["numercial_checked_premises"]
+            numerical_checked_premises = res["numerical_checked_premises"]
             trivial_premises = res["trivial_premises"]
             aux_points = res["aux_points"]
             aux = res["aux"]
-            numercial_checked_aux = res["numercial_checked_aux"]
+            numerical_checked_aux = res["numerical_checked_aux"]
             trivial_aux = res["trivial_aux"]
             proof_steps = res["proof_steps"]
 
@@ -811,11 +811,11 @@ class ProblemWorker:
                 [goal_new],
                 points,
                 premises,
-                numercial_checked_premises,
+                numerical_checked_premises,
                 trivial_premises,
                 aux_points,
                 aux,
-                numercial_checked_aux,
+                numerical_checked_aux,
                 trivial_aux,
                 proof_steps,
                 name2node,
@@ -912,11 +912,11 @@ class ProblemWorker:
         goals: list[Statement],
         points: set[Point],
         premises: list[Dependency],
-        numercial_checked_premises: list[Dependency],
+        numerical_checked_premises: list[Dependency],
         trivial_premises: list[Dependency],
         aux_points: set[Point],
         aux: list[Dependency],
-        numercial_checked_aux: list[Dependency],
+        numerical_checked_aux: list[Dependency],
         trivial_aux: list[Dependency],
         proof_steps: list[Dependency],
         name2node: dict[str, Symbol],
@@ -980,8 +980,8 @@ class ProblemWorker:
             numerical_check = ProblemWorker._generate_numerical_check_section(
                 mp,
                 dep_idx,
-                numercial_checked_premises,
-                numercial_checked_aux,
+                numerical_checked_premises,
+                numerical_checked_aux,
                 output_dep_graph,
             )
             trivial_check = ProblemWorker._generate_trivial_section(
@@ -1270,21 +1270,21 @@ class ProblemWorker:
     def _generate_numerical_check_section(
         mp,
         dep_idx,
-        numercial_checked_premises,
-        numercial_checked_aux,
+        numerical_checked_premises,
+        numerical_checked_aux,
         dep_graph: DependencyGraph,
     ):
         """Generate numerical check section"""
         numerical_check_items = []
-        for line in numercial_checked_premises:
+        for line in numerical_checked_premises:
             statement_str = Statement.from_tokens(
                 translate_sentence(mp, line.statement.to_str().split(" ")),
                 dep_graph,
             ).to_str()
             if statement_str not in dep_idx:
                 dep_idx[statement_str] = f"{len(dep_idx):03d}"
-        sorted_numercial_checked_premises = sorted(
-            numercial_checked_premises,
+        sorted_numerical_checked_premises = sorted(
+            numerical_checked_premises,
             key=lambda line: dep_idx[
                 Statement.from_tokens(
                     translate_sentence(mp, line.statement.to_str().split(" ")),
@@ -1292,21 +1292,21 @@ class ProblemWorker:
                 ).to_str()
             ],
         )
-        for line in sorted_numercial_checked_premises:
+        for line in sorted_numerical_checked_premises:
             statement_str = Statement.from_tokens(
                 translate_sentence(mp, line.statement.to_str().split(" ")),
                 dep_graph,
             ).to_str()
             numerical_check_items.append(f"{statement_str} [{dep_idx[statement_str]}]")
-        for line in numercial_checked_aux:
+        for line in numerical_checked_aux:
             statement_str = Statement.from_tokens(
                 translate_sentence(mp, line.statement.to_str().split(" ")),
                 dep_graph,
             ).to_str()
             if statement_str not in dep_idx:
                 dep_idx[statement_str] = f"{len(dep_idx):03d}"
-        sorted_numercial_checked_aux = sorted(
-            numercial_checked_aux,
+        sorted_numerical_checked_aux = sorted(
+            numerical_checked_aux,
             key=lambda line: dep_idx[
                 Statement.from_tokens(
                     translate_sentence(mp, line.statement.to_str().split(" ")),
@@ -1314,7 +1314,7 @@ class ProblemWorker:
                 ).to_str()
             ],
         )
-        for line in sorted_numercial_checked_aux:
+        for line in sorted_numerical_checked_aux:
             statement_str = Statement.from_tokens(
                 translate_sentence(mp, line.statement.to_str().split(" ")),
                 dep_graph,

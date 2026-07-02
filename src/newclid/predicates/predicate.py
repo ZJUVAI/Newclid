@@ -37,7 +37,7 @@ class Predicate(ABC):
     @classmethod
     def check(cls, statement: Statement) -> bool:
         """
-        Hypothesis : the numercial test is passed
+        Hypothesis : the numerical test is passed
         """
         return False
 
@@ -48,7 +48,7 @@ class Predicate(ABC):
     @classmethod
     def why(cls, statement: Statement) -> Optional[Dependency]:
         """
-        Hypothesis : the numercial test is passed
+        Hypothesis : the numerical test is passed
         This function should only be giving one same dependency, which is the implicit dependency used in the first check success.
         """
         return None
