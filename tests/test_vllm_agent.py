@@ -166,6 +166,7 @@ class Qwen3AgentTests(unittest.TestCase):
         self.assertEqual(payload["stop"], ["</aux>"])
         self.assertFalse(payload["continue_final_message"])
         self.assertTrue(payload["add_generation_prompt"])
+        self.assertEqual(payload["max_tokens"], 1024)
         self.assertEqual(payload["chat_template_kwargs"], {"enable_thinking": True})
         self.assertNotIn("stop_token_ids", payload)
         self.assertEqual(result["aux_dsl_scores"]["<aux> x00 z : free z"], -0.2)
@@ -208,6 +209,7 @@ class Qwen3AgentTests(unittest.TestCase):
         payload = mock_post.call_args.kwargs["json"]
         self.assertTrue(payload["continue_final_message"])
         self.assertFalse(payload["add_generation_prompt"])
+        self.assertEqual(payload["max_tokens"], 100)
         self.assertNotIn("chat_template_kwargs", payload)
         self.assertEqual(payload["stop"], [" ;"])
         self.assertEqual(payload["stop_token_ids"], [99])

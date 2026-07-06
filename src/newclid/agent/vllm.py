@@ -22,6 +22,7 @@ from newclid.proof import ProofState
 
 SYSTEM_PROMPT = "You are a helpful assistant."
 MAX_NEW_TOKENS = 100
+MAX_THINK_NEW_TOKENS = 1024
 AUX_STOP = "</aux>"
 AUX_CANDIDATE_STOP = " ;"
 HTTP_WORKERS = 16
@@ -151,7 +152,7 @@ class _BaseQwen3Agent(BaseAgent):
             "messages": request["messages"],
             "continue_final_message": not generate_think,
             "add_generation_prompt": generate_think,
-            "max_tokens": MAX_NEW_TOKENS,
+            "max_tokens": MAX_THINK_NEW_TOKENS if generate_think else MAX_NEW_TOKENS,
             "n": self.decoding_size,
             "temperature": 1.0,
             "top_p": 1.0,
