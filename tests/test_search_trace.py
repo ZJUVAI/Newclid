@@ -32,6 +32,7 @@ def test_attempt_aggregator_preserves_construction_fields_across_transitions(tmp
         "beam_score_after": -1.4,
         "raw_aux_text": " x21 = on_tline a b c d",
         "construction_text": "x21 = on_tline a b c d",
+        "model_think": "try tangent line",
     }
 
     aggregator.process(
@@ -71,6 +72,7 @@ def test_attempt_aggregator_preserves_construction_fields_across_transitions(tmp
     assert attempt["ddar_status"] == "unsolved"
     assert attempt["raw_aux_text"] == " x21 = on_tline a b c d"
     assert attempt["construction_text"] == "x21 = on_tline a b c d"
+    assert attempt["model_think"] == "try tangent line"
 
 
 def test_attempt_aggregator_records_parse_failed_raw_text(tmp_path):
@@ -97,6 +99,7 @@ def test_attempt_aggregator_records_parse_failed_raw_text(tmp_path):
             "beam_score_after": None,
             "raw_aux_text": " nonsense",
             "construction_text": None,
+            "model_think": "bad idea",
         }
     )
     aggregator.close()
@@ -107,3 +110,4 @@ def test_attempt_aggregator_records_parse_failed_raw_text(tmp_path):
     assert attempt["status"] == "parse_failed"
     assert attempt["raw_aux_text"] == " nonsense"
     assert attempt["construction_text"] is None
+    assert attempt["model_think"] == "bad idea"

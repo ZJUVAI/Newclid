@@ -72,18 +72,29 @@ def _extract_aux_dsl(text: str) -> str | None:
     return text[aux_start:].partition(AUX_STOP)[0].rstrip()
 
 
-def _score_chat_choices(
+def _split_model_think(text: str) -> tuple[str, str]:
+    before, sep, after = text.partition("</think>")
+    if not sep:
+        return "", text
+    if "<think>" in before:
+        before = before.rsplit("<think>", 1)[1]
+    return before.strip(), after
+
+
+def _parse_scored_choices(
     *,
     choices: list[dict[str, Any]],
     request: dict[str, Any],
     stop_token_id: int,
-) -> dict[str, float]:
+) -> tuple[dict[str, float], dict[str, str]]:
     response_prefix = str(request.get("response_prefix", RESPONSE_PREFIX))
     new_point_name = str(request.get("new_point_name", ""))
     extract_aux_from_output = bool(request.get("extract_aux_from_output", False))
-    aux_dsl_dict: dict[str, float] = {}
+    aux_dsl_scores: dict[str, float] = {}
+    aux_dsl_thinks: dict[str, str] = {}
     for choice in choices:
         text = str(choice.get("message", {}).get("content", ""))
+        model_think, text_without_think = _split_model_think(text)
         token_ids = choice.get("token_ids", [])
         token_logprobs = [
             item.get("logprob") for item in choice.get("logprobs", {}).get("content", [])
@@ -95,15 +106,16 @@ def _score_chat_choices(
         valid = [lp for lp in token_logprobs[:stop_idx] if lp is not None]
         score = sum(valid) / max(len(valid), 1)
         if extract_aux_from_output:
-            aux_dsl = _extract_aux_dsl(text)
+            aux_dsl = _extract_aux_dsl(text_without_think)
             if aux_dsl is None:
                 continue
         else:
-            continuation = text.partition(AUX_STOP)[0].rstrip()
+            continuation = text_without_think.partition(AUX_STOP)[0].rstrip()
             aux_dsl = f"{response_prefix} {new_point_name} : {continuation.lstrip()}"
-        if aux_dsl not in aux_dsl_dict or score > aux_dsl_dict[aux_dsl]:
-            aux_dsl_dict[aux_dsl] = score
-    return aux_dsl_dict
+        if aux_dsl not in aux_dsl_scores or score > aux_dsl_scores[aux_dsl]:
+            aux_dsl_scores[aux_dsl] = score
+            aux_dsl_thinks[aux_dsl] = model_think
+    return aux_dsl_scores, aux_dsl_thinks
 
 
 class _BaseQwen3Agent(BaseAgent):
@@ -186,11 +198,13 @@ class _BaseQwen3Agent(BaseAgent):
         choices = list(response.json().get("choices", []))
         if len(choices) != self.decoding_size:
             raise ValueError(f"Expected {self.decoding_size} choices, got {len(choices)}.")
+        aux_dsl_scores, aux_dsl_thinks = _parse_scored_choices(
+            choices=choices, request=request, stop_token_id=self.stop_token_id
+        )
         return {
             "request_id": request["request_id"],
-            "aux_dsl_scores": _score_chat_choices(
-                choices=choices, request=request, stop_token_id=self.stop_token_id
-            ),
+            "aux_dsl_scores": aux_dsl_scores,
+            "aux_dsl_thinks": aux_dsl_thinks,
             "completed_at_unix_s": time.time(),
         }
 

@@ -12,7 +12,7 @@ from newclid.agent.vllm import (
     Qwen3VLAgent,
     _build_messages,
     _extract_aux_dsl,
-    _score_chat_choices,
+    _parse_scored_choices,
 )
 
 
@@ -57,8 +57,8 @@ class VLLMHelperTests(unittest.TestCase):
         self.assertEqual(messages[2]["role"], "assistant")
         self.assertEqual(messages[2]["content"], "<aux> x00 a :")
 
-    def test_score_chat_choices_rebuilds_aux_dsl(self):
-        aux_dsl_dict = _score_chat_choices(
+    def test_parse_scored_choices_rebuilds_aux_dsl(self):
+        aux_dsl_scores, aux_dsl_thinks = _parse_scored_choices(
             choices=[
                 {
                     "message": {"content": "free a</aux>"},
@@ -73,38 +73,41 @@ class VLLMHelperTests(unittest.TestCase):
             stop_token_id=99,
         )
 
-        self.assertEqual(aux_dsl_dict, {"<aux> x00 a : free a": -0.2})
+        self.assertEqual(aux_dsl_scores, {"<aux> x00 a : free a": -0.2})
+        self.assertEqual(aux_dsl_thinks, {"<aux> x00 a : free a": ""})
 
-    def test_score_chat_choices_can_extract_generated_aux_block(self):
-        aux_dsl_dict = _score_chat_choices(
-            choices=[
-                {
-                    "message": {
-                        "content": " useful reasoning</think>\n\n<aux> x00 z : free z</aux>"
-                    },
-                    "token_ids": [17, 18, 99],
-                    "logprobs": {
-                        "content": [
-                            {"logprob": -0.4},
-                            {"logprob": -0.2},
-                            {"logprob": -1.0},
-                        ]
-                    },
+    def test_parse_scored_choices_can_extract_generated_aux_block(self):
+        choices = [
+            {
+                "message": {
+                    "content": " useful reasoning</think>\n\n<aux> x00 z : free z</aux>"
                 },
-                {
-                    "message": {"content": " no aux here"},
-                    "token_ids": [19],
-                    "logprobs": {"content": [{"logprob": -0.1}]},
+                "token_ids": [17, 18, 99],
+                "logprobs": {
+                    "content": [
+                        {"logprob": -0.4},
+                        {"logprob": -0.2},
+                        {"logprob": -1.0},
+                    ]
                 },
-            ],
-            request={"response_prefix": "<aux> x00", "extract_aux_from_output": True},
+            },
+            {
+                "message": {"content": " no aux here"},
+                "token_ids": [19],
+                "logprobs": {"content": [{"logprob": -0.1}]},
+            },
+        ]
+        request = {"response_prefix": "<aux> x00", "extract_aux_from_output": True}
+        aux_dsl_scores, aux_dsl_thinks = _parse_scored_choices(
+            choices=choices,
+            request=request,
             stop_token_id=99,
         )
 
-        self.assertEqual(list(aux_dsl_dict), ["<aux> x00 z : free z"])
-        self.assertAlmostEqual(aux_dsl_dict["<aux> x00 z : free z"], -0.3)
+        self.assertEqual(list(aux_dsl_scores), ["<aux> x00 z : free z"])
+        self.assertAlmostEqual(aux_dsl_scores["<aux> x00 z : free z"], -0.3)
+        self.assertEqual(aux_dsl_thinks["<aux> x00 z : free z"], "useful reasoning")
         self.assertEqual(_extract_aux_dsl("x <aux> y </aux> z"), "<aux> y")
-
 
 class Qwen3AgentTests(unittest.TestCase):
     def test_request_completions_uses_chat_endpoint_not_completions(self):
@@ -188,6 +191,7 @@ class Qwen3AgentTests(unittest.TestCase):
         self.assertEqual(payload["stop"], ["</aux>"])
         self.assertNotIn("stop_token_ids", payload)
         self.assertEqual(result["aux_dsl_scores"]["<aux> x00 z : free z"], -0.2)
+        self.assertEqual(result["aux_dsl_thinks"]["<aux> x00 z : free z"], "reason")
 
     def test_hybrid_search_falls_back_to_v2_after_v1_failure_with_cumulative_counts(self):
         with patch("newclid.agent.vllm._load_tokenizer", return_value=_FakeTokenizer()):

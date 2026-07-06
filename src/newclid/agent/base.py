@@ -243,15 +243,18 @@ class BaseAgent(DeductiveAgent, ABC):
     ) -> bool:
         ctx = context[result["request_id"]]
         response_prefix = str(ctx["request"]["response_prefix"])
+        aux_dsl_thinks = result.get("aux_dsl_thinks", {})
 
         for rank, (aux_dsl, score) in enumerate(_rank(result.get("aux_dsl_scores", {}))):
             if not aux_dsl.startswith(response_prefix):
                 continue
             aux_construction = try_dsl_to_constructions(aux_dsl[len(response_prefix):].strip())
+            model_think = aux_dsl_thinks.get(aux_dsl)
             self._trace(
                 "candidate_parse", mode=mode, depth=depth,
                 request_id=result["request_id"], candidate_rank=rank,
                 aux_dsl=aux_dsl, parsed=aux_construction is not None,
+                model_think=model_think,
             )
             if aux_construction is None:
                 continue
