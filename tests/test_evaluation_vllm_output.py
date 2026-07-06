@@ -34,6 +34,16 @@ class EvaluationOutputTests(unittest.TestCase):
         with self.assertRaises(Exception):
             evaluation.parse_bool("maybe")
 
+    def test_think_true_only_allows_v1_search(self):
+        evaluation.validate_think_search_version(think=True, search_version="v1")
+        evaluation.validate_think_search_version(think=False, search_version="hybrid")
+
+        with self.assertRaisesRegex(ValueError, "only supports --search_version v1"):
+            evaluation.validate_think_search_version(
+                think=True,
+                search_version="hybrid",
+            )
+
     def test_output_stem_contains_model_checkpoint_dataset_and_commit_slugs(self):
         stem = evaluation.build_eval_output_stem(
             agent_type="qwen3_text",

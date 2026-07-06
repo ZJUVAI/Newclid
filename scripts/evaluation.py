@@ -40,6 +40,14 @@ def parse_bool(value: str) -> bool:
     raise argparse.ArgumentTypeError(f"Expected true or false, got {value!r}.")
 
 
+def validate_think_search_version(*, think: bool, search_version: str) -> None:
+    if think and search_version != "v1":
+        raise ValueError(
+            "--think true only supports --search_version v1; "
+            f"got {search_version!r}."
+        )
+
+
 def slugify(value: str, default: str = "item") -> str:
     cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", str(value).strip().rstrip("/"))
     return cleaned.strip("._") or default
@@ -192,6 +200,8 @@ def solve_problems_vllm(
     enable_trace: bool,
     using_exp: bool = True,
 ):
+    validate_think_search_version(think=think, search_version=search_version)
+
     main_t0 = time.perf_counter()
     if not filepath.exists():
         raise FileNotFoundError(f"Problems file not found: {filepath}")
@@ -422,6 +432,14 @@ def main() -> None:
     parser.add_argument("--using_exp", type=lambda v: v.strip().lower() not in {"false", "0", "no", "n", "off"}, default=True)
     parser.add_argument("--enable_trace", action=argparse.BooleanOptionalAction, default=False)
     args = parser.parse_args()
+
+    try:
+        validate_think_search_version(
+            think=args.think,
+            search_version=args.search_version,
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
 
     solve_problems_vllm(
         filepath=Path(args.problems_path),
