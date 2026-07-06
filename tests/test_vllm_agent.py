@@ -11,6 +11,7 @@ from newclid.agent.vllm import (
     Qwen3Agent,
     Qwen3VLAgent,
     _build_messages,
+    _extract_aux_dsl,
     _score_chat_choices,
 )
 
@@ -45,6 +46,17 @@ class VLLMHelperTests(unittest.TestCase):
             "<think>\n\n</think>\n\n<aux> x00 a :",
         )
 
+    def test_build_chat_messages_can_skip_empty_think_prefix(self):
+        messages = _build_messages(
+            query="<problem> demo </problem>",
+            response_prefix="<aux> x00",
+            new_point_name="a",
+            include_empty_think=False,
+        )
+
+        self.assertEqual(messages[2]["role"], "assistant")
+        self.assertEqual(messages[2]["content"], "<aux> x00 a :")
+
     def test_score_chat_choices_rebuilds_aux_dsl(self):
         aux_dsl_dict = _score_chat_choices(
             choices=[
@@ -63,6 +75,36 @@ class VLLMHelperTests(unittest.TestCase):
 
         self.assertEqual(aux_dsl_dict, {"<aux> x00 a : free a": -0.2})
 
+    def test_score_chat_choices_can_extract_generated_aux_block(self):
+        aux_dsl_dict = _score_chat_choices(
+            choices=[
+                {
+                    "message": {
+                        "content": " useful reasoning</think>\n\n<aux> x00 z : free z</aux>"
+                    },
+                    "token_ids": [17, 18, 99],
+                    "logprobs": {
+                        "content": [
+                            {"logprob": -0.4},
+                            {"logprob": -0.2},
+                            {"logprob": -1.0},
+                        ]
+                    },
+                },
+                {
+                    "message": {"content": " no aux here"},
+                    "token_ids": [19],
+                    "logprobs": {"content": [{"logprob": -0.1}]},
+                },
+            ],
+            request={"response_prefix": "<aux> x00", "extract_aux_from_output": True},
+            stop_token_id=99,
+        )
+
+        self.assertEqual(list(aux_dsl_dict), ["<aux> x00 z : free z"])
+        self.assertAlmostEqual(aux_dsl_dict["<aux> x00 z : free z"], -0.3)
+        self.assertEqual(_extract_aux_dsl("x <aux> y </aux> z"), "<aux> y")
+
 
 class Qwen3AgentTests(unittest.TestCase):
     def test_request_completions_uses_chat_endpoint_not_completions(self):
@@ -77,12 +119,12 @@ class Qwen3AgentTests(unittest.TestCase):
                 return {
                     "choices": [
                         {
-                            "message": {"content": " = free a"},
+                            "message": {"content": "free a"},
                             "token_ids": [17],
                             "logprobs": {"content": [{"logprob": -0.2}]},
                         },
                         {
-                            "message": {"content": " = free b"},
+                            "message": {"content": "free b"},
                             "token_ids": [18],
                             "logprobs": {"content": [{"logprob": -0.3}]},
                         },
@@ -103,6 +145,49 @@ class Qwen3AgentTests(unittest.TestCase):
         self.assertNotIn("/v1/completions", mock_post.call_args.args[0])
         self.assertEqual(result["request_id"], "r0")
         self.assertEqual(len(result["aux_dsl_scores"]), 2)
+
+    def test_request_completions_uses_aux_stop_for_generated_think_mode(self):
+        with patch("newclid.agent.vllm._load_tokenizer", return_value=_FakeTokenizer()):
+            agent = Qwen3Agent(**_agent_kwargs(), think=True)
+
+        class _Response:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": " reason</think>\n\n<aux> x00 z : free z"
+                            },
+                            "token_ids": [17],
+                            "logprobs": {"content": [{"logprob": -0.2}]},
+                        },
+                        {
+                            "message": {
+                                "content": " other</think>\n\n<aux> x00 y : free y"
+                            },
+                            "token_ids": [18],
+                            "logprobs": {"content": [{"logprob": -0.3}]},
+                        },
+                    ]
+                }
+
+        with patch.object(agent.session, "post", return_value=_Response()) as mock_post:
+            result = agent.request_completions(
+                {
+                    "request_id": "r0",
+                    "messages": [],
+                    "response_prefix": "<aux> x00",
+                    "extract_aux_from_output": True,
+                }
+            )
+
+        payload = mock_post.call_args.kwargs["json"]
+        self.assertEqual(payload["stop"], ["</aux>"])
+        self.assertNotIn("stop_token_ids", payload)
+        self.assertEqual(result["aux_dsl_scores"]["<aux> x00 z : free z"], -0.2)
 
     def test_hybrid_search_falls_back_to_v2_after_v1_failure_with_cumulative_counts(self):
         with patch("newclid.agent.vllm._load_tokenizer", return_value=_FakeTokenizer()):
@@ -174,12 +259,34 @@ class Qwen3AgentTests(unittest.TestCase):
                 depth=0,
                 request_id="d0_proot",
                 problem=object(),
-                aux_prefix=" x00 a = free a",
+                aux_prefix=" x00 a : free a",
                 proof=types.SimpleNamespace(defs={}),
             )
 
         self.assertEqual(request["query"], "<problem> root </problem>")
-        self.assertEqual(request["response_prefix"], "<aux> x00 a = free a ; x00")
+        self.assertEqual(request["response_prefix"], "<aux> x00 a : free a ; x00")
+
+    def test_text_think_true_starts_assistant_at_open_think(self):
+        with patch("newclid.agent.vllm._load_tokenizer", return_value=_FakeTokenizer()):
+            agent = Qwen3Agent(**_agent_kwargs(), think=True)
+        agent.problemJGEX = object()
+        with patch("newclid.agent.vllm.problem_to_dsl", return_value="<problem> text </problem>") as mock_dsl:
+            with patch("newclid.agent.vllm.get_new_point_name", return_value="a"):
+                request = agent.build_request(
+                    mode="v2",
+                    depth=0,
+                    request_id="d0_proot",
+                    problem=object(),
+                    aux_prefix="",
+                    proof=types.SimpleNamespace(defs={}),
+                )
+
+        mock_dsl.assert_called_once()
+        self.assertEqual(request["messages"][2]["content"], "<think>")
+        self.assertEqual(request["response_prefix"], "<aux> x00")
+        self.assertEqual(request["new_point_name"], "")
+        self.assertTrue(request["extract_aux_from_output"])
+        self.assertTrue(agent.server_info()["think"])
 
 
 class Qwen3VLAgentTests(unittest.TestCase):
@@ -210,7 +317,7 @@ class Qwen3VLAgentTests(unittest.TestCase):
                         depth=1,
                         frontier=[
                             (0.0, ((0,), object(), "")),
-                            (1.0, ((1,), object(), " x00 a = free a")),
+                            (1.0, ((1,), object(), " x00 a : free a")),
                         ],
                         proof=types.SimpleNamespace(defs={}),
                     )
@@ -258,6 +365,7 @@ class Qwen3VLAgentTests(unittest.TestCase):
 
         mock_build_proof.assert_called_once_with(problem, {})
         self.assertTrue(request["image_data_url"].startswith("data:image/png;base64,"))
+        self.assertEqual(request["messages"][2]["content"], "<aux> x00 c :")
         self.assertEqual(request["messages"][1]["content"][0]["type"], "image_url")
 
 

@@ -4,6 +4,7 @@ import os
 import argparse
 import json
 import time
+import sys
 from datetime import timedelta, datetime
 import ray
 import re
@@ -344,6 +345,21 @@ def positive_int(value: str) -> int:
     return parsed
 
 
+def write_cli_args(params_path: str, args: argparse.Namespace):
+    with open(params_path, "w", encoding="utf-8") as f:
+        json.dump(
+            {
+                "command": " ".join(sys.argv),
+                "argv": sys.argv,
+                "args": vars(args),
+            },
+            f,
+            ensure_ascii=False,
+            indent=4,
+        )
+        f.write("\n")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Create problem fl - nl dataset")
     # General parameters
@@ -518,6 +534,10 @@ def main():
         using_exp=args.using_exp,
         direct_png=args.direct_png,
         img_pixels=args.img_pixels,
+    )
+    write_cli_args(
+        os.path.join(generator.writer.output_dir, generator.file_prefix + "_params.json"),
+        args,
     )
     generator.generate()
 

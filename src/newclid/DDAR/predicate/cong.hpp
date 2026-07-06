@@ -35,7 +35,6 @@ public:
     std::vector<statement_arg> args() const override;
 
     std::vector<std::unique_ptr<Equation>> as_equation_dist(bool exp, bool using_ar) const override;
-    std::vector<std::unique_ptr<Equation>> as_equation_slope(bool exp, bool using_ar) const override;
     std::vector<std::unique_ptr<Equation>> as_equation_distlog(bool exp, bool using_ar) const override;
 
     const Dist &left() const { return _left; }

@@ -44,11 +44,11 @@ def write_proof_steps(
     (
         points,
         premises,
-        numercial_checked_premises,
+        numerical_checked_premises,
         trivial_premises,
         aux_points,
         aux,
-        numercial_checked_aux,
+        numerical_checked_aux,
         trivial_aux,
         proof_steps,
     ) = proof_state.dep_graph.get_proof_steps(goals)
@@ -60,7 +60,7 @@ def write_proof_steps(
     solution += f"Points : {', '.join(points)}\n"
     for line in premises:
         solution += rediger(line) + "\n"
-    for line in numercial_checked_premises:
+    for line in numerical_checked_premises:
         solution += rediger(line) + "\n"
     for line in trivial_premises:
         solution += rediger(line) + "\n"
@@ -69,7 +69,7 @@ def write_proof_steps(
     solution += f"Points : {', '.join(aux_points)}\n"
     for line in aux:
         solution += rediger(line) + "\n"
-    for line in numercial_checked_aux:
+    for line in numerical_checked_aux:
         solution += rediger(line) + "\n"
     for line in trivial_aux:
         solution += rediger(line) + "\n"

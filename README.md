@@ -119,12 +119,15 @@ python scripts/evaluation.py \
   --agent qwen3_text \
   --problems_path benchmarks/dev_imo.txt \
   --vllm_base_url http://127.0.0.1:8000 \
+  --think false \
   --decoding_size 32 \
   --beam_size 512 \
   --search_depth 4 \
   --ray_num_cpus 40 \
   --timeout 3600
 ```
+
+Use `--think true` to start the text model with `<think>` and extract the generated `<aux>` block instead of forcing the next point name. The VL agent starts directly from `<aux>` for Qwen3-VL-Instruct checkpoints.
 
 ### Qwen3-VL
 

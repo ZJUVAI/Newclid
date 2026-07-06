@@ -26,6 +26,14 @@ class _FakeLive:
 
 
 class EvaluationOutputTests(unittest.TestCase):
+    def test_parse_bool_accepts_explicit_true_false(self):
+        self.assertTrue(evaluation.parse_bool("true"))
+        self.assertTrue(evaluation.parse_bool("1"))
+        self.assertFalse(evaluation.parse_bool("false"))
+        self.assertFalse(evaluation.parse_bool("0"))
+        with self.assertRaises(Exception):
+            evaluation.parse_bool("maybe")
+
     def test_output_stem_contains_model_checkpoint_dataset_and_commit_slugs(self):
         stem = evaluation.build_eval_output_stem(
             agent_type="qwen3_text",
@@ -101,6 +109,7 @@ class EvaluationOutputTests(unittest.TestCase):
                                                         beam_size=16,
                                                         search_depth=3,
                                                         search_version="hybrid",
+                                                        think=False,
                                                         ray_num_cpus=1,
                                                         timeout=30,
                                                         log_dir=tmpdir,

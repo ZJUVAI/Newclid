@@ -139,45 +139,6 @@ bool Coll::operator<(const Coll &other) const
     return _a < other._a;
 }
 
-vector<unique_ptr<Equation>> Coll::as_equation_slope(bool exp, bool using_ar) const
-{
-    if (!using_ar)
-    {
-        return {};
-    }
-    vector<unique_ptr<Equation>> result;
-
-    vector<Slope> candidates = {
-        Slope(_a, _b),
-        Slope(_a, _c),
-        Slope(_b, _c),
-    };
-
-    vector<Slope> valid_slopes;
-    for (const auto &s : candidates)
-    {
-        if (s.check_numerically())
-        {
-            valid_slopes.push_back(s);
-        }
-    }
-
-    // 3. 两两配对，生成 p - q = 0 的方程
-    for (size_t i = 0; i < valid_slopes.size(); ++i)
-    {
-        for (size_t j = i + 1; j < valid_slopes.size(); ++j)
-        {
-            vector<Term> terms = {
-                Term(valid_slopes[i]),
-                -Term(valid_slopes[j])};
-
-            result.push_back(make_unique<Equation>(Equation(std::move(terms))));
-        }
-    }
-
-    return result;
-}
-
 vector<unique_ptr<Equation>> Coll::as_equation_dist(bool exp, bool using_ar) const
 {
     if (!using_ar)
