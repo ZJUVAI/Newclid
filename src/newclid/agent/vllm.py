@@ -41,30 +41,6 @@ def discover_served_model(base_url: str) -> tuple[str, list[str | None]]:
     return str(server_models[0]), server_models
 
 
-def _build_messages(
-    *,
-    query: str,
-    response_prefix: str,
-    new_point_name: str,
-    image_url: str | None = None,
-    include_empty_think: bool = True,
-    assistant_prefix: str | None = None,
-) -> list[dict[str, Any]]:
-    user_content: Any = query if image_url is None else [
-        {"type": "image_url", "image_url": {"url": image_url}},
-        {"type": "text", "text": query},
-    ]
-    if assistant_prefix is None:
-        assistant_prefix = f"{response_prefix} {new_point_name} :"
-        if include_empty_think:
-            assistant_prefix = f"<think>\n\n</think>\n\n{assistant_prefix}"
-    return [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": user_content},
-        {"role": "assistant", "content": assistant_prefix},
-    ]
-
-
 def _extract_aux_dsl(text: str) -> str | None:
     aux_start = text.find("<aux>")
     if aux_start < 0:
@@ -86,10 +62,10 @@ def _parse_scored_choices(
     choices: list[dict[str, Any]],
     request: dict[str, Any],
     stop_token_id: int,
+    extract_aux_from_output: bool = False,
 ) -> tuple[dict[str, float], dict[str, str]]:
     response_prefix = str(request.get("response_prefix", RESPONSE_PREFIX))
     new_point_name = str(request.get("new_point_name", ""))
-    extract_aux_from_output = bool(request.get("extract_aux_from_output", False))
     aux_dsl_scores: dict[str, float] = {}
     aux_dsl_thinks: dict[str, str] = {}
     for choice in choices:
@@ -169,12 +145,12 @@ class _BaseQwen3Agent(BaseAgent):
         return f"<aux>{aux_prefix}{separator} x00"
 
     def request_completions(self, request: dict[str, Any]) -> dict[str, Any]:
-        extract_aux_from_output = bool(request.get("extract_aux_from_output", False))
+        generate_think = bool(getattr(self, "think", False))
         payload = {
             "model": self.served_model_name,
             "messages": request["messages"],
-            "continue_final_message": True,
-            "add_generation_prompt": False,
+            "continue_final_message": not generate_think,
+            "add_generation_prompt": generate_think,
             "max_tokens": MAX_NEW_TOKENS,
             "n": self.decoding_size,
             "temperature": 1.0,
@@ -187,9 +163,11 @@ class _BaseQwen3Agent(BaseAgent):
             "return_token_ids": True,
             "stream": False,
             "include_stop_str_in_output": False,
-            "stop": [AUX_STOP] if extract_aux_from_output else [AUX_CANDIDATE_STOP],
+            "stop": [AUX_STOP] if generate_think else [AUX_CANDIDATE_STOP],
         }
-        if not extract_aux_from_output:
+        if generate_think:
+            payload["chat_template_kwargs"] = {"enable_thinking": True}
+        else:
             payload["stop_token_ids"] = [self.stop_token_id]
         response = self.session.post(
             f"{self.base_url}/v1/chat/completions", json=payload, timeout=120.0
@@ -199,7 +177,10 @@ class _BaseQwen3Agent(BaseAgent):
         if len(choices) != self.decoding_size:
             raise ValueError(f"Expected {self.decoding_size} choices, got {len(choices)}.")
         aux_dsl_scores, aux_dsl_thinks = _parse_scored_choices(
-            choices=choices, request=request, stop_token_id=self.stop_token_id
+            choices=choices,
+            request=request,
+            stop_token_id=self.stop_token_id,
+            extract_aux_from_output=generate_think,
         )
         return {
             "request_id": request["request_id"],
@@ -215,34 +196,23 @@ class _BaseQwen3Agent(BaseAgent):
             return self._root_problem_dsl
         return problem_to_dsl(problem, proof.defs)
 
-    def _build_request_dict(
+    def _make_request_dict(
         self,
         *,
         request_id: str,
+        messages: list[dict[str, Any]],
         query: str,
         response_prefix: str,
         new_point_name: str,
-        image_url: str | None = None,
-        include_empty_think: bool = True,
-        assistant_prefix: str | None = None,
-        extract_aux_from_output: bool = False,
         extra: dict | None = None,
     ) -> dict[str, Any]:
         result = {
             "request_id": request_id,
-            "messages": _build_messages(
-                query=query,
-                response_prefix=response_prefix,
-                new_point_name=new_point_name,
-                image_url=image_url,
-                include_empty_think=include_empty_think,
-                assistant_prefix=assistant_prefix,
-            ),
+            "messages": messages,
             "query": query,
             "new_point_name": new_point_name,
             "response_prefix": response_prefix,
             "decoding_size": self.decoding_size,
-            "extract_aux_from_output": extract_aux_from_output,
         }
         if extra:
             result.update(extra)
@@ -278,20 +248,32 @@ class Qwen3Agent(_BaseQwen3Agent):
             query = self._get_query(mode, problem, proof)
         response_prefix = self.response_prefix(mode=mode, aux_prefix=aux_prefix)
         if self.think:
-            return self._build_request_dict(
+            return self._make_request_dict(
                 request_id=request_id,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": query},
+                ],
                 query=query,
                 response_prefix=RESPONSE_PREFIX,
                 new_point_name="",
-                assistant_prefix="<think>",
-                extract_aux_from_output=True,
             )
-        return self._build_request_dict(
+        new_point_name = get_new_point_name(problem)
+        return self._make_request_dict(
             request_id=request_id,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": query},
+                {
+                    "role": "assistant",
+                    "content": (
+                        f"<think>\n\n</think>\n\n{response_prefix} {new_point_name} :"
+                    ),
+                },
+            ],
             query=query,
             response_prefix=response_prefix,
-            new_point_name=get_new_point_name(problem),
-            include_empty_think=True,
+            new_point_name=new_point_name,
         )
 
 class Qwen3VLAgent(_BaseQwen3Agent):
@@ -332,12 +314,24 @@ class Qwen3VLAgent(_BaseQwen3Agent):
         image_url = "data:image/png;base64," + base64.b64encode(
             png_path.read_bytes()
         ).decode("ascii")
-        return self._build_request_dict(
+        response_prefix = self.response_prefix(mode=mode, aux_prefix=aux_prefix)
+        new_point_name = get_new_point_name(problem)
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": image_url}},
+                    {"type": "text", "text": query},
+                ],
+            },
+            {"role": "assistant", "content": f"{response_prefix} {new_point_name} :"},
+        ]
+        return self._make_request_dict(
             request_id=request_id,
+            messages=messages,
             query=query,
-            response_prefix=self.response_prefix(mode=mode, aux_prefix=aux_prefix),
-            new_point_name=get_new_point_name(problem),
-            include_empty_think=False,
-            image_url=image_url,
+            response_prefix=response_prefix,
+            new_point_name=new_point_name,
             extra={"image_data_url": image_url},
         )
