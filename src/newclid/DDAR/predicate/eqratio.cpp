@@ -80,29 +80,22 @@ unique_ptr<Statement> EqRatio::normalize() const
     Dist c = right_up().normalize();
     Dist d = right_down().normalize();
 
-    if (min(a, b) > min(c, d))
-    {
-        swap(a, c);
-        swap(b, d);
-    }
+    vector<array<Dist, 4>> candidates = {
+        {a, b, c, d},
+        {a, c, b, d},
+        {b, a, d, c},
+        {b, d, a, c},
+        {c, a, d, b},
+        {c, d, a, b},
+        {d, b, c, a},
+        {d, c, b, a},
+    };
 
-    if (a > b)
-    {
-        swap(a, b);
-        swap(c, d);
-    }
+    auto best = *min_element(candidates.begin(), candidates.end());
 
-    if (a == b && c > d)
-    {
-        swap(c, d);
-    }
-
-    if (b > c)
-    {
-        swap(b, c);
-    }
-
-    return make_unique<EqRatio>(a, b, c, d);
+    return make_unique<EqRatio>(
+        best[0], best[1], best[2], best[3]
+    );
 }
 
 ostream &EqRatio::print(ostream &os) const

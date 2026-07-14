@@ -3,6 +3,8 @@
 #include "ar/equation.hpp"
 #include "typedef.hpp"
 #include <algorithm>
+#include <array>
+#include <vector>
 
 using namespace std;
 
@@ -113,29 +115,20 @@ unique_ptr<Statement> EqAngle::normalize() const
     Slope c = _s3.normalize();
     Slope d = _s4.normalize();
 
-    if (min(a, b) > min(c, d))
-    {
-        swap(a, c);
-        swap(b, d);
-    }
+    vector<array<Slope, 4>> candidates = {
+        {a, b, c, d},
+        {a, c, b, d},
+        {b, a, d, c},
+        {b, d, a, c},
+        {c, a, d, b},
+        {c, d, a, b},
+        {d, b, c, a},
+        {d, c, b, a},
+    };
 
-    if (a > b)
-    {
-        swap(a, b);
-        swap(c, d);
-    }
+    auto best = *min_element(candidates.begin(), candidates.end());
 
-    if (a == b && c > d)
-    {
-        swap(c, d);
-    }
-
-    if (b > c)
-    {
-        swap(b, c);
-    }
-
-    return make_unique<EqAngle>(a, b, c, d);
+    return make_unique<EqAngle>(best[0], best[1], best[2], best[3]);
 }
 
 ostream &EqAngle::print(ostream &os) const
