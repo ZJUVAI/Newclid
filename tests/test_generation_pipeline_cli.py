@@ -3,12 +3,23 @@ from types import SimpleNamespace
 
 import pytest
 
+from newclid.algebraic_reasoning.algebraic_manipulator import AlgebraicManipulator
+from newclid.dependencies.dependency import Dependency
+from newclid.dependencies.dependency_graph import DependencyGraph
+from newclid.formulations.clause import Clause
 from newclid.generation import pipeline as generation_pipeline
 from newclid.generation.worker import ProblemWorker
+from newclid.statement import Statement
 
 
 @pytest.mark.parametrize(
-    ("argv", "expected_using_log", "expected_using_exp", "expected_direct_png", "expected_img_pixels"),
+    (
+        "argv",
+        "expected_using_log",
+        "expected_using_exp",
+        "expected_direct_png",
+        "expected_img_pixels",
+    ),
     [
         (
             ["pipeline.py", "--n_samples", "1", "--dir", "./tmp-datasets"],
@@ -88,7 +99,9 @@ def test_problem_worker_passes_csolver_equation_flags(monkeypatch):
     monkeypatch.setattr(
         ProblemWorker,
         "_build_solver",
-        staticmethod(lambda fl_statement, max_attempts=1: (dummy_solver, dummy_builder)),
+        staticmethod(
+            lambda fl_statement, max_attempts=1: (dummy_solver, dummy_builder)
+        ),
     )
     monkeypatch.setattr(
         ProblemWorker,
@@ -125,3 +138,49 @@ def test_problem_worker_passes_csolver_equation_flags(monkeypatch):
     assert captured["max_level"] == 77
     assert captured["kwargs"]["using_log"] is False
     assert captured["kwargs"]["using_exp"] is True
+
+
+def test_problem_worker_point_mapping_uses_predicate_order():
+    mapping = ProblemWorker._create_point_mapping(
+        ["d", "a", "c"],
+        ["b"],
+    )
+
+    assert mapping == {
+        "d": "a",
+        "a": "b",
+        "c": "c",
+        "b": "d",
+    }
+
+
+def test_problem_worker_proof_reuses_canonicalized_premise_ids():
+    source_dep_graph = DependencyGraph(AlgebraicManipulator())
+    output_dep_graph = DependencyGraph(AlgebraicManipulator())
+    premise = Statement.from_tokens(("coll", "x", "y", "z"), source_dep_graph)
+    conclusion = Statement.from_tokens(("coll", "x", "y", "w"), source_dep_graph)
+    assert premise is not None
+    assert conclusion is not None
+
+    mapping = {"x": "c", "y": "b", "z": "a", "w": "d"}
+    clause = Clause(points=("x", "y", "z"), sentences=())
+    dep_idx = {}
+
+    problem = ProblemWorker._generate_problem_predicates_section(
+        mapping,
+        dep_idx,
+        {clause: [(("x", "y", "z"), (premise,))]},
+        [clause],
+        [],
+        output_dep_graph,
+    )
+    proof = ProblemWorker._generate_proof_section(
+        mapping,
+        dep_idx,
+        [Dependency(conclusion, "r00", (premise,))],
+        output_dep_graph,
+    )
+
+    assert "coll a b c [000]" in problem
+    assert "coll b c d [001] r00 [000]" in proof
+    assert "[002]" not in proof

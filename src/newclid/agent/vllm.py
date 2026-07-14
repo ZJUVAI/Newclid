@@ -22,6 +22,7 @@ from newclid.proof import ProofState
 
 SYSTEM_PROMPT = "You are a helpful assistant."
 MAX_NEW_TOKENS = 100
+MAX_THINK_NEW_TOKENS = 1024
 AUX_STOP = "</aux>"
 AUX_CANDIDATE_STOP = " ;"
 HTTP_WORKERS = 16
@@ -41,32 +42,36 @@ def discover_served_model(base_url: str) -> tuple[str, list[str | None]]:
     return str(server_models[0]), server_models
 
 
-def _build_messages(
-    *, query: str, response_prefix: str, new_point_name: str, image_url: str | None = None
-) -> list[dict[str, Any]]:
-    user_content: Any = query if image_url is None else [
-        {"type": "image_url", "image_url": {"url": image_url}},
-        {"type": "text", "text": query},
-    ]
-    return [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": user_content},
-        {"role": "assistant", "content": f"<think>\n\n</think>\n\n{response_prefix} {new_point_name}"},
-    ]
+def _extract_aux_dsl(text: str) -> str | None:
+    aux_start = text.find("<aux>")
+    if aux_start < 0:
+        return None
+    return text[aux_start:].partition(AUX_STOP)[0].rstrip()
 
 
-def _score_chat_choices(
+def _split_model_think(text: str) -> tuple[str, str]:
+    before, sep, after = text.partition("</think>")
+    if not sep:
+        return "", text
+    if "<think>" in before:
+        before = before.rsplit("<think>", 1)[1]
+    return before.strip(), after
+
+
+def _parse_scored_choices(
     *,
     choices: list[dict[str, Any]],
     request: dict[str, Any],
     stop_token_id: int,
-) -> dict[str, float]:
+    extract_aux_from_output: bool = False,
+) -> tuple[dict[str, float], dict[str, str]]:
     response_prefix = str(request.get("response_prefix", RESPONSE_PREFIX))
-    new_point_name = str(request["new_point_name"])
-    aux_dsl_dict: dict[str, float] = {}
+    new_point_name = str(request.get("new_point_name", ""))
+    aux_dsl_scores: dict[str, float] = {}
+    aux_dsl_thinks: dict[str, str] = {}
     for choice in choices:
         text = str(choice.get("message", {}).get("content", ""))
-        continuation = text.partition(AUX_STOP)[0].rstrip()
+        model_think, text_without_think = _split_model_think(text)
         token_ids = choice.get("token_ids", [])
         token_logprobs = [
             item.get("logprob") for item in choice.get("logprobs", {}).get("content", [])
@@ -77,10 +82,17 @@ def _score_chat_choices(
         )
         valid = [lp for lp in token_logprobs[:stop_idx] if lp is not None]
         score = sum(valid) / max(len(valid), 1)
-        aux_dsl = f"{response_prefix} {new_point_name}{continuation}"
-        if aux_dsl not in aux_dsl_dict or score > aux_dsl_dict[aux_dsl]:
-            aux_dsl_dict[aux_dsl] = score
-    return aux_dsl_dict
+        if extract_aux_from_output:
+            aux_dsl = _extract_aux_dsl(text_without_think)
+            if aux_dsl is None:
+                continue
+        else:
+            continuation = text_without_think.partition(AUX_STOP)[0].rstrip()
+            aux_dsl = f"{response_prefix} {new_point_name} : {continuation.lstrip()}"
+        if aux_dsl not in aux_dsl_scores or score > aux_dsl_scores[aux_dsl]:
+            aux_dsl_scores[aux_dsl] = score
+            aux_dsl_thinks[aux_dsl] = model_think
+    return aux_dsl_scores, aux_dsl_thinks
 
 
 class _BaseQwen3Agent(BaseAgent):
@@ -134,12 +146,13 @@ class _BaseQwen3Agent(BaseAgent):
         return f"<aux>{aux_prefix}{separator} x00"
 
     def request_completions(self, request: dict[str, Any]) -> dict[str, Any]:
+        generate_think = bool(getattr(self, "think", False))
         payload = {
             "model": self.served_model_name,
             "messages": request["messages"],
-            "continue_final_message": True,
-            "add_generation_prompt": False,
-            "max_tokens": MAX_NEW_TOKENS,
+            "continue_final_message": not generate_think,
+            "add_generation_prompt": generate_think,
+            "max_tokens": MAX_THINK_NEW_TOKENS if generate_think else MAX_NEW_TOKENS,
             "n": self.decoding_size,
             "temperature": 1.0,
             "top_p": 1.0,
@@ -151,9 +164,12 @@ class _BaseQwen3Agent(BaseAgent):
             "return_token_ids": True,
             "stream": False,
             "include_stop_str_in_output": False,
-            "stop": [AUX_CANDIDATE_STOP],
-            "stop_token_ids": [self.stop_token_id],
+            "stop": [AUX_STOP] if generate_think else [AUX_CANDIDATE_STOP],
         }
+        if generate_think:
+            payload["chat_template_kwargs"] = {"enable_thinking": True}
+        else:
+            payload["stop_token_ids"] = [self.stop_token_id]
         response = self.session.post(
             f"{self.base_url}/v1/chat/completions", json=payload, timeout=120.0
         )
@@ -161,11 +177,16 @@ class _BaseQwen3Agent(BaseAgent):
         choices = list(response.json().get("choices", []))
         if len(choices) != self.decoding_size:
             raise ValueError(f"Expected {self.decoding_size} choices, got {len(choices)}.")
+        aux_dsl_scores, aux_dsl_thinks = _parse_scored_choices(
+            choices=choices,
+            request=request,
+            stop_token_id=self.stop_token_id,
+            extract_aux_from_output=generate_think,
+        )
         return {
             "request_id": request["request_id"],
-            "aux_dsl_scores": _score_chat_choices(
-                choices=choices, request=request, stop_token_id=self.stop_token_id
-            ),
+            "aux_dsl_scores": aux_dsl_scores,
+            "aux_dsl_thinks": aux_dsl_thinks,
             "completed_at_unix_s": time.time(),
         }
 
@@ -176,24 +197,19 @@ class _BaseQwen3Agent(BaseAgent):
             return self._root_problem_dsl
         return problem_to_dsl(problem, proof.defs)
 
-    def _build_request_dict(
+    def _make_request_dict(
         self,
         *,
         request_id: str,
+        messages: list[dict[str, Any]],
         query: str,
         response_prefix: str,
         new_point_name: str,
-        image_url: str | None = None,
         extra: dict | None = None,
     ) -> dict[str, Any]:
         result = {
             "request_id": request_id,
-            "messages": _build_messages(
-                query=query,
-                response_prefix=response_prefix,
-                new_point_name=new_point_name,
-                image_url=image_url,
-            ),
+            "messages": messages,
             "query": query,
             "new_point_name": new_point_name,
             "response_prefix": response_prefix,
@@ -207,6 +223,15 @@ class _BaseQwen3Agent(BaseAgent):
 class Qwen3Agent(_BaseQwen3Agent):
     agent_name = "qwen3_text"
 
+    def __init__(self, *, think: bool = False, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.think = think
+
+    def server_info(self) -> dict[str, Any]:
+        info = super().server_info()
+        info["think"] = self.think
+        return info
+
     def build_request(
         self,
         *,
@@ -218,12 +243,38 @@ class Qwen3Agent(_BaseQwen3Agent):
         proof: ProofState,
     ) -> dict[str, Any]:
         del depth
-        query = self._get_query(mode, problem, proof)
-        return self._build_request_dict(
+        if self.think:
+            query = problem_to_dsl(problem, proof.defs)
+        else:
+            query = self._get_query(mode, problem, proof)
+        response_prefix = self.response_prefix(mode=mode, aux_prefix=aux_prefix)
+        if self.think:
+            return self._make_request_dict(
+                request_id=request_id,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": query},
+                ],
+                query=query,
+                response_prefix=RESPONSE_PREFIX,
+                new_point_name="",
+            )
+        new_point_name = get_new_point_name(problem)
+        return self._make_request_dict(
             request_id=request_id,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": query},
+                {
+                    "role": "assistant",
+                    "content": (
+                        f"<think>\n\n</think>\n\n{response_prefix} {new_point_name} :"
+                    ),
+                },
+            ],
             query=query,
-            response_prefix=self.response_prefix(mode=mode, aux_prefix=aux_prefix),
-            new_point_name=get_new_point_name(problem),
+            response_prefix=response_prefix,
+            new_point_name=new_point_name,
         )
 
 class Qwen3VLAgent(_BaseQwen3Agent):
@@ -264,11 +315,24 @@ class Qwen3VLAgent(_BaseQwen3Agent):
         image_url = "data:image/png;base64," + base64.b64encode(
             png_path.read_bytes()
         ).decode("ascii")
-        return self._build_request_dict(
+        response_prefix = self.response_prefix(mode=mode, aux_prefix=aux_prefix)
+        new_point_name = get_new_point_name(problem)
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": image_url}},
+                    {"type": "text", "text": query},
+                ],
+            },
+            {"role": "assistant", "content": f"{response_prefix} {new_point_name} :"},
+        ]
+        return self._make_request_dict(
             request_id=request_id,
+            messages=messages,
             query=query,
-            response_prefix=self.response_prefix(mode=mode, aux_prefix=aux_prefix),
-            new_point_name=get_new_point_name(problem),
-            image_url=image_url,
+            response_prefix=response_prefix,
+            new_point_name=new_point_name,
             extra={"image_data_url": image_url},
         )
