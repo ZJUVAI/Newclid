@@ -165,11 +165,11 @@ class _BaseQwen3Agent(BaseAgent):
             "return_token_ids": True,
             "stream": False,
             "include_stop_str_in_output": False,
-            "stop": [AUX_STOP] if generate_think else [AUX_CANDIDATE_STOP],
         }
         if generate_think:
             payload["chat_template_kwargs"] = {"enable_thinking": True}
         else:
+            payload["stop"] = [AUX_CANDIDATE_STOP]
             payload["stop_token_ids"] = [self.stop_token_id]
         response = self.session.post(
             f"{self.base_url}/v1/chat/completions", json=payload, timeout=120.0

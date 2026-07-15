@@ -108,6 +108,27 @@ def try_dsl_to_constructions(content: str) -> str | None:
     return construction
 
 
+def try_full_aux_dsl_to_constructions(content: str) -> str | None:
+    construction_parts: list[str] = []
+    for segment in content.split(";"):
+        segment = segment.strip()
+        if not segment:
+            continue
+        segment = re.sub(r"^x00\s+", "", segment)
+        construction = try_dsl_to_constructions(segment)
+        if construction is None:
+            return None
+        construction_parts.append(construction)
+    if not construction_parts:
+        return None
+    constructions = "; ".join(construction_parts)
+    try:
+        Clause.parse_line(constructions)
+    except ValueError:
+        return None
+    return constructions
+
+
 def translate_dsl_to_construction(
     point: str, predicate: str, args: list[str]
 ) -> str | None:

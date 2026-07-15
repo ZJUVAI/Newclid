@@ -13,6 +13,7 @@ from newclid.evaluation.search_runtime import (
     run_ddar_c,
     run_ddar_remote,
     try_dsl_to_constructions,
+    try_full_aux_dsl_to_constructions,
 )
 from newclid.formulations.problem import ProblemJGEX
 from newclid.proof import ProofState
@@ -248,7 +249,11 @@ class BaseAgent(DeductiveAgent, ABC):
         for rank, (aux_dsl, score) in enumerate(_rank(result.get("aux_dsl_scores", {}))):
             if not aux_dsl.startswith(response_prefix):
                 continue
-            aux_construction = try_dsl_to_constructions(aux_dsl[len(response_prefix):].strip())
+            aux_body = aux_dsl[len(response_prefix):].strip()
+            if bool(getattr(self, "think", False)):
+                aux_construction = try_full_aux_dsl_to_constructions(aux_body)
+            else:
+                aux_construction = try_dsl_to_constructions(aux_body)
             model_think = aux_dsl_thinks.get(aux_dsl)
             self._trace(
                 "candidate_parse", mode=mode, depth=depth,

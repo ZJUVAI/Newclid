@@ -3,7 +3,10 @@ from types import SimpleNamespace
 from newclid.algebraic_reasoning.algebraic_manipulator import AlgebraicManipulator
 from newclid.configs import default_defs_path
 from newclid.dependencies.dependency_graph import DependencyGraph
-from newclid.evaluation.search_runtime import problem_to_dsl
+from newclid.evaluation.search_runtime import (
+    problem_to_dsl,
+    try_full_aux_dsl_to_constructions,
+)
 from newclid.formulations.definition import DefinitionJGEX
 from newclid.formulations.problem import ProblemJGEX
 from newclid.generation.worker import ProblemWorker
@@ -70,6 +73,12 @@ def test_problem_dsl_uses_basic_order():
         "y : coll a c y [004] perp a c i y [005] ; "
         "z : coll a b z [006] perp a b i z [007] ? cong x y x y </problem>"
     )
+
+
+def test_full_aux_dsl_parses_all_semicolon_separated_aux_points():
+    assert try_full_aux_dsl_to_constructions(
+        "e : coll a b e [000] ; x00 f : coll a c f [001] ;"
+    ) == "e = on_line e a b; f = on_line f a c"
 
 
 def test_generation_construction_round_trips_to_eval_predicates():
