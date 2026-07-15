@@ -331,6 +331,16 @@ def main() -> None:
     parser.add_argument("--gpu_ids", type=str, default="0,1,2,3")
     parser.add_argument("--gpu_memory_utilization", type=float, default=0.2)
     parser.add_argument("--max_logprobs", type=int, default=64)
+    parser.add_argument(
+        "--generation_config",
+        type=str,
+        default=None,
+        help=(
+            "Forward to vLLM --generation-config. Use 'vllm' to avoid loading "
+            "the model directory generation_config.json, including its "
+            "max_new_tokens default."
+        ),
+    )
     parser.add_argument("--healthcheck_timeout_s", type=float, default=120.0)
     parser.add_argument("--startup_timeout_s", type=float, default=600.0)
     parser.add_argument("--debug_log_requests", action="store_true")
@@ -380,6 +390,10 @@ def main() -> None:
                 str(args.max_logprobs),
                 "--trust-remote-code",
             ]
+            # `vllm` avoids model generation_config.json defaults such as
+            # max_new_tokens being applied at server startup.
+            if args.generation_config:
+                command.extend(["--generation-config", args.generation_config])
             process = subprocess.Popen(command, env=env)
             backends.append(
                 BackendInstance(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 from functools import lru_cache
+import os
 from pathlib import Path
 import time
 from typing import Any
@@ -22,7 +23,7 @@ from newclid.proof import ProofState
 
 SYSTEM_PROMPT = "You are a helpful assistant."
 MAX_NEW_TOKENS = 100
-MAX_THINK_NEW_TOKENS = 1024
+MAX_THINK_NEW_TOKENS = int(os.environ.get("EVAL_MAX_THINK_NEW_TOKENS", "1024"))
 AUX_STOP = "</aux>"
 AUX_CANDIDATE_STOP = " ;"
 HTTP_WORKERS = 16
