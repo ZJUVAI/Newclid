@@ -276,7 +276,12 @@ class BaseAgent(DeductiveAgent, ABC):
                 continue
 
             try:
-                new_problem = ctx["problem"].with_more_construction(aux_construction)
+                appended_problem = ctx["problem"].with_more_construction(aux_construction)
+                new_problem = appended_problem.renamed()
+                new_constructions = new_problem.constructions[
+                    len(ctx["problem"].constructions):
+                ]
+                renamed_construction = "; ".join(str(c) for c in new_constructions)
             except Exception as exc:
                 self._trace(
                     "candidate_build", mode=mode, depth=depth,
@@ -288,7 +293,9 @@ class BaseAgent(DeductiveAgent, ABC):
             self._trace(
                 "candidate_build", mode=mode, depth=depth,
                 request_id=result["request_id"], candidate_rank=rank,
-                construction_text=aux_construction, built=True,
+                construction_text=renamed_construction,
+                raw_construction_text=aux_construction,
+                built=True,
             )
 
             while len(pending) >= self._max_pending:
@@ -308,12 +315,14 @@ class BaseAgent(DeductiveAgent, ABC):
                 "problem": new_problem,
                 "child_aux_prefix": aux_dsl[len("<aux>"):],
                 "request_id": result["request_id"],
-                "construction_text": aux_construction,
+                "construction_text": renamed_construction,
+                "raw_construction_text": aux_construction,
             }
             self._trace(
                 "ddar_submit", mode=mode, depth=depth,
                 request_id=result["request_id"], candidate_rank=rank,
-                construction_text=aux_construction,
+                construction_text=renamed_construction,
+                raw_construction_text=aux_construction,
             )
         return False
 
@@ -350,6 +359,7 @@ class BaseAgent(DeductiveAgent, ABC):
                 request_id=info["request_id"], candidate_rank=info["rank"],
                 status=result.get("status"), elapsed_time=result.get("elapsed_time"),
                 construction_text=info.get("construction_text"),
+                raw_construction_text=info.get("raw_construction_text"),
                 error_type=result.get("error_type"), error_message=result.get("error_message"),
             )
 
