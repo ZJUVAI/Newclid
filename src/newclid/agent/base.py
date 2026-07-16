@@ -166,8 +166,19 @@ class BaseAgent(DeductiveAgent, ABC):
                     for req in requests_list
                 }
                 for future in as_completed(futures):
-                    result = future.result()
                     self._llm_calls += 1
+                    request = futures[future]
+                    try:
+                        result = future.result()
+                    except Exception as exc:
+                        last_lm_done = time.time()
+                        self._trace(
+                            "lm_error", mode=mode, depth=depth,
+                            request_id=request.get("request_id"),
+                            error_type=type(exc).__name__, error_message=str(exc),
+                        )
+                        continue
+
                     last_lm_done = float(result.get("completed_at_unix_s", time.time()))
                     self._trace(
                         "lm_result", mode=mode, depth=depth,
