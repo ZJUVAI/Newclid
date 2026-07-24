@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import time
 from abc import ABC, abstractmethod
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from itertools import islice
 from typing import TYPE_CHECKING, Any
 
 import ray
@@ -13,6 +14,7 @@ from newclid.evaluation.search_runtime import (
     run_ddar_c,
     run_ddar_remote,
     try_dsl_to_constructions,
+    try_full_aux_dsl_to_constructions,
 )
 from newclid.formulations.problem import ProblemJGEX
 from newclid.proof import ProofState
@@ -156,31 +158,84 @@ class BaseAgent(DeductiveAgent, ABC):
             pending: list[Any] = []
             meta: dict[Any, dict[str, Any]] = {}
             solved = False
+            timed_out = False
             lm_start = time.time()
             last_lm_done = lm_start
+            request_iter = iter(requests_list)
 
-            with ThreadPoolExecutor(max_workers=HTTP_WORKERS) as executor:
-                futures = {
-                    executor.submit(self.request_completions, req): req
-                    for req in requests_list
-                }
-                for future in as_completed(futures):
-                    result = future.result()
-                    self._llm_calls += 1
-                    last_lm_done = float(result.get("completed_at_unix_s", time.time()))
-                    self._trace(
-                        "lm_result", mode=mode, depth=depth,
-                        request_id=result.get("request_id"),
-                        candidate_count=len(result.get("aux_dsl_scores", {})),
+            executor = ThreadPoolExecutor(max_workers=HTTP_WORKERS)
+            futures = {
+                executor.submit(
+                    self.request_completions,
+                    {**request, "_deadline_unix_s": deadline},
+                ): (request, time.time())
+                for request in islice(request_iter, HTTP_WORKERS)
+            }
+            try:
+                while futures and not solved:
+                    remaining_s = deadline - time.time()
+                    if remaining_s <= 0:
+                        timed_out = True
+                        break
+                    done, _ = wait(
+                        futures,
+                        timeout=min(1.0, remaining_s),
+                        return_when=FIRST_COMPLETED,
                     )
-                    if self._submit(result, context, pending, meta, next_beam, last_depth, deadline, mode=mode, depth=depth):
-                        solved = True
-                        break
-                    if self._collect(pending, meta, next_beam, last_depth, deadline, mode=mode, depth=depth, block=False):
-                        solved = True
-                        break
+                    if not done:
+                        continue
+
+                    for future in done:
+                        request, request_started = futures.pop(future)
+                        self._llm_calls += 1
+                        try:
+                            result = future.result()
+                        except Exception as exc:
+                            last_lm_done = time.time()
+                            self._trace(
+                                "lm_error", mode=mode, depth=depth,
+                                request_id=request.get("request_id"),
+                                error_type=type(exc).__name__, error_message=str(exc),
+                                request_elapsed_s=round(last_lm_done - request_started, 6),
+                            )
+                        else:
+                            last_lm_done = float(result.get("completed_at_unix_s", time.time()))
+                            self._trace(
+                                "lm_result", mode=mode, depth=depth,
+                                request_id=result.get("request_id"),
+                                candidate_count=len(result.get("aux_dsl_scores", {})),
+                                request_elapsed_s=round(last_lm_done - request_started, 6),
+                            )
+                            solved = self._submit(
+                                result, context, pending, meta, next_beam, last_depth,
+                                deadline, mode=mode, depth=depth,
+                            ) or self._collect(
+                                pending, meta, next_beam, last_depth, deadline,
+                                mode=mode, depth=depth, block=False,
+                            )
+                            if solved:
+                                break
+
+                        if time.time() < deadline:
+                            try:
+                                next_request = next(request_iter)
+                            except StopIteration:
+                                pass
+                            else:
+                                futures[
+                                    executor.submit(
+                                        self.request_completions,
+                                        {**next_request, "_deadline_unix_s": deadline},
+                                    )
+                                ] = (next_request, time.time())
+            finally:
+                executor.shutdown(wait=not (solved or timed_out), cancel_futures=True)
 
             self._llm_wall += max(last_lm_done - lm_start, 0.0)
+            if timed_out:
+                self._cancel(pending)
+                self._trace("depth_end", mode=mode, depth=depth, next_frontier_size=len(next_beam), solved=False)
+                return False, "Timeout"
             if not solved:
                 solved = self._collect(pending, meta, next_beam, last_depth, deadline, mode=mode, depth=depth, block=True)
             if solved:
@@ -248,7 +303,11 @@ class BaseAgent(DeductiveAgent, ABC):
         for rank, (aux_dsl, score) in enumerate(_rank(result.get("aux_dsl_scores", {}))):
             if not aux_dsl.startswith(response_prefix):
                 continue
-            aux_construction = try_dsl_to_constructions(aux_dsl[len(response_prefix):].strip())
+            aux_body = aux_dsl[len(response_prefix):].strip()
+            if bool(getattr(self, "think", False)):
+                aux_construction = try_full_aux_dsl_to_constructions(aux_body)
+            else:
+                aux_construction = try_dsl_to_constructions(aux_body)
             model_think = aux_dsl_thinks.get(aux_dsl)
             self._trace(
                 "candidate_parse", mode=mode, depth=depth,
@@ -260,7 +319,12 @@ class BaseAgent(DeductiveAgent, ABC):
                 continue
 
             try:
-                new_problem = ctx["problem"].with_more_construction(aux_construction)
+                appended_problem = ctx["problem"].with_more_construction(aux_construction)
+                new_problem = appended_problem.renamed()
+                new_constructions = new_problem.constructions[
+                    len(ctx["problem"].constructions):
+                ]
+                renamed_construction = "; ".join(str(c) for c in new_constructions)
             except Exception as exc:
                 self._trace(
                     "candidate_build", mode=mode, depth=depth,
@@ -272,7 +336,9 @@ class BaseAgent(DeductiveAgent, ABC):
             self._trace(
                 "candidate_build", mode=mode, depth=depth,
                 request_id=result["request_id"], candidate_rank=rank,
-                construction_text=aux_construction, built=True,
+                construction_text=renamed_construction,
+                raw_construction_text=aux_construction,
+                built=True,
             )
 
             while len(pending) >= self._max_pending:
@@ -292,12 +358,14 @@ class BaseAgent(DeductiveAgent, ABC):
                 "problem": new_problem,
                 "child_aux_prefix": aux_dsl[len("<aux>"):],
                 "request_id": result["request_id"],
-                "construction_text": aux_construction,
+                "construction_text": renamed_construction,
+                "raw_construction_text": aux_construction,
             }
             self._trace(
                 "ddar_submit", mode=mode, depth=depth,
                 request_id=result["request_id"], candidate_rank=rank,
-                construction_text=aux_construction,
+                construction_text=renamed_construction,
+                raw_construction_text=aux_construction,
             )
         return False
 
@@ -334,6 +402,7 @@ class BaseAgent(DeductiveAgent, ABC):
                 request_id=info["request_id"], candidate_rank=info["rank"],
                 status=result.get("status"), elapsed_time=result.get("elapsed_time"),
                 construction_text=info.get("construction_text"),
+                raw_construction_text=info.get("raw_construction_text"),
                 error_type=result.get("error_type"), error_message=result.get("error_message"),
             )
 

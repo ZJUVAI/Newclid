@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tempfile
+import time
 import types
 import unittest
 from pathlib import Path
@@ -163,11 +164,11 @@ class Qwen3AgentTests(unittest.TestCase):
             )
 
         payload = mock_post.call_args.kwargs["json"]
-        self.assertEqual(payload["stop"], ["</aux>"])
         self.assertFalse(payload["continue_final_message"])
         self.assertTrue(payload["add_generation_prompt"])
         self.assertEqual(payload["max_tokens"], 1024)
         self.assertEqual(payload["chat_template_kwargs"], {"enable_thinking": True})
+        self.assertNotIn("stop", payload)
         self.assertNotIn("stop_token_ids", payload)
         self.assertEqual(result["aux_dsl_scores"]["<aux> x00 z : free z"], -0.2)
         self.assertEqual(result["aux_dsl_thinks"]["<aux> x00 z : free z"], "reason")
@@ -272,6 +273,47 @@ class Qwen3AgentTests(unittest.TestCase):
         self.assertEqual(result["llm_calls"], 3)
         self.assertEqual(result["ddar_calls"], 8)
         self.assertEqual(result["error"], "RuntimeError: render failed")
+
+    def test_search_ignores_single_lm_request_error(self):
+        with patch("newclid.agent.vllm._load_tokenizer", return_value=_FakeTokenizer()):
+            agent = Qwen3Agent(**_agent_kwargs())
+        agent.problemJGEX = object()
+        trace_events: list[tuple[str, dict]] = []
+
+        def fake_request_completions(request):
+            if request["request_id"] == "bad":
+                raise TimeoutError("request timed out")
+            return {
+                "request_id": request["request_id"],
+                "aux_dsl_scores": {},
+                "aux_dsl_thinks": {},
+                "completed_at_unix_s": 10.0,
+            }
+
+        with patch.object(
+            BaseAgent,
+            "_build_requests",
+            return_value=(
+                [{"request_id": "bad"}, {"request_id": "good"}],
+                {"bad": {"request": {}}, "good": {"request": {}}},
+            ),
+        ):
+            with patch.object(agent, "request_completions", side_effect=fake_request_completions):
+                with patch.object(agent, "_submit", return_value=False):
+                    with patch.object(agent, "_trace", side_effect=lambda event, **payload: trace_events.append((event, payload))):
+                        solved, error = agent._search("v1", proof=types.SimpleNamespace(), deadline=time.time() + 30)
+
+        self.assertFalse(solved)
+        self.assertEqual(error, "Tried but failed.")
+        self.assertEqual(agent._llm_calls, 2)
+        self.assertTrue(
+            any(
+                event == "lm_error"
+                and payload["request_id"] == "bad"
+                and payload["error_type"] == "TimeoutError"
+                for event, payload in trace_events
+            )
+        )
 
     def test_prepare_request_v2_reuses_root_problem_with_separator(self):
         with patch("newclid.agent.vllm._load_tokenizer", return_value=_FakeTokenizer()):

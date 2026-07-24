@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 from functools import lru_cache
+import os
 from pathlib import Path
 import time
 from typing import Any
@@ -22,7 +23,8 @@ from newclid.proof import ProofState
 
 SYSTEM_PROMPT = "You are a helpful assistant."
 MAX_NEW_TOKENS = 100
-MAX_THINK_NEW_TOKENS = 1024
+MAX_THINK_NEW_TOKENS = int(os.environ.get("EVAL_MAX_THINK_NEW_TOKENS", "1024"))
+HTTP_TIMEOUT_S = float(os.environ.get("EVAL_VLLM_HTTP_TIMEOUT", "1200"))
 AUX_STOP = "</aux>"
 AUX_CANDIDATE_STOP = " ;"
 HTTP_WORKERS = 16
@@ -34,7 +36,7 @@ def _load_tokenizer(tokenizer_name: str):
 
 
 def discover_served_model(base_url: str) -> tuple[str, list[str | None]]:
-    response = requests.get(f"{base_url.rstrip('/')}/v1/models", timeout=120.0)
+    response = requests.get(f"{base_url.rstrip('/')}/v1/models", timeout=HTTP_TIMEOUT_S)
     response.raise_for_status()
     server_models = [item.get("id") for item in response.json().get("data", [])]
     if not server_models or not server_models[0]:
@@ -147,6 +149,10 @@ class _BaseQwen3Agent(BaseAgent):
 
     def request_completions(self, request: dict[str, Any]) -> dict[str, Any]:
         generate_think = bool(getattr(self, "think", False))
+        request_timeout_s = HTTP_TIMEOUT_S
+        deadline = request.get("_deadline_unix_s")
+        if deadline is not None:
+            request_timeout_s = max(1.0, min(HTTP_TIMEOUT_S, float(deadline) - time.time()))
         payload = {
             "model": self.served_model_name,
             "messages": request["messages"],
@@ -164,14 +170,16 @@ class _BaseQwen3Agent(BaseAgent):
             "return_token_ids": True,
             "stream": False,
             "include_stop_str_in_output": False,
-            "stop": [AUX_STOP] if generate_think else [AUX_CANDIDATE_STOP],
         }
         if generate_think:
             payload["chat_template_kwargs"] = {"enable_thinking": True}
         else:
+            payload["stop"] = [AUX_CANDIDATE_STOP]
             payload["stop_token_ids"] = [self.stop_token_id]
         response = self.session.post(
-            f"{self.base_url}/v1/chat/completions", json=payload, timeout=120.0
+            f"{self.base_url}/v1/chat/completions",
+            json=payload,
+            timeout=request_timeout_s,
         )
         response.raise_for_status()
         choices = list(response.json().get("choices", []))

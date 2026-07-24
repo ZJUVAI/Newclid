@@ -105,6 +105,14 @@ def extract_tag_content(text: str, tag: str) -> str:
     return match.group(1).strip() if match else ""
 
 
+def text_after_think(text: str) -> str:
+    end_tag = "</think>"
+    end_index = text.rfind(end_tag)
+    if end_index < 0:
+        return text
+    return text[end_index + len(end_tag) :]
+
+
 def split_segments(text: str) -> list[str]:
     return [segment.strip() for segment in text.split(";") if segment.strip()]
 
@@ -320,7 +328,7 @@ def validate_sample(
 ) -> ValidationResult:
     try:
         aux_segments = extract_tag_segments(
-            sample.llm_output, "aux", strip_aux_prefix=True
+            text_after_think(sample.llm_output), "aux", strip_aux_prefix=True
         )
         if not aux_segments:
             return ValidationResult(
@@ -418,7 +426,7 @@ def collect_stats_and_sample(
                 llm_output = record["llm_output_renamed"]
                 fl_problem = record.get("fl_problem", "")
 
-                aux_segments = extract_tag_segments(llm_output, "aux")
+                aux_segments = extract_tag_segments(text_after_think(llm_output), "aux")
                 if aux_segments:
                     stats.aux_count += 1
                     combinations, segment_count, points_per_segment = parse_aux_stats(
