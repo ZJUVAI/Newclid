@@ -59,6 +59,8 @@ def test_pipeline_cli_image_render_args(
     class DummyPipeline:
         def __init__(self, **kwargs):
             captured.update(kwargs)
+            self.writer = SimpleNamespace(output_dir="./tmp-datasets")
+            self.file_prefix = "dummy"
 
         def generate(self):
             captured["generated"] = True
@@ -67,6 +69,7 @@ def test_pipeline_cli_image_render_args(
     monkeypatch.setattr(
         generation_pipeline, "load_construction_config", lambda path: None
     )
+    monkeypatch.setattr(generation_pipeline, "write_cli_args", lambda path, args: None)
     monkeypatch.setattr(sys, "argv", argv)
 
     generation_pipeline.main()
@@ -138,6 +141,60 @@ def test_problem_worker_passes_csolver_equation_flags(monkeypatch):
     assert captured["max_level"] == 77
     assert captured["kwargs"]["using_log"] is False
     assert captured["kwargs"]["using_exp"] is True
+
+
+def test_minimal_aux_search_passes_csolver_equation_flags(monkeypatch):
+    captured_kwargs = []
+
+    class DummyGoal:
+        def to_str(self):
+            return "goal"
+
+        def check(self):
+            return False
+
+    class DummyCSolver:
+        def __init__(self, problem, seed=None, solver=None, **kwargs):
+            captured_kwargs.append(kwargs)
+
+        def run(self, max_level=500):
+            return False
+
+    class DummyGeometricSolver:
+        def __init__(self, proof_state, rules, agent):
+            self.goals = [DummyGoal()]
+
+    monkeypatch.setattr("newclid.generation.worker.CSolver", DummyCSolver)
+    monkeypatch.setattr(
+        "newclid.generation.worker.GeometricSolver", DummyGeometricSolver
+    )
+    monkeypatch.setattr(
+        "newclid.generation.worker.ProofState.build_predicates",
+        staticmethod(lambda **kwargs: SimpleNamespace()),
+    )
+
+    _, timings = ProblemWorker._find_minimal_aux_clauses_new(
+        pointstr2basicstrs={},
+        basicstr2pointstrs={},
+        solver=SimpleNamespace(),
+        solver_builder=SimpleNamespace(defs={}, rules=[], seed=123),
+        goals_str=["goal"],
+        expanded_premises=[],
+        expanded_aux_groups=[[SimpleNamespace()], [SimpleNamespace()]],
+        aux_only=0,
+        rng=SimpleNamespace(random=lambda: 1.0),
+        using_log=False,
+        using_exp=True,
+    )
+
+    assert len(captured_kwargs) == 4
+    assert all(kwargs["using_log"] is False for kwargs in captured_kwargs)
+    assert all(kwargs["using_exp"] is True for kwargs in captured_kwargs)
+    assert set(timings) == {
+        "build_predicates_time",
+        "build_solver_time",
+        "run_solver_time",
+    }
 
 
 def test_problem_worker_point_mapping_uses_predicate_order():
