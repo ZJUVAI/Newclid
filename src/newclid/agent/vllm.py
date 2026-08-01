@@ -194,6 +194,38 @@ def _build_text_request_payload(
     )
 
 
+def _build_vl_text_request_payload(
+    *,
+    mode: str,
+    request_id: str,
+    problem: ProblemJGEX,
+    aux_prefix: str,
+    defs: dict,
+    root_problem_dsl: str | None,
+    decoding_size: int,
+) -> dict[str, Any]:
+    query = _query_for_mode(
+        mode=mode,
+        problem=problem,
+        defs=defs,
+        root_problem_dsl=root_problem_dsl,
+    )
+    response_prefix = _response_prefix(mode=mode, aux_prefix=aux_prefix)
+    new_point_name = get_new_point_name(problem)
+    return _make_request_dict(
+        request_id=request_id,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": query},
+            {"role": "assistant", "content": f"{response_prefix} {new_point_name} :"},
+        ],
+        query=query,
+        response_prefix=response_prefix,
+        new_point_name=new_point_name,
+        decoding_size=decoding_size,
+    )
+
+
 def _build_vl_request_payload(
     *,
     mode: str,
@@ -257,6 +289,8 @@ def _build_vl_request_payload(
 def _build_request_remote(*, agent_type: str, **kwargs):
     if agent_type == "qwen3_text":
         return _build_text_request_payload(**kwargs)
+    if agent_type == "qwen3_vl_text":
+        return _build_vl_text_request_payload(**kwargs)
     if agent_type == "qwen3_vl":
         return _build_vl_request_payload(**kwargs)
     raise ValueError(f"Unsupported request build agent_type: {agent_type}")
@@ -451,6 +485,53 @@ class Qwen3Agent(_BaseQwen3Agent):
             "decoding_size": self.decoding_size,
             "think": self.think,
         }
+
+
+class Qwen3VLTextAgent(_BaseQwen3Agent):
+    agent_name = "qwen3_vl_text"
+
+    def build_request(
+        self,
+        *,
+        mode: str,
+        depth: int,
+        request_id: str,
+        problem: ProblemJGEX,
+        aux_prefix: str,
+        proof: ProofState,
+    ) -> dict[str, Any]:
+        del depth
+        return _build_vl_text_request_payload(
+            mode=mode,
+            request_id=request_id,
+            problem=problem,
+            aux_prefix=aux_prefix,
+            defs=proof.defs,
+            root_problem_dsl=self._root_problem_dsl,
+            decoding_size=self.decoding_size,
+        )
+
+    def build_request_remote_kwargs(
+        self,
+        *,
+        mode: str,
+        depth: int,
+        request_id: str,
+        problem: ProblemJGEX,
+        aux_prefix: str,
+        proof: ProofState,
+    ) -> dict[str, Any]:
+        del depth
+        return {
+            "mode": mode,
+            "request_id": request_id,
+            "problem": problem,
+            "aux_prefix": aux_prefix,
+            "defs": self._defs_ref if self._defs_ref is not None else proof.defs,
+            "root_problem_dsl": self._root_problem_dsl,
+            "decoding_size": self.decoding_size,
+        }
+
 
 class Qwen3VLAgent(_BaseQwen3Agent):
     agent_name = "qwen3_vl"

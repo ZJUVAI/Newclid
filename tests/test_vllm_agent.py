@@ -11,6 +11,7 @@ from newclid.agent.base import BaseAgent
 from newclid.agent.vllm import (
     Qwen3Agent,
     Qwen3VLAgent,
+    Qwen3VLTextAgent,
     _extract_aux_dsl,
     _parse_scored_choices,
 )
@@ -382,19 +383,18 @@ class Qwen3AgentTests(unittest.TestCase):
 
 
 class Qwen3VLAgentTests(unittest.TestCase):
-    def test_build_requests_skips_frontier_entries_that_fail_to_render(self):
+    def test_build_requests_skips_frontier_entries_that_fail_to_render_remotely(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("newclid.agent.vllm._load_tokenizer", return_value=_FakeTokenizer()):
                 agent = Qwen3VLAgent(
                     **_agent_kwargs(),
                     search_version="v1",
                     render_root=Path(tmpdir),
-                )
+            )
             traces = []
-            with patch.object(agent, "_trace", side_effect=lambda event, **kw: traces.append((event, kw))):
-                with patch.object(
-                    agent,
-                    "build_request",
+            with patch("newclid.agent.base.ray.is_initialized", return_value=True):
+                with patch(
+                    "newclid.agent.base.ray.get",
                     side_effect=[
                         RuntimeError("bad geometry"),
                         {
@@ -404,15 +404,30 @@ class Qwen3VLAgentTests(unittest.TestCase):
                         },
                     ],
                 ):
-                    requests, context = agent._build_requests(
-                        mode="v1",
-                        depth=1,
-                        frontier=[
-                            (0.0, ((0,), object(), "")),
-                            (1.0, ((1,), object(), " x00 a : free a")),
-                        ],
-                        proof=types.SimpleNamespace(defs={}),
-                    )
+                    with patch.object(
+                        agent,
+                        "_trace",
+                        side_effect=lambda event, **kw: traces.append((event, kw)),
+                    ):
+                        with patch.object(
+                            agent,
+                            "build_request_remote_kwargs",
+                            side_effect=[{"request_id": "d1_p0"}, {"request_id": "d1_p1"}],
+                        ):
+                            with patch.object(
+                                agent,
+                                "build_request_from_remote_kwargs",
+                                side_effect=["bad-ref", "good-ref"],
+                            ):
+                                requests, context = agent._build_requests(
+                                    mode="v1",
+                                    depth=1,
+                                    frontier=[
+                                        (0.0, ((0,), object(), "")),
+                                        (1.0, ((1,), object(), " x00 a : free a")),
+                                    ],
+                                    proof=types.SimpleNamespace(defs={}),
+                                )
 
         self.assertEqual(len(requests), 1)
         self.assertEqual(requests[0]["request_id"], "d1_p1")
@@ -420,6 +435,33 @@ class Qwen3VLAgentTests(unittest.TestCase):
         self.assertEqual(traces[0][0], "request_build_error")
         self.assertEqual(traces[0][1]["error_message"], "bad geometry")
         self.assertEqual(traces[1][0], "lm_request")
+
+    def test_vl_text_build_request_uses_text_only_messages_with_vl_prefix(self):
+        with patch("newclid.agent.vllm._load_tokenizer", return_value=_FakeTokenizer()):
+            agent = Qwen3VLTextAgent(**_agent_kwargs(), search_version="v1")
+        agent.problemJGEX = object()
+        with patch("newclid.agent.vllm.problem_to_dsl", return_value="<problem> text only </problem>"):
+            with patch("newclid.agent.vllm.get_new_point_name", return_value="c"):
+                request = agent.build_request(
+                    mode="v1",
+                    depth=0,
+                    request_id="d0_proot",
+                    problem=object(),
+                    aux_prefix="",
+                    proof=types.SimpleNamespace(defs={}),
+                )
+
+        self.assertEqual(request["request_id"], "d0_proot")
+        self.assertEqual(
+            request["messages"],
+            [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "<problem> text only </problem>"},
+                {"role": "assistant", "content": "<aux> x00 c :"},
+            ],
+        )
+        self.assertNotIn("image_data_url", request)
+        self.assertEqual(request["response_prefix"], "<aux> x00")
 
     def test_prepare_request_rebuilds_proof_and_embeds_png_as_data_url(self):
         with tempfile.TemporaryDirectory() as tmpdir:

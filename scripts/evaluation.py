@@ -22,7 +22,12 @@ for path in (str(REPO_ROOT), str(SRC_ROOT)):
     if path not in sys.path:
         sys.path.insert(0, path)
 
-from newclid.agent.vllm import Qwen3Agent, Qwen3VLAgent, discover_served_model
+from newclid.agent.vllm import (
+    Qwen3Agent,
+    Qwen3VLAgent,
+    Qwen3VLTextAgent,
+    discover_served_model,
+)
 from newclid.api import GeometricSolverBuilder
 from newclid.configs import load_solver_config
 from newclid.evaluation.search_trace import TraceRun, get_git_commit, timestamp_slug
@@ -117,6 +122,8 @@ def create_agent(config: EvalConfig, *, trace_writer=None):
     }
     if config.agent_type == "qwen3_text":
         return Qwen3Agent(**common, think=config.think)
+    if config.agent_type == "qwen3_vl_text":
+        return Qwen3VLTextAgent(**common)
     if config.agent_type == "qwen3_vl":
         return Qwen3VLAgent(**common, render_root=config.render_root)
     raise ValueError(f"Unsupported agent type: {config.agent_type}")
@@ -410,7 +417,12 @@ def main() -> None:
         force=True,
     )
     parser = argparse.ArgumentParser(description="vLLM-only evaluation.")
-    parser.add_argument("--agent", type=str, required=True, choices=["qwen3_text", "qwen3_vl"])
+    parser.add_argument(
+        "--agent",
+        type=str,
+        required=True,
+        choices=["qwen3_text", "qwen3_vl", "qwen3_vl_text"],
+    )
     parser.add_argument("--problems_path", type=str, required=True)
     parser.add_argument("--vllm_base_url", type=str, default="http://127.0.0.1:8000")
     parser.add_argument("--decoding_size", type=int, default=8)
