@@ -8,6 +8,7 @@ import time
 from typing import Any
 
 import requests
+import ray
 from transformers import AutoTokenizer
 
 from newclid.agent.base import BaseAgent, RESPONSE_PREFIX
@@ -27,7 +28,8 @@ MAX_THINK_NEW_TOKENS = int(os.environ.get("EVAL_MAX_THINK_NEW_TOKENS", "1024"))
 HTTP_TIMEOUT_S = float(os.environ.get("EVAL_VLLM_HTTP_TIMEOUT", "1200"))
 AUX_STOP = "</aux>"
 AUX_CANDIDATE_STOP = " ;"
-HTTP_WORKERS = 16
+HTTP_WORKERS = max(1, int(os.environ.get("EVAL_HTTP_WORKERS", "16")))
+VL_BUILD_BACKEND = os.environ.get("EVAL_VL_BUILD_BACKEND", "thread").strip().lower()
 
 
 @lru_cache(maxsize=8)
@@ -95,6 +97,77 @@ def _parse_scored_choices(
             aux_dsl_scores[aux_dsl] = score
             aux_dsl_thinks[aux_dsl] = model_think
     return aux_dsl_scores, aux_dsl_thinks
+
+
+def _response_prefix(*, mode: str, aux_prefix: str) -> str:
+    if mode != "v2":
+        return RESPONSE_PREFIX
+    separator = " ;" if aux_prefix.strip() else ""
+    return f"<aux>{aux_prefix}{separator} x00"
+
+
+def _build_vl_request_payload(
+    *,
+    mode: str,
+    depth: int,
+    request_id: str,
+    problem: ProblemJGEX,
+    aux_prefix: str,
+    defs: dict,
+    root_problem_dsl: str | None,
+    render_root: str | Path,
+    decoding_size: int,
+) -> dict[str, Any]:
+    if mode == "v2":
+        if root_problem_dsl is None:
+            raise ValueError("Root DSL is unavailable.")
+        query = root_problem_dsl
+    else:
+        query = problem_to_dsl(problem, defs)
+
+    current_proof = build_problem_proof(problem, defs)
+    render_root = Path(render_root)
+    render_root.mkdir(parents=True, exist_ok=True)
+    png_path = render_root / f"d{depth}_{request_id}.png"
+    save_figure_as_png(
+        draw_clause_figure(
+            current_proof, problem, None, current_proof.rng,
+            draw_annotations=True, theme=None,
+        ),
+        png_path=str(png_path),
+        img_pixels=512,
+        direct_png=True,
+    )
+    image_url = "data:image/png;base64," + base64.b64encode(
+        png_path.read_bytes()
+    ).decode("ascii")
+    response_prefix = _response_prefix(mode=mode, aux_prefix=aux_prefix)
+    new_point_name = get_new_point_name(problem)
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {
+            "role": "user",
+            "content": [
+                {"type": "image_url", "image_url": {"url": image_url}},
+                {"type": "text", "text": query},
+            ],
+        },
+        {"role": "assistant", "content": f"{response_prefix} {new_point_name} :"},
+    ]
+    return {
+        "request_id": request_id,
+        "messages": messages,
+        "query": query,
+        "new_point_name": new_point_name,
+        "response_prefix": response_prefix,
+        "decoding_size": decoding_size,
+        "image_data_url": image_url,
+    }
+
+
+@ray.remote(num_cpus=1)
+def _build_vl_request_remote(**kwargs):
+    return _build_vl_request_payload(**kwargs)
 
 
 class _BaseQwen3Agent(BaseAgent):
@@ -308,39 +381,79 @@ class Qwen3VLAgent(_BaseQwen3Agent):
         aux_prefix: str,
         proof: ProofState,
     ) -> dict[str, Any]:
-        query = self._get_query(mode, problem, proof)
-        current_proof = build_problem_proof(problem, proof.defs)
-        png_path = self.render_root / f"d{depth}_{request_id}.png"
-        save_figure_as_png(
-            draw_clause_figure(
-                current_proof, problem, None, current_proof.rng,
-                draw_annotations=True, theme=None,
-            ),
-            png_path=str(png_path),
-            img_pixels=512,
-            direct_png=True,
-        )
-        image_url = "data:image/png;base64," + base64.b64encode(
-            png_path.read_bytes()
-        ).decode("ascii")
-        response_prefix = self.response_prefix(mode=mode, aux_prefix=aux_prefix)
-        new_point_name = get_new_point_name(problem)
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image_url", "image_url": {"url": image_url}},
-                    {"type": "text", "text": query},
-                ],
-            },
-            {"role": "assistant", "content": f"{response_prefix} {new_point_name} :"},
-        ]
-        return self._make_request_dict(
+        return _build_vl_request_payload(
+            mode=mode,
+            depth=depth,
             request_id=request_id,
-            messages=messages,
-            query=query,
-            response_prefix=response_prefix,
-            new_point_name=new_point_name,
-            extra={"image_data_url": image_url},
+            problem=problem,
+            aux_prefix=aux_prefix,
+            defs=proof.defs,
+            root_problem_dsl=self._root_problem_dsl,
+            render_root=self.render_root,
+            decoding_size=self.decoding_size,
         )
+
+    def _build_requests(
+        self,
+        mode: str,
+        depth: int,
+        frontier: list[tuple[float, tuple[tuple[int, ...], ProblemJGEX, str]]],
+        proof: ProofState,
+    ) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
+        if VL_BUILD_BACKEND != "ray" or not ray.is_initialized():
+            return super()._build_requests(mode, depth, frontier, proof)
+
+        entries: list[dict[str, Any]] = []
+        refs = []
+        defs_ref = self._defs_ref if self._defs_ref is not None else ray.put(proof.defs)
+        remote_builder = _build_vl_request_remote.options(num_cpus=1)
+
+        for prev_score, (path_key, problem, aux_prefix) in frontier:
+            suffix = "root" if not path_key else "-".join(map(str, path_key))
+            request_id = f"d{depth}_p{suffix}"
+            entry = {
+                "prev_score": prev_score,
+                "path_key": path_key,
+                "problem": problem,
+                "request_id": request_id,
+            }
+            entries.append(entry)
+            refs.append(
+                remote_builder.remote(
+                    mode=mode,
+                    depth=depth,
+                    request_id=request_id,
+                    problem=problem,
+                    aux_prefix=aux_prefix,
+                    defs=defs_ref,
+                    root_problem_dsl=self._root_problem_dsl,
+                    render_root=str(self.render_root),
+                    decoding_size=self.decoding_size,
+                )
+            )
+
+        requests_list: list[dict[str, Any]] = []
+        context: dict[str, dict[str, Any]] = {}
+        for entry, ref in zip(entries, refs):
+            request_id = entry["request_id"]
+            try:
+                request = ray.get(ref)
+            except Exception as exc:
+                self._trace(
+                    "request_build_error", mode=mode, depth=depth, request_id=request_id,
+                    error_type=type(exc).__name__, error_message=str(exc),
+                )
+                continue
+            requests_list.append(request)
+            context[request_id] = {
+                "prev_score": entry["prev_score"],
+                "path_key": entry["path_key"],
+                "problem": entry["problem"],
+                "request": request,
+            }
+            self._trace(
+                "lm_request", mode=mode, depth=depth, request_id=request_id,
+                response_prefix=request.get("response_prefix"),
+                new_point_name=request.get("new_point_name"),
+            )
+        return requests_list, context

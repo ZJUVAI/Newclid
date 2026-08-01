@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import time
 from abc import ABC, abstractmethod
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
@@ -23,12 +24,21 @@ if TYPE_CHECKING:
     from newclid.formulations.rule import Rule
 
 
-HTTP_WORKERS = 16
+HTTP_WORKERS = max(1, int(os.environ.get("EVAL_HTTP_WORKERS", "16")))
 RESPONSE_PREFIX = "<aux> x00"
 
 
 def _rank(aux_dsl_scores: dict[str, float]) -> list[tuple[str, float]]:
     return sorted(aux_dsl_scores.items(), key=lambda item: item[1], reverse=True)
+
+
+def _build_request_workers() -> int:
+    configured = os.environ.get("EVAL_BUILD_REQUEST_WORKERS")
+    if configured:
+        return max(1, int(configured))
+    if ray.is_initialized():
+        return max(1, int(ray.cluster_resources().get("CPU", HTTP_WORKERS)))
+    return HTTP_WORKERS
 
 
 class BaseAgent(DeductiveAgent, ABC):
@@ -188,6 +198,7 @@ class BaseAgent(DeductiveAgent, ABC):
                     for future in done:
                         request, request_started = futures.pop(future)
                         self._llm_calls += 1
+                        result: dict[str, Any] | None = None
                         try:
                             result = future.result()
                         except Exception as exc:
@@ -206,17 +217,8 @@ class BaseAgent(DeductiveAgent, ABC):
                                 candidate_count=len(result.get("aux_dsl_scores", {})),
                                 request_elapsed_s=round(last_lm_done - request_started, 6),
                             )
-                            solved = self._submit(
-                                result, context, pending, meta, next_beam, last_depth,
-                                deadline, mode=mode, depth=depth,
-                            ) or self._collect(
-                                pending, meta, next_beam, last_depth, deadline,
-                                mode=mode, depth=depth, block=False,
-                            )
-                            if solved:
-                                break
 
-                        if time.time() < deadline:
+                        if time.time() < deadline and not solved:
                             try:
                                 next_request = next(request_iter)
                             except StopIteration:
@@ -228,6 +230,17 @@ class BaseAgent(DeductiveAgent, ABC):
                                         {**next_request, "_deadline_unix_s": deadline},
                                     )
                                 ] = (next_request, time.time())
+
+                        if result is not None:
+                            solved = self._submit(
+                                result, context, pending, meta, next_beam, last_depth,
+                                deadline, mode=mode, depth=depth,
+                            ) or self._collect(
+                                pending, meta, next_beam, last_depth, deadline,
+                                mode=mode, depth=depth, block=False,
+                            )
+                            if solved:
+                                break
             finally:
                 executor.shutdown(wait=not (solved or timed_out), cancel_futures=True)
 
@@ -255,9 +268,8 @@ class BaseAgent(DeductiveAgent, ABC):
         frontier: list[tuple[float, tuple[tuple[int, ...], ProblemJGEX, str]]],
         proof: ProofState,
     ) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
-        requests_list: list[dict[str, Any]] = []
-        context: dict[str, dict[str, Any]] = {}
-        for prev_score, (path_key, problem, aux_prefix) in frontier:
+        def _build_one(entry: tuple[float, tuple[tuple[int, ...], ProblemJGEX, str]]):
+            prev_score, (path_key, problem, aux_prefix) = entry
             suffix = "root" if not path_key else "-".join(map(str, path_key))
             request_id = f"d{depth}_p{suffix}"
             try:
@@ -266,15 +278,46 @@ class BaseAgent(DeductiveAgent, ABC):
                     problem=problem, aux_prefix=aux_prefix, proof=proof,
                 )
             except Exception as exc:
+                return {
+                    "prev_score": prev_score,
+                    "path_key": path_key,
+                    "problem": problem,
+                    "request_id": request_id,
+                    "error": exc,
+                }
+            return {
+                "prev_score": prev_score,
+                "path_key": path_key,
+                "problem": problem,
+                "request_id": request_id,
+                "request": request,
+            }
+
+        max_workers = max(1, min(_build_request_workers(), len(frontier)))
+        if max_workers == 1:
+            built_entries = [_build_one(entry) for entry in frontier]
+        else:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                built_entries = list(executor.map(_build_one, frontier))
+
+        requests_list: list[dict[str, Any]] = []
+        context: dict[str, dict[str, Any]] = {}
+        for built in built_entries:
+            request_id = built["request_id"]
+            error = built.get("error")
+            if error is not None:
                 self._trace(
                     "request_build_error", mode=mode, depth=depth, request_id=request_id,
-                    error_type=type(exc).__name__, error_message=str(exc),
+                    error_type=type(error).__name__, error_message=str(error),
                 )
                 continue
+            request = built["request"]
             requests_list.append(request)
             context[request_id] = {
-                "prev_score": prev_score, "path_key": path_key,
-                "problem": problem, "request": request,
+                "prev_score": built["prev_score"],
+                "path_key": built["path_key"],
+                "problem": built["problem"],
+                "request": request,
             }
             self._trace(
                 "lm_request", mode=mode, depth=depth, request_id=request_id,
