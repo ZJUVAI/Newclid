@@ -221,6 +221,8 @@ class ProblemWorker:
                     img,
                     aux_only,
                     seed,
+                    using_log,
+                    using_exp,
                 )
                 generated_data.extend(data)
             process_goal_time = time.time() - process_goal_time
@@ -462,6 +464,8 @@ class ProblemWorker:
         expanded_aux_groups,
         aux_only,
         rng,
+        using_log=True,
+        using_exp=False,
     ):
         """Find minimal auxiliary clause set"""
         results = []
@@ -488,7 +492,12 @@ class ProblemWorker:
         timings["build_solver_time"] = time.time() - t0
 
         t0 = time.time()
-        csolver_no_aux = CSolver(problem="", solver=solver_no_aux)
+        csolver_no_aux = CSolver(
+            problem="",
+            solver=solver_no_aux,
+            using_log=using_log,
+            using_exp=using_exp,
+        )
         csolver_no_aux.run()
         timings["run_solver_time"] = time.time() - t0
 
@@ -526,7 +535,12 @@ class ProblemWorker:
             )
             timings["build_solver_time"] += time.time() - t0
 
-            csolver_all_aux = CSolver(problem="", solver=solver_all_aux)
+            csolver_all_aux = CSolver(
+                problem="",
+                solver=solver_all_aux,
+                using_log=using_log,
+                using_exp=using_exp,
+            )
             t0 = time.time()
             csolver_all_aux.run()
             timings["run_solver_time"] += time.time() - t0
@@ -616,7 +630,12 @@ class ProblemWorker:
                 timings["build_solver_time"] += time.time() - t0
 
                 t0 = time.time()
-                csolver_test = CSolver(problem="", solver=solver_test)
+                csolver_test = CSolver(
+                    problem="",
+                    solver=solver_test,
+                    using_log=using_log,
+                    using_exp=using_exp,
+                )
                 csolver_test.run()
                 timings["run_solver_time"] += time.time() - t0
 
@@ -695,7 +714,12 @@ class ProblemWorker:
             )
             timings["build_solver_time"] += time.time() - t0
 
-            csolver_all_aux = CSolver(problem="", solver=solver_all_aux)
+            csolver_all_aux = CSolver(
+                problem="",
+                solver=solver_all_aux,
+                using_log=using_log,
+                using_exp=using_exp,
+            )
             t0 = time.time()
             csolver_all_aux.run()
             timings["run_solver_time"] += time.time() - t0
@@ -729,6 +753,8 @@ class ProblemWorker:
         img,
         aux_only,
         seed,
+        using_log=True,
+        using_exp=False,
     ):
         """Process a single goal"""
 
@@ -783,6 +809,8 @@ class ProblemWorker:
             expanded_aux_groups,
             aux_only,
             rng,
+            using_log=using_log,
+            using_exp=using_exp,
         )
 
         for res in res_list:

@@ -6,8 +6,10 @@ import hashlib
 import logging
 import os
 import re
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from fractions import Fraction
+from multiprocessing import get_context
 from threading import Lock
 from typing import Any, Optional
 
@@ -84,6 +86,15 @@ def _resolve_reward_value(
     return float(env_value)
 
 
+def _resolve_cpu_workers(explicit_value: Optional[int]) -> int:
+    value = explicit_value
+    if value is None:
+        value = int(os.getenv("NEWCLID_GRPO_CPU_WORKERS", "1"))
+    if value < 1:
+        raise ValueError("GRPO reward CPU workers must be at least 1.")
+    return value
+
+
 class AuxRewardEvaluator:
     """Evaluate an aux completion against the geometric engine."""
 
@@ -128,15 +139,19 @@ class AuxRewardEvaluator:
     @property
     def defs(self) -> dict[str, DefinitionJGEX]:
         if self._defs is None:
-            self._defs = DefinitionJGEX.to_dict(
-                DefinitionJGEX.parse_txt_file(default_defs_path())
-            )
+            with self._cache_lock:
+                if self._defs is None:
+                    self._defs = DefinitionJGEX.to_dict(
+                        DefinitionJGEX.parse_txt_file(default_defs_path())
+                    )
         return self._defs
 
     @property
     def rules(self) -> list[Rule]:
         if self._rules is None:
-            self._rules = Rule.parse_txt_file(default_rules_path())
+            with self._cache_lock:
+                if self._rules is None:
+                    self._rules = Rule.parse_txt_file(default_rules_path())
         return self._rules
 
     def evaluate(self, completion: Any, problem_dsl: str) -> AuxEvaluationResult:
@@ -313,13 +328,51 @@ class AuxRewardEvaluator:
         return goals
 
 
+_WORKER_EVALUATOR: Optional[AuxRewardEvaluator] = None
+
+
+def _initialize_reward_worker(evaluator_kwargs: dict[str, Any]) -> None:
+    global _WORKER_EVALUATOR
+    _WORKER_EVALUATOR = AuxRewardEvaluator(**evaluator_kwargs)
+
+
+def _evaluate_reward_worker(
+    evaluation_input: tuple[Any, str],
+) -> AuxEvaluationResult:
+    if _WORKER_EVALUATOR is None:
+        raise RuntimeError("GRPO reward worker was not initialized.")
+    return _WORKER_EVALUATOR.evaluate(*evaluation_input)
+
+
 class AuxReward:
     """Adapter around the evaluator for environments without SWIFT base types."""
 
     def __init__(self, **kwargs) -> None:
         # Filter out SWIFT-specific kwargs that AuxRewardEvaluator doesn't accept
         kwargs.pop("args", None)
+        self.cpu_workers = _resolve_cpu_workers(kwargs.pop("cpu_workers", None))
         self.evaluator = AuxRewardEvaluator(**kwargs)
+        self._executor = (
+            ProcessPoolExecutor(
+                max_workers=self.cpu_workers,
+                mp_context=get_context("spawn"),
+                initializer=_initialize_reward_worker,
+                initargs=(
+                    {
+                        "solved_reward": self.evaluator.solved_reward,
+                        "valid_reward": self.evaluator.valid_reward,
+                        "invalid_build_reward": self.evaluator.invalid_build_reward,
+                        "invalid_format_reward": self.evaluator.invalid_format_reward,
+                        "engine_error_reward": self.evaluator.engine_error_reward,
+                        "build_max_attempts": self.evaluator.build_max_attempts,
+                        "ddar_max_level": self.evaluator.ddar_max_level,
+                        "random_seed": self.evaluator.random_seed,
+                    },
+                ),
+            )
+            if self.cpu_workers > 1
+            else None
+        )
 
     def evaluate_batch(
         self, completions, fl_problem=None, **kwargs
@@ -340,10 +393,24 @@ class AuxReward:
         if len(problem_texts) != len(completions):
             raise ValueError("`fl_problem` must align with completions.")
 
-        results = []
-        for completion, sample_problem_text in zip(completions, problem_texts):
-            results.append(self.evaluator.evaluate(completion, sample_problem_text))
-        return results
+        evaluation_inputs = zip(completions, problem_texts)
+        if self._executor is None:
+            return [
+                self.evaluator.evaluate(completion, sample_problem_text)
+                for completion, sample_problem_text in evaluation_inputs
+            ]
+
+        return list(
+            self._executor.map(
+                _evaluate_reward_worker,
+                evaluation_inputs,
+            )
+        )
+
+    def close(self) -> None:
+        if self._executor is not None:
+            self._executor.shutdown()
+            self._executor = None
 
     def __call__(self, completions, fl_problem=None, **kwargs) -> list[float]:
         return [

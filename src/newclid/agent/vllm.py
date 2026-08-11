@@ -8,6 +8,7 @@ import time
 from typing import Any
 
 import requests
+import ray
 from transformers import AutoTokenizer
 
 from newclid.agent.base import BaseAgent, RESPONSE_PREFIX
@@ -27,7 +28,7 @@ MAX_THINK_NEW_TOKENS = int(os.environ.get("EVAL_MAX_THINK_NEW_TOKENS", "1024"))
 HTTP_TIMEOUT_S = float(os.environ.get("EVAL_VLLM_HTTP_TIMEOUT", "1200"))
 AUX_STOP = "</aux>"
 AUX_CANDIDATE_STOP = " ;"
-HTTP_WORKERS = 16
+HTTP_WORKERS = max(1, int(os.environ.get("EVAL_HTTP_WORKERS", "16")))
 
 
 @lru_cache(maxsize=8)
@@ -95,6 +96,204 @@ def _parse_scored_choices(
             aux_dsl_scores[aux_dsl] = score
             aux_dsl_thinks[aux_dsl] = model_think
     return aux_dsl_scores, aux_dsl_thinks
+
+
+def _response_prefix(*, mode: str, aux_prefix: str) -> str:
+    if mode != "v2":
+        return RESPONSE_PREFIX
+    separator = " ;" if aux_prefix.strip() else ""
+    return f"<aux>{aux_prefix}{separator} x00"
+
+
+def _query_for_mode(
+    *,
+    mode: str,
+    problem: ProblemJGEX,
+    defs: dict,
+    root_problem_dsl: str | None,
+) -> str:
+    if mode == "v2":
+        if root_problem_dsl is None:
+            raise ValueError("Root DSL is unavailable.")
+        return root_problem_dsl
+    return problem_to_dsl(problem, defs)
+
+
+def _make_request_dict(
+    *,
+    request_id: str,
+    messages: list[dict[str, Any]],
+    query: str,
+    response_prefix: str,
+    new_point_name: str,
+    decoding_size: int,
+    extra: dict | None = None,
+) -> dict[str, Any]:
+    result = {
+        "request_id": request_id,
+        "messages": messages,
+        "query": query,
+        "new_point_name": new_point_name,
+        "response_prefix": response_prefix,
+        "decoding_size": decoding_size,
+    }
+    if extra:
+        result.update(extra)
+    return result
+
+
+def _build_text_request_payload(
+    *,
+    mode: str,
+    request_id: str,
+    problem: ProblemJGEX,
+    aux_prefix: str,
+    defs: dict,
+    root_problem_dsl: str | None,
+    decoding_size: int,
+    think: bool,
+) -> dict[str, Any]:
+    if think:
+        query = problem_to_dsl(problem, defs)
+    else:
+        query = _query_for_mode(
+            mode=mode,
+            problem=problem,
+            defs=defs,
+            root_problem_dsl=root_problem_dsl,
+        )
+    response_prefix = _response_prefix(mode=mode, aux_prefix=aux_prefix)
+    if think:
+        return _make_request_dict(
+            request_id=request_id,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": query},
+            ],
+            query=query,
+            response_prefix=RESPONSE_PREFIX,
+            new_point_name="",
+            decoding_size=decoding_size,
+        )
+
+    new_point_name = get_new_point_name(problem)
+    return _make_request_dict(
+        request_id=request_id,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": query},
+            {
+                "role": "assistant",
+                "content": f"<think>\n\n</think>\n\n{response_prefix} {new_point_name} :",
+            },
+        ],
+        query=query,
+        response_prefix=response_prefix,
+        new_point_name=new_point_name,
+        decoding_size=decoding_size,
+    )
+
+
+def _build_vl_text_request_payload(
+    *,
+    mode: str,
+    request_id: str,
+    problem: ProblemJGEX,
+    aux_prefix: str,
+    defs: dict,
+    root_problem_dsl: str | None,
+    decoding_size: int,
+) -> dict[str, Any]:
+    query = _query_for_mode(
+        mode=mode,
+        problem=problem,
+        defs=defs,
+        root_problem_dsl=root_problem_dsl,
+    )
+    response_prefix = _response_prefix(mode=mode, aux_prefix=aux_prefix)
+    new_point_name = get_new_point_name(problem)
+    return _make_request_dict(
+        request_id=request_id,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": query},
+            {"role": "assistant", "content": f"{response_prefix} {new_point_name} :"},
+        ],
+        query=query,
+        response_prefix=response_prefix,
+        new_point_name=new_point_name,
+        decoding_size=decoding_size,
+    )
+
+
+def _build_vl_request_payload(
+    *,
+    mode: str,
+    depth: int,
+    request_id: str,
+    problem: ProblemJGEX,
+    aux_prefix: str,
+    defs: dict,
+    root_problem_dsl: str | None,
+    render_root: str | Path,
+    decoding_size: int,
+) -> dict[str, Any]:
+    query = _query_for_mode(
+        mode=mode,
+        problem=problem,
+        defs=defs,
+        root_problem_dsl=root_problem_dsl,
+    )
+
+    current_proof = build_problem_proof(problem, defs)
+    render_root = Path(render_root)
+    render_root.mkdir(parents=True, exist_ok=True)
+    png_path = render_root / f"d{depth}_{request_id}.png"
+    save_figure_as_png(
+        draw_clause_figure(
+            current_proof, problem, None, current_proof.rng,
+            draw_annotations=True, theme=None,
+        ),
+        png_path=str(png_path),
+        img_pixels=512,
+        direct_png=True,
+    )
+    image_url = "data:image/png;base64," + base64.b64encode(
+        png_path.read_bytes()
+    ).decode("ascii")
+    response_prefix = _response_prefix(mode=mode, aux_prefix=aux_prefix)
+    new_point_name = get_new_point_name(problem)
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {
+            "role": "user",
+            "content": [
+                {"type": "image_url", "image_url": {"url": image_url}},
+                {"type": "text", "text": query},
+            ],
+        },
+        {"role": "assistant", "content": f"{response_prefix} {new_point_name} :"},
+    ]
+    return _make_request_dict(
+        request_id=request_id,
+        messages=messages,
+        query=query,
+        new_point_name=new_point_name,
+        response_prefix=response_prefix,
+        decoding_size=decoding_size,
+        extra={"image_data_url": image_url},
+    )
+
+
+@ray.remote(num_cpus=1)
+def _build_request_remote(*, agent_type: str, **kwargs):
+    if agent_type == "qwen3_text":
+        return _build_text_request_payload(**kwargs)
+    if agent_type == "qwen3_vl_text":
+        return _build_vl_text_request_payload(**kwargs)
+    if agent_type == "qwen3_vl":
+        return _build_vl_request_payload(**kwargs)
+    raise ValueError(f"Unsupported request build agent_type: {agent_type}")
 
 
 class _BaseQwen3Agent(BaseAgent):
@@ -227,6 +426,9 @@ class _BaseQwen3Agent(BaseAgent):
             result.update(extra)
         return result
 
+    def build_request_from_remote_kwargs(self, kwargs: dict[str, Any]):
+        return _build_request_remote.remote(agent_type=self.agent_name, **kwargs)
+
 
 class Qwen3Agent(_BaseQwen3Agent):
     agent_name = "qwen3_text"
@@ -251,39 +453,85 @@ class Qwen3Agent(_BaseQwen3Agent):
         proof: ProofState,
     ) -> dict[str, Any]:
         del depth
-        if self.think:
-            query = problem_to_dsl(problem, proof.defs)
-        else:
-            query = self._get_query(mode, problem, proof)
-        response_prefix = self.response_prefix(mode=mode, aux_prefix=aux_prefix)
-        if self.think:
-            return self._make_request_dict(
-                request_id=request_id,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": query},
-                ],
-                query=query,
-                response_prefix=RESPONSE_PREFIX,
-                new_point_name="",
-            )
-        new_point_name = get_new_point_name(problem)
-        return self._make_request_dict(
+        return _build_text_request_payload(
+            mode=mode,
             request_id=request_id,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": query},
-                {
-                    "role": "assistant",
-                    "content": (
-                        f"<think>\n\n</think>\n\n{response_prefix} {new_point_name} :"
-                    ),
-                },
-            ],
-            query=query,
-            response_prefix=response_prefix,
-            new_point_name=new_point_name,
+            problem=problem,
+            aux_prefix=aux_prefix,
+            defs=proof.defs,
+            root_problem_dsl=self._root_problem_dsl,
+            decoding_size=self.decoding_size,
+            think=self.think,
         )
+
+    def build_request_remote_kwargs(
+        self,
+        *,
+        mode: str,
+        depth: int,
+        request_id: str,
+        problem: ProblemJGEX,
+        aux_prefix: str,
+        proof: ProofState,
+    ) -> dict[str, Any]:
+        del depth
+        return {
+            "mode": mode,
+            "request_id": request_id,
+            "problem": problem,
+            "aux_prefix": aux_prefix,
+            "defs": self._defs_ref if self._defs_ref is not None else proof.defs,
+            "root_problem_dsl": self._root_problem_dsl,
+            "decoding_size": self.decoding_size,
+            "think": self.think,
+        }
+
+
+class Qwen3VLTextAgent(_BaseQwen3Agent):
+    agent_name = "qwen3_vl_text"
+
+    def build_request(
+        self,
+        *,
+        mode: str,
+        depth: int,
+        request_id: str,
+        problem: ProblemJGEX,
+        aux_prefix: str,
+        proof: ProofState,
+    ) -> dict[str, Any]:
+        del depth
+        return _build_vl_text_request_payload(
+            mode=mode,
+            request_id=request_id,
+            problem=problem,
+            aux_prefix=aux_prefix,
+            defs=proof.defs,
+            root_problem_dsl=self._root_problem_dsl,
+            decoding_size=self.decoding_size,
+        )
+
+    def build_request_remote_kwargs(
+        self,
+        *,
+        mode: str,
+        depth: int,
+        request_id: str,
+        problem: ProblemJGEX,
+        aux_prefix: str,
+        proof: ProofState,
+    ) -> dict[str, Any]:
+        del depth
+        return {
+            "mode": mode,
+            "request_id": request_id,
+            "problem": problem,
+            "aux_prefix": aux_prefix,
+            "defs": self._defs_ref if self._defs_ref is not None else proof.defs,
+            "root_problem_dsl": self._root_problem_dsl,
+            "decoding_size": self.decoding_size,
+        }
+
 
 class Qwen3VLAgent(_BaseQwen3Agent):
     agent_name = "qwen3_vl"
@@ -308,39 +556,36 @@ class Qwen3VLAgent(_BaseQwen3Agent):
         aux_prefix: str,
         proof: ProofState,
     ) -> dict[str, Any]:
-        query = self._get_query(mode, problem, proof)
-        current_proof = build_problem_proof(problem, proof.defs)
-        png_path = self.render_root / f"d{depth}_{request_id}.png"
-        save_figure_as_png(
-            draw_clause_figure(
-                current_proof, problem, None, current_proof.rng,
-                draw_annotations=True, theme=None,
-            ),
-            png_path=str(png_path),
-            img_pixels=512,
-            direct_png=True,
-        )
-        image_url = "data:image/png;base64," + base64.b64encode(
-            png_path.read_bytes()
-        ).decode("ascii")
-        response_prefix = self.response_prefix(mode=mode, aux_prefix=aux_prefix)
-        new_point_name = get_new_point_name(problem)
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image_url", "image_url": {"url": image_url}},
-                    {"type": "text", "text": query},
-                ],
-            },
-            {"role": "assistant", "content": f"{response_prefix} {new_point_name} :"},
-        ]
-        return self._make_request_dict(
+        return _build_vl_request_payload(
+            mode=mode,
+            depth=depth,
             request_id=request_id,
-            messages=messages,
-            query=query,
-            response_prefix=response_prefix,
-            new_point_name=new_point_name,
-            extra={"image_data_url": image_url},
+            problem=problem,
+            aux_prefix=aux_prefix,
+            defs=proof.defs,
+            root_problem_dsl=self._root_problem_dsl,
+            render_root=self.render_root,
+            decoding_size=self.decoding_size,
         )
+
+    def build_request_remote_kwargs(
+        self,
+        *,
+        mode: str,
+        depth: int,
+        request_id: str,
+        problem: ProblemJGEX,
+        aux_prefix: str,
+        proof: ProofState,
+    ) -> dict[str, Any]:
+        return {
+            "mode": mode,
+            "depth": depth,
+            "request_id": request_id,
+            "problem": problem,
+            "aux_prefix": aux_prefix,
+            "defs": self._defs_ref if self._defs_ref is not None else proof.defs,
+            "root_problem_dsl": self._root_problem_dsl,
+            "render_root": str(self.render_root),
+            "decoding_size": self.decoding_size,
+        }

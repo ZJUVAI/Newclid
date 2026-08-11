@@ -87,6 +87,12 @@ def test_search_submit_renames_whole_problem_before_ddar(monkeypatch):
         def build_request(self, **kwargs):
             return {}
 
+        def build_request_remote_kwargs(self, **kwargs):
+            return {}
+
+        def build_request_from_remote_kwargs(self, kwargs):
+            return {}
+
         def request_completions(self, request):
             return {}
 

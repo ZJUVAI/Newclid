@@ -14,8 +14,12 @@ TOP_K="${TOP_K:-}"
 TOP_P="${TOP_P:-}"
 MAX_COMPLETION_LENGTH="${MAX_COMPLETION_LENGTH:-}"
 BETA="${BETA:-}"
-REWARD_LOG_INTERVAL="${REWARD_LOG_INTERVAL:-50}"
+REWARD_LOG_INTERVAL="${REWARD_LOG_INTERVAL:-1}"
 REWARD_BREAKDOWN_FILENAME="${REWARD_BREAKDOWN_FILENAME:-reward_breakdown.jsonl}"
+REWARD_CPU_WORKERS="${REWARD_CPU_WORKERS:-1}"
+LOG_COMPLETIONS="${LOG_COMPLETIONS:-true}"
+WANDB_LOG_UNIQUE_PROMPTS="${WANDB_LOG_UNIQUE_PROMPTS:-false}"
+LOGGING_STEPS="${LOGGING_STEPS:-1}"
 
 # Get the directory of this script and use venv swift
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -26,6 +30,8 @@ mkdir -p "$OUTPUT_DIR"
 
 export NEWCLID_GRPO_REWARD_LOG_INTERVAL="$REWARD_LOG_INTERVAL"
 export NEWCLID_GRPO_REWARD_BREAKDOWN_PATH="$OUTPUT_DIR/$REWARD_BREAKDOWN_FILENAME"
+export NEWCLID_GRPO_CPU_WORKERS="$REWARD_CPU_WORKERS"
+export LOG_COMPLETIONS
 
 METADATA_PATH="$OUTPUT_DIR/run_metadata.json"
 "$PYTHON_BIN" - <<'PY' "$DATASET_PATH" "$OUTPUT_DIR" "$METADATA_PATH"
@@ -61,6 +67,8 @@ metadata = {
     "beta": os.getenv("BETA") or None,
     "reward_log_interval": os.getenv("NEWCLID_GRPO_REWARD_LOG_INTERVAL"),
     "reward_breakdown_path": os.getenv("NEWCLID_GRPO_REWARD_BREAKDOWN_PATH"),
+    "reward_cpu_workers": os.getenv("NEWCLID_GRPO_CPU_WORKERS"),
+    "log_completions": os.getenv("LOG_COMPLETIONS"),
     "reward_config": {
         "solved_reward": os.getenv("NEWCLID_GRPO_SOLVED_REWARD"),
         "valid_reward": os.getenv("NEWCLID_GRPO_VALID_REWARD"),
@@ -108,6 +116,9 @@ fi
     --dataset "$DATASET_PATH" \
     --external_plugins scripts/grpo/plugin.py \
     --reward_funcs aux_reward \
+    --log_completions "$LOG_COMPLETIONS" \
+    --wandb_log_unique_prompts "$WANDB_LOG_UNIQUE_PROMPTS" \
+    --logging_steps "$LOGGING_STEPS" \
     --split_dataset_ratio 0 \
     --system 'You are a helpful assistant.' \
     --max_length 2048 \
