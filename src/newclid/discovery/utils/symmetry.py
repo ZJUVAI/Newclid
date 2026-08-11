@@ -25,8 +25,8 @@ def compare_args(arg1: str, arg2: str) -> int:
 # 谓词 → 对称性类型 查表
 # ---------------------------------------------------------------------------
 
-_UNORDERED: frozenset[str] = frozenset({"coll", "cyclic"})
-_SWAP_PAIRS: frozenset[str] = frozenset({"cong", "para", "perp", "eqpoint"})
+_UNORDERED: frozenset[str] = frozenset({"coll", "ncoll", "cyclic"})
+_SWAP_PAIRS: frozenset[str] = frozenset({"cong", "para", "npara", "perp", "nperp", "eqpoint"})
 _PREPARSE: frozenset[str] = frozenset({"eqangle", "eqratio"})
 _VERTEX_MAP: frozenset[str] = frozenset({"contri", "simtri", "contrir", "simtrir"})
 _HEAD_FIXED: frozenset[str] = frozenset({"midp", "constline", "circle"})

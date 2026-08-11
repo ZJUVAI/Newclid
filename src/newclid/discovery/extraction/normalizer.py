@@ -105,30 +105,53 @@ def _id_key(rule: NormalizedRule) -> tuple[int, int, int]:
     return (seed, rule.index_in_seed, root_n)
 
 
-def normalize_and_dedup(props: list[PropositionRecord]) -> list[NormalizedRule]:
-    """规范化一批命题并按规范形去重（同形保留序号最小者）。"""
+# rule_text -> seed(str) -> 出现次数。溯源统计：记录去重前每条规范形分别来自
+# 多少个不同 seed、每个 seed 里出现几次，供人工反查规则在源数据集中的泛化程度。
+SeedOccurrences = dict[str, dict[str, int]]
+
+
+def _record_occurrence(occurrences: SeedOccurrences, rule: NormalizedRule) -> None:
+    seed_key = str(rule.seed) if rule.seed is not None else "null"
+    bucket = occurrences.setdefault(rule.rule_text, {})
+    bucket[seed_key] = bucket.get(seed_key, 0) + 1
+
+
+def normalize_and_dedup(
+    props: list[PropositionRecord],
+) -> tuple[list[NormalizedRule], SeedOccurrences]:
+    """规范化一批命题并按规范形去重（同形保留序号最小者）。
+
+    同时统计去重前每条规范形 rule_text 分别来自多少个 seed、各出现几次
+    （在合并 / 规约之前，反映原始命题层面的泛化程度）。
+    """
     best: dict[str, NormalizedRule] = {}
+    occurrences: SeedOccurrences = {}
     for prop in tqdm(props, desc="[part1] 规范化去重", unit="条"):
         rule = normalize_proposition(prop)
         if rule is None:
             continue
+        _record_occurrence(occurrences, rule)
         cur = best.get(rule.rule_text)
         if cur is None or _id_key(rule) < _id_key(cur):
             best[rule.rule_text] = rule
-    return sorted(best.values(), key=_id_key)
+    return sorted(best.values(), key=_id_key), occurrences
 
 
-def _normalize_chunk(props: list[PropositionRecord]) -> dict[str, NormalizedRule]:
+def _normalize_chunk(
+    props: list[PropositionRecord],
+) -> tuple[dict[str, NormalizedRule], SeedOccurrences]:
     """单个分块内规范化 + 局部去重（Ray worker 里跑，块内串行）。"""
     best: dict[str, NormalizedRule] = {}
+    occurrences: SeedOccurrences = {}
     for prop in props:
         rule = normalize_proposition(prop)
         if rule is None:
             continue
+        _record_occurrence(occurrences, rule)
         cur = best.get(rule.rule_text)
         if cur is None or _id_key(rule) < _id_key(cur):
             best[rule.rule_text] = rule
-    return best
+    return best, occurrences
 
 
 def _merge_best(dicts: list[dict[str, NormalizedRule]]) -> dict[str, NormalizedRule]:
@@ -141,17 +164,28 @@ def _merge_best(dicts: list[dict[str, NormalizedRule]]) -> dict[str, NormalizedR
     return best
 
 
+def _merge_occurrences(dicts: list[SeedOccurrences]) -> SeedOccurrences:
+    merged: SeedOccurrences = {}
+    for d in dicts:
+        for rule_text, seed_counts in d.items():
+            bucket = merged.setdefault(rule_text, {})
+            for seed_key, count in seed_counts.items():
+                bucket[seed_key] = bucket.get(seed_key, 0) + count
+    return merged
+
+
 def normalize_and_dedup_parallel(
     props: list[PropositionRecord],
     *,
     n_workers: int = 30,
     chunk_size: int = 5000,
-) -> list[NormalizedRule]:
+) -> tuple[list[NormalizedRule], SeedOccurrences]:
     """normalize_and_dedup 的 Ray 并行版：分块规范化(各 worker 内先局部去重)，
     再在主进程合并各块结果做最终去重。
 
     每条命题的规范化互相独立，天然可分块并行；去重是 reduce 步骤，块内局部去重
     只是减少跨进程传输量，最终仍需在主进程按 _id_key 合并一次全局最小值。
+    seed 出现次数统计同理按块局部汇总，再在主进程合并求和。
     """
     import ray
 
@@ -166,14 +200,17 @@ def normalize_and_dedup_parallel(
     args = [(c,) for c in chunks]
 
     partials: list[dict[str, NormalizedRule]] = []
-    for chunk_best in tqdm(
+    occurrence_partials: list[SeedOccurrences] = []
+    for chunk_best, chunk_occurrences in tqdm(
         run_bounded(remote, args, inflight=n_workers),
         total=len(chunks), desc="[part1] 规范化去重(并行)", unit="块",
     ):
         partials.append(chunk_best)
+        occurrence_partials.append(chunk_occurrences)
 
     best = _merge_best(partials)
-    return sorted(best.values(), key=_id_key)
+    occurrences = _merge_occurrences(occurrence_partials)
+    return sorted(best.values(), key=_id_key), occurrences
 
 
 def rule_to_output(rule: NormalizedRule) -> dict:

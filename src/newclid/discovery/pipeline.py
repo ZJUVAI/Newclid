@@ -2,6 +2,12 @@
 
 串行执行 Part 1（规则提取）和 Part 2（规则规约），维护 last_output 自动链接。
 
+Part 2（reduction.orchestrator.run_part2）内部含 NDG 发现+应用阶段
+（part2_reduction.ndg，紧接在点数/前提数预过滤之后、seed_reduce 之前执行）——
+NDG 必须在任何规约判定之前完成，否则规约阶段用作 sources 的规则可能是"看似
+恒成立、实际需要 guard 才成立"的假规则，用它淘汰别的规则这个决定本身就可能
+是错的，且不可逆。曾经独立的 Part 3（NDG）已并入 Part 2，不再是单独阶段。
+
 当前进度：Part 1 仅实现「构图」子步（读取数据 + 构建完整证明图）。
 后续子步（剪枝、命题提取、规则文本化、去重、落盘）与 Part 2 暂以注释占位，
 随实现推进逐步接入；测试脚本 / config 入口保持不变。
@@ -55,7 +61,7 @@ def run_pipeline(config_path: str) -> None:
             "normalized_rules.jsonl" if part1_cfg.get("normalize", True) else "propositions.jsonl",
         )
 
-    # ---------------- Part 2: 规则规约 ----------------
+    # ---------------- Part 2: 规则规约（含 NDG 发现，见 part2_reduction.ndg） ----------------
     part2_cfg = cfg["part2_reduction"]
     if part2_cfg.get("enabled"):
         input_path = part2_cfg.get("input") or last_output
@@ -94,6 +100,27 @@ def run_part1(
     limit = part1_cfg.get("limit")          # 取前 N 条
     sample = part1_cfg.get("sample")        # 随机抽 N 条（优先于 limit）
     random_seed = part1_cfg.get("random_seed")
+
+    # Step 0 (optional): robustness pre-filter.  Strip coordinates from each
+    # fl_problem, rebuild with a fresh seed, and numerically verify the goal.
+    # Discards records whose conclusion is a coordinate-dependent coincidence.
+    robust_cfg = part1_cfg.get("robustness_filter", {})
+    if robust_cfg.get("enabled", False):
+        from newclid.discovery.validation.robustness_filter import filter_file
+
+        robust_input = input_path
+        robust_output = os.path.join(output_dir, "robustness_filtered.jsonl")
+        os.makedirs(output_dir, exist_ok=True)
+        r_stats = filter_file(
+            robust_input, robust_output,
+            rebuild_seed=robust_cfg.get("rebuild_seed", 999983),
+            max_attempts=robust_cfg.get("max_attempts", 100),
+            n_workers=robust_cfg.get("n_workers", 1),
+            limit=limit if not sample else None,
+        )
+        print(f"[part1] 鲁棒性过滤: {r_stats['total']} -> {r_stats['kept']} "
+              f"(build失败={r_stats['build_fail']}, goal不成立={r_stats['goal_fail']})")
+        input_path = robust_output  # Use filtered data for subsequent steps
 
     # 跳过读数据/构图/拆解/命题提取，直接从已落盘的 propositions.jsonl 做规范化去重。
     # 用于命题提取已完成、只想重跑/调参规范化去重这一步的场景。
@@ -287,9 +314,29 @@ def run_part1(
 
     # 规范化 + 去重（config: part1_extract.normalize）
     if part1_cfg.get("normalize", True) and propositions:
-        rules = _normalize_dedup(part1_cfg, propositions)
+        rules, occurrences = _normalize_dedup(part1_cfg, propositions)
         stats["normalized_rules"] = len(rules)
         print(f"[part1] 规范化去重: {len(propositions)} 命题 -> {len(rules)} 条规则")
+
+        # Bridge-point elimination after normalization (configurable).
+        # Normalization converts para→coll and renames points, which can
+        # expose bridge points invisible in the raw propositions.  Running
+        # here (instead of before normalization) catches all of them.
+        bridge_cfg = part1_cfg.get("bridge_elimination", {})
+        if bridge_cfg.get("enabled", False) and rules:
+            from dataclasses import replace
+            from newclid.discovery.reduction.bridge_elimination import bridge_point_eliminate
+
+            n_bridge = 0
+            for i, r in enumerate(rules):
+                new_text = bridge_point_eliminate(r.rule_text)
+                if new_text and new_text != r.rule_text:
+                    rules[i] = replace(r, rule_text=new_text)
+                    n_bridge += 1
+            if n_bridge:
+                stats["normalized_rules"] = len(rules)
+                print(f"[part1] 桥接点消除: {n_bridge} 条被简化")
+
         if rules:
             print(f"[part1] sample rule {rules[0].rule_id}: {rules[0].rule_text}")
         from newclid.discovery.extraction.normalizer import rule_to_output
@@ -299,6 +346,11 @@ def run_part1(
         write_jsonl([rule_to_output(r) for r in rules], output_path)
         stats["output"] = output_path
         print(f"[part1] 规则已保存 -> {output_path}")
+
+        occurrences_path = os.path.join(os.path.dirname(output_path), "rule_seed_occurrences_all.json")
+        _write_occurrences(occurrences, occurrences_path)
+        stats["seed_occurrences_all"] = occurrences_path
+        print(f"[part1] 去重前 rule_text->seed 出现次数统计已保存 -> {occurrences_path}")
     else:
         output_path = prop_path
         stats["output"] = prop_path
@@ -306,7 +358,18 @@ def run_part1(
     return output_path, stats
 
 
-def _normalize_dedup(part1_cfg: dict[str, Any], propositions: list) -> list:
+def _write_occurrences(occurrences: dict[str, dict[str, int]], path: str) -> None:
+    """把 rule_text -> {seed: count} 的溯源统计落盘为 JSON。"""
+    import json
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(occurrences, f, ensure_ascii=False, indent=2)
+
+
+def _normalize_dedup(
+    part1_cfg: dict[str, Any], propositions: list,
+) -> tuple[list, dict[str, dict[str, int]]]:
     """按配置在串行 / Ray 并行的 normalize_and_dedup 之间选择。
 
     config: part1_extract.normalize_n_workers（null/<=1 = 串行）。
@@ -338,7 +401,7 @@ def _run_normalize_only(
     propositions = load_propositions(propositions_path)
     stats: dict[str, Any] = {"propositions": len(propositions)}
 
-    rules = _normalize_dedup(part1_cfg, propositions)
+    rules, occurrences = _normalize_dedup(part1_cfg, propositions)
     stats["normalized_rules"] = len(rules)
     print(f"[part1] 规范化去重: {len(propositions)} 命题 -> {len(rules)} 条规则")
     if rules:
@@ -351,6 +414,11 @@ def _run_normalize_only(
     write_jsonl([rule_to_output(r) for r in rules], output_path)
     stats["output"] = output_path
     print(f"[part1] 规则已保存 -> {output_path}")
+
+    occurrences_path = os.path.join(os.path.dirname(output_path), "rule_seed_occurrences_all.json")
+    _write_occurrences(occurrences, occurrences_path)
+    stats["seed_occurrences_all"] = occurrences_path
+    print(f"[part1] 去重前 rule_text->seed 出现次数统计已保存 -> {occurrences_path}")
     return output_path, stats
 
 
@@ -362,3 +430,5 @@ def run_part2(
     """执行 Part 2: 规则规约（第一步：按前提数量过滤）。委托 reduction.orchestrator。"""
     from newclid.discovery.reduction.orchestrator import run_part2 as _run_part2
     return _run_part2(cfg, output_dir, input_path)
+
+

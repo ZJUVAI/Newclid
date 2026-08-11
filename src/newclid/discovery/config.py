@@ -33,6 +33,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "output": None,                # 默认 {output_dir}/part2/extracted_rules.txt
         "max_premises": None,
         "max_perp_premises": None,     # 阶段0: perp 前提数 > 该值则丢弃; null = 不过滤
+        "extra_rules_path": None,      # 额外 sources 规则(如上一轮已验证规则库), 不参与本轮规约/NDG
         "engine": "full",
         "timeout": 3600,
         "seed_reduction": {
@@ -41,6 +42,22 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "divide_conquer_reduction": {
             "enabled": False,
             "min_chunk_size": 30,
+        },
+        # 阶段0.5: NDG 发现 + 应用（原独立的 part3_ndg，已并入 Part 2，且提前
+        # 到任何规约判定之前——规约阶段的 subsumption 判定会把 sources 当作
+        # 无条件成立的定理，若 source 本身需要 guard 才成立，用它淘汰别的
+        # 规则这个决定就可能是错的，且规约丢弃不可逆）。
+        "ndg": {
+            "enabled": False,
+            "n_seeds": 10,
+            "n_ce_trials": 3,
+            "n_workers": 8,
+            "degeneracy_threshold": 0.001,
+            "rule_timeout_seconds": 120.0,
+            "min_good_ratio": 0.0,           # good/(good+bad) 采样占比低于该值直接丢弃; 0 = 不检查
+            "normalized_rules_path": None,   # 默认 {output_dir}/part1/normalized_rules.jsonl
+            "occurrences_path": None,        # 默认 {output_dir}/part1/rule_seed_occurrences_all.json
+            "source_dataset_path": None,     # 默认取 part1_extract.input
         },
     },
 }

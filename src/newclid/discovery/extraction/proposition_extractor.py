@@ -51,6 +51,35 @@ def extract_proposition(graph: "SingleProofGraph") -> PropositionRecord | None:
         seen.add(key)
         premises.append(PredicateInstance(predicate=f.predicate, args=tuple(f.args)))
 
+    # ---- 过滤 1: 结论中的点必须全部出现在前提中 ----
+    prem_points: set[str] = set()
+    for pi in premises:
+        prem_points.update(pi.args)
+    concl_points: set[str] = set(conclusion.args)
+    if not concl_points.issubset(prem_points):
+        return None  # 结论引入了前提中未出现的新点 → 弃掉
+
+    # ---- 过滤 1b: 谓词自身参数结构退化(如 coll C E E / ncoll A B A) → 弃掉 ----
+    # coll/ncoll/cyclic 等谓词要求所有参数代表不同的点(同名参数无意义, 或者
+    # 使谓词恒真/恒假)；这跟"cong A B A C 里两个 A 是合法共享端点"不同——
+    # 用 eqpoint_merge._is_degenerate 按谓词类型区分, 而不是对所有谓词一概
+    # 放行同名参数(那是过滤 2 的职责, 处理的是不同名但数值重合的退化)。
+    from newclid.discovery.extraction.eqpoint_merge import _is_degenerate
+    if any(_is_degenerate(pi) for pi in [*premises, conclusion]):
+        return None
+
+    # ---- 过滤 2: 结论中不同名的两个点坐标重合 → 退化（如 a 和 g 是同一个点）----
+    coord = {p.name: p for p in graph.points}
+    for i, a1 in enumerate(conclusion.args):
+        for a2 in conclusion.args[i + 1:]:
+            if a1 == a2:
+                continue  # 同名点（如 cong A B A C 中的两个 A）不是退化
+            if a1 in coord and a2 in coord:
+                p1, p2 = coord[a1], coord[a2]
+                from newclid.numerical import close_enough
+                if close_enough(p1.x, p2.x) and close_enough(p1.y, p2.y):
+                    return None  # 不同名的两个点坐标一致 → 退化 → 弃掉
+
     # 命题涉及的点（前提 + 结论中出现的点），保留坐标
     coord = {p.name: p for p in graph.points}
     used_points: list = []

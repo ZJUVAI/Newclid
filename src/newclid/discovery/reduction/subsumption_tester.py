@@ -32,6 +32,7 @@ class RuleItem:
     premises: list[tuple[str, list[str]]] = field(default_factory=list)
     goal: tuple[str, list[str]] | None = None
     premise_count: int = 0
+    guards: str = ""                                  # NDG guard predicates (numerical-only)
 
     @classmethod
     def from_record(cls, rec: dict) -> "RuleItem":
@@ -54,6 +55,7 @@ class RuleItem:
             premises=premises,
             goal=goal,
             premise_count=len(premises),
+            guards=rec.get("guards", ""),
         )
 
 
@@ -93,7 +95,7 @@ class SubsumptionTester:
                 config_path=self.config_path,
                 seed=self.seed,
             )
-            custom = [to_pipe_format(s.rule_id, s.rule_text) for s in sources]
+            custom = [to_pipe_format(s.rule_id, s.rule_text, s.guards) for s in sources]
             # TODO(鲁棒性): 多坐标实现取共识，只有多次都可推才判冗余，降低浮点巧合误判。
             return bool(csolver.run(custom_rules=custom))
         except Exception:

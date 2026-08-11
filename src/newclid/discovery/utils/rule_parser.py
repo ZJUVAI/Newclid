@@ -134,7 +134,7 @@ def build_rule_text(
 # CSolver pipe 格式转换
 # ---------------------------------------------------------------------------
 
-def to_pipe_format(rule_id: str, rule_text: str) -> str:
+def to_pipe_format(rule_id: str, rule_text: str, guards: str = "") -> str:
     """将规则转为 CSolver 接受的 pipe 自定义规则格式。
 
     Parameters
@@ -143,18 +143,23 @@ def to_pipe_format(rule_id: str, rule_text: str) -> str:
         规则 ID，如 "r00000042_0"
     rule_text : str
         规范化规则文本，如 "cong a b c d => para e f g h"
+    guards : str
+        可选的守卫谓词（逗号分隔），只做数值检查不参与推理
 
     Returns
     -------
     str
-        CSolver pipe 格式字符串。
+        CSolver pipe 格式字符串。格式: id|premises|conclusions[|guards]
     """
     if "=>" not in rule_text:
         return f"{rule_id}||"
     premise_part, conclusion_part = rule_text.split("=>", 1)
     premises = ",".join(p.strip() for p in premise_part.split(",") if p.strip())
     conclusions = ",".join(c.strip() for c in conclusion_part.split(",") if c.strip())
-    return f"{rule_id}|{premises}|{conclusions}"
+    pipe = f"{rule_id}|{premises}|{conclusions}"
+    if guards.strip():
+        pipe += f"|{guards.strip()}"
+    return pipe
 
 
 # ---------------------------------------------------------------------------

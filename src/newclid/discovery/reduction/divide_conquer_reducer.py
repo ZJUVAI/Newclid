@@ -14,13 +14,21 @@ import random
 from tqdm import tqdm
 
 from newclid.discovery.reduction.parallel import ensure_ray, run_bounded
-from newclid.discovery.reduction.seed_reducer import greedy_reduce
+from newclid.discovery.reduction.seed_reducer import greedy_reduce, leave_one_out_reduce
 from newclid.discovery.reduction.subsumption_tester import RuleItem, SubsumptionTester
 
 
-def _reduce_chunk(rules: list[RuleItem], seed: int, config_path: str | None) -> list[RuleItem]:
+def _reduce_chunk(
+    rules: list[RuleItem], seed: int, config_path: str | None, stage: str = "divide_conquer",
+    extra_sources: list[RuleItem] | None = None,
+) -> tuple[list[RuleItem], dict[str, dict]]:
     tester = SubsumptionTester(seed=seed, config_path=config_path)
-    return greedy_reduce(rules, tester)
+    audit: dict[str, dict] = {}
+    basis = greedy_reduce(rules, tester, stage=stage, audit=audit, extra_sources=extra_sources)
+    survivors = leave_one_out_reduce(
+        basis, tester, stage=stage, audit=audit, extra_sources=extra_sources,
+    )
+    return survivors, audit
 
 
 def _split(rules: list[RuleItem], chunk_size: int) -> list[list[RuleItem]]:
@@ -33,22 +41,33 @@ def reduce(
     chunk_size: int = 200,
     n_workers: int = 30,
     use_ray: bool = True,
-    max_rounds: int = 5,
-    shrink_ratio: float = 0.98,
+    max_rounds: int = 20,
     config_path: str | None = None,
     seed: int = 42,
-) -> list[RuleItem]:
+    extra_sources: list[RuleItem] | None = None,
+) -> tuple[list[RuleItem], dict[str, dict]]:
     """分块迭代规约至稳定。
 
     每轮：打乱顺序 → 分块 → 块内 greedy（并行）→ 汇总。若幸存/上轮 > shrink_ratio
     （几乎不再减少）或到 max_rounds 则停止。规则数 <= chunk_size 时单块一次收敛。
+
+    extra_sources: 额外的、始终可用作 sources 但不参与规约的规则集合
+    （见 seed_reducer.greedy_reduce），每个 chunk 都会附加同一份 extra_sources。
+
+    audit 按轮次记录 stage="divide_conquer_round_{rnd}"；同一条规则若跨轮多次
+    被判冗余（不应发生，规约后规模只减不增），以最后一次记录为准。
     """
     current = list(rules)
+    audit: dict[str, dict] = {}
     rng = random.Random(seed)
     for rnd in range(max_rounds):
         before = len(current)
+        stage = f"divide_conquer_round_{rnd}"
         if before <= chunk_size:
-            current = _reduce_chunk(current, seed, config_path)
+            current, round_audit = _reduce_chunk(
+                current, seed, config_path, stage=stage, extra_sources=extra_sources,
+            )
+            audit.update(round_audit)
             print(f"[divide_conquer] 轮{rnd}: 单块 {before} -> {len(current)}")
             break
 
@@ -60,19 +79,22 @@ def reduce(
 
             ensure_ray(n_workers)
             remote = ray.remote(_reduce_chunk)
-            args = [(c, seed, config_path) for c in chunks]
-            for chunk_survivors in tqdm(
+            args = [(c, seed, config_path, stage, extra_sources) for c in chunks]
+            for chunk_survivors, chunk_audit in tqdm(
                 run_bounded(remote, args, inflight=n_workers),
                 total=len(chunks), desc=f"[part2] 分治规约 轮{rnd}", unit="块",
             ):
                 survivors.extend(chunk_survivors)
+                audit.update(chunk_audit)
         else:
             for c in tqdm(chunks, desc=f"[part2] 分治规约 轮{rnd}", unit="块"):
-                survivors.extend(_reduce_chunk(c, seed, config_path))
+                chunk_survivors, chunk_audit = _reduce_chunk(
+                    c, seed, config_path, stage=stage, extra_sources=extra_sources,
+                )
+                survivors.extend(chunk_survivors)
+                audit.update(chunk_audit)
 
         current = survivors
         print(f"[divide_conquer] 轮{rnd}: {before} -> {len(current)} ({len(chunks)} 块)")
-        if len(current) > before * shrink_ratio:
-            break
 
-    return current
+    return current, audit

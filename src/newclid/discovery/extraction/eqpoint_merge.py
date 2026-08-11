@@ -69,9 +69,12 @@ def _rewrite(pred: Pred, rep: dict[str, str]) -> Pred:
 # 退化判断需要按谓词的参数结构分组检查——不同"线段"/"三角形"之间共享端点是
 # 合法的几何情况（如 perp a e e g 表示两条线段在 e 点垂直相交），只有同一
 # 线段/同一三角形内部出现重复点才算退化。分组沿用 utils/symmetry.py 的谓词分类。
-_SEGMENT_PAIR_PREDICATES = frozenset({"cong", "para", "perp", "eqpoint"})
+_SEGMENT_PAIR_PREDICATES = frozenset({"cong", "para", "npara", "perp", "nperp", "eqpoint"})
 _SEGMENT_QUAD_PREDICATES = frozenset({"eqangle", "eqratio", "aconst", "rconst"})
-_ALL_DISTINCT_PREDICATES = frozenset({"coll", "cyclic", "midp", "constline", "circle"})
+# 否定形式(ncoll/nperp/npara)与正向形式共享同一套"参数须两两不同"约束——
+# ncoll a b c 断言 A,B,C 不共线，若 b==c 之类同名参数出现，命题本身已无意义
+# (退化前就该丢弃)，之前漏掉 ncoll 导致 "coll C E E" 这类命题被放行。
+_ALL_DISTINCT_PREDICATES = frozenset({"coll", "ncoll", "cyclic", "midp", "constline", "circle"})
 _TRIANGLE_PAIR_PREDICATES = frozenset({"contri", "simtri", "contrir", "simtrir"})
 
 
